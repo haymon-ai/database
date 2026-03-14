@@ -20,6 +20,14 @@ pub struct MysqlBackend {
     pub read_only: bool,
 }
 
+impl std::fmt::Debug for MysqlBackend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MysqlBackend")
+            .field("read_only", &self.read_only)
+            .finish_non_exhaustive()
+    }
+}
+
 impl MysqlBackend {
     /// Creates a new `MySQL` backend from configuration.
     ///
@@ -109,7 +117,7 @@ impl MysqlBackend {
     /// Executes raw SQL and converts rows to JSON maps.
     ///
     /// Uses the text protocol via `Executor::fetch_all(&str)` instead of prepared
-    /// statements, because MySQL 9+ doesn't support SHOW commands as prepared
+    /// statements, because `MySQL` 9+ doesn't support SHOW commands as prepared
     /// statements, and the text protocol returns all values as strings.
     async fn query_to_json(
         &self,
@@ -177,26 +185,19 @@ impl DatabaseBackend for MysqlBackend {
             .await?;
         Ok(results
             .into_iter()
-            .filter_map(|row| {
-                row.get("name")
-                    .and_then(|v| v.as_str().map(String::from))
-            })
+            .filter_map(|row| row.get("name").and_then(|v| v.as_str().map(String::from)))
             .collect())
     }
 
     async fn list_tables(&self, database: &str) -> Result<Vec<String>, AppError> {
         validate_identifier(database)?;
         let sql = format!(
-            "SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = '{}' ORDER BY TABLE_NAME",
-            database
+            "SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = '{database}' ORDER BY TABLE_NAME"
         );
         let results = self.query_to_json(&sql, None).await?;
         Ok(results
             .into_iter()
-            .filter_map(|row| {
-                row.get("name")
-                    .and_then(|v| v.as_str().map(String::from))
-            })
+            .filter_map(|row| row.get("name").and_then(|v| v.as_str().map(String::from)))
             .collect())
     }
 
