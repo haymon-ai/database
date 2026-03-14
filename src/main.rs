@@ -42,7 +42,7 @@ use rmcp::ServiceExt;
 use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
-use server::DbMcpServer;
+use server::Server;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
@@ -156,12 +156,12 @@ async fn main() {
     let config = Arc::new(config);
 
     match cli.transport {
-        Transport::Stdio => run_stdio(DbMcpServer::new(backend)).await,
+        Transport::Stdio => run_stdio(Server::new(backend)).await,
         Transport::Http => run_http(backend, config, &cli.host, cli.port).await,
     }
 }
 
-async fn run_stdio(server: DbMcpServer) {
+async fn run_stdio(server: Server) {
     info!("Starting MCP server via stdio transport...");
 
     let transport = rmcp::transport::io::stdio();
@@ -198,7 +198,7 @@ async fn run_http(backend: Backend, config: Arc<Config>, host: &str, port: u16) 
         .allow_headers([axum::http::header::CONTENT_TYPE, axum::http::header::ACCEPT]);
 
     let service = StreamableHttpService::new(
-        move || Ok(DbMcpServer::new(backend.clone())),
+        move || Ok(Server::new(backend.clone())),
         Arc::new(LocalSessionManager::default()),
         StreamableHttpServerConfig {
             stateful_mode: true,
