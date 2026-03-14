@@ -201,7 +201,8 @@ async fn run_http(backend: Backend, config: Arc<Config>, host: &str, port: u16) 
         move || Ok(Server::new(backend.clone())),
         Arc::new(LocalSessionManager::default()),
         StreamableHttpServerConfig {
-            stateful_mode: true,
+            stateful_mode: false,
+            json_response: true,
             cancellation_token: ct.child_token(),
             ..Default::default()
         },
