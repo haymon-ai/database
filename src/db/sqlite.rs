@@ -2,21 +2,19 @@
 //!
 //! Implements [`DatabaseBackend`] for `SQLite` file-based databases.
 
-use crate::db::backend::DatabaseBackend;
 use crate::db::identifier::validate_identifier;
 use crate::error::AppError;
-use async_trait::async_trait;
 use serde_json::{json, Map, Value};
-use sqlparser::dialect::{Dialect, SQLiteDialect};
 use sqlx::sqlite::{SqlitePoolOptions, SqliteRow};
 use sqlx::{Column, Row, SqlitePool};
 use std::collections::HashMap;
 use tracing::info;
 
 /// `SQLite` file-based database backend.
+#[derive(Clone)]
 pub struct SqliteBackend {
     pool: SqlitePool,
-    read_only: bool,
+    pub read_only: bool,
 }
 
 impl SqliteBackend {
@@ -36,14 +34,14 @@ impl SqliteBackend {
     }
 }
 
-#[async_trait]
-impl DatabaseBackend for SqliteBackend {
-    async fn list_databases(&self) -> Result<Vec<String>, AppError> {
+impl SqliteBackend {
+    #[allow(clippy::unused_async)]
+    pub async fn list_databases(&self) -> Result<Vec<String>, AppError> {
         // SQLite has one database: "main"
         Ok(vec!["main".to_string()])
     }
 
-    async fn list_tables(&self, _database: &str) -> Result<Vec<String>, AppError> {
+    pub async fn list_tables(&self, _database: &str) -> Result<Vec<String>, AppError> {
         let rows: Vec<(String,)> = sqlx::query_as(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
         )
@@ -53,7 +51,7 @@ impl DatabaseBackend for SqliteBackend {
         Ok(rows.into_iter().map(|r| r.0).collect())
     }
 
-    async fn get_table_schema(&self, _database: &str, table: &str) -> Result<Value, AppError> {
+    pub async fn get_table_schema(&self, _database: &str, table: &str) -> Result<Value, AppError> {
         validate_identifier(table)?;
         let rows: Vec<SqliteRow> = sqlx::query(&format!("PRAGMA table_info('{table}')"))
             .fetch_all(&self.pool)
@@ -85,7 +83,7 @@ impl DatabaseBackend for SqliteBackend {
         Ok(json!(schema))
     }
 
-    async fn get_table_schema_with_relations(
+    pub async fn get_table_schema_with_relations(
         &self,
         database: &str,
         table: &str,
@@ -135,7 +133,7 @@ impl DatabaseBackend for SqliteBackend {
         }))
     }
 
-    async fn execute_query(
+    pub async fn execute_query(
         &self,
         sql: &str,
         _database: Option<&str>,
@@ -158,18 +156,11 @@ impl DatabaseBackend for SqliteBackend {
         Ok(results)
     }
 
-    async fn create_database(&self, _name: &str) -> Result<Value, AppError> {
+    #[allow(clippy::unused_async)]
+    pub async fn create_database(&self, _name: &str) -> Result<Value, AppError> {
         Ok(json!({
             "status": "unsupported",
             "message": "SQLite does not support creating databases. Use --db-path to specify the database file.",
         }))
-    }
-
-    fn dialect(&self) -> Box<dyn Dialect> {
-        Box::new(SQLiteDialect {})
-    }
-
-    fn read_only(&self) -> bool {
-        self.read_only
     }
 }

@@ -2,9 +2,9 @@
 //!
 //! Provides 6 tools: `list_databases`, `list_tables`, `get_table_schema`,
 //! `get_table_schema_with_relations`, `execute_sql`, and `create_database`.
-//! All tools delegate to the active [`DatabaseBackend`].
+//! All tools delegate to the active [`Backend`].
 
-use crate::db::backend::DatabaseBackend;
+use crate::db::backend::Backend;
 use crate::db::identifier::validate_identifier;
 use crate::db::validation::validate_read_only_with_dialect;
 use crate::error::AppError;
@@ -12,7 +12,7 @@ use serde_json::Value;
 use tracing::{error, info};
 
 /// Lists all accessible databases as a JSON array.
-pub async fn list_databases(backend: &dyn DatabaseBackend) -> Result<String, AppError> {
+pub async fn list_databases(backend: &Backend) -> Result<String, AppError> {
     info!("TOOL: list_databases called");
     let db_list = backend.list_databases().await?;
     info!(
@@ -23,10 +23,7 @@ pub async fn list_databases(backend: &dyn DatabaseBackend) -> Result<String, App
 }
 
 /// Lists all tables in a database as a JSON array.
-pub async fn list_tables(
-    backend: &dyn DatabaseBackend,
-    database_name: &str,
-) -> Result<String, AppError> {
+pub async fn list_tables(backend: &Backend, database_name: &str) -> Result<String, AppError> {
     info!("TOOL: list_tables called. database_name={database_name}");
     validate_identifier(database_name)?;
     let table_list = match backend.list_tables(database_name).await {
@@ -45,7 +42,7 @@ pub async fn list_tables(
 
 /// Returns column definitions for a table as JSON.
 pub async fn get_table_schema(
-    backend: &dyn DatabaseBackend,
+    backend: &Backend,
     database_name: &str,
     table_name: &str,
 ) -> Result<String, AppError> {
@@ -59,7 +56,7 @@ pub async fn get_table_schema(
 
 /// Returns column definitions with foreign key relationships.
 pub async fn get_table_schema_with_relations(
-    backend: &dyn DatabaseBackend,
+    backend: &Backend,
     database_name: &str,
     table_name: &str,
 ) -> Result<String, AppError> {
@@ -75,7 +72,7 @@ pub async fn get_table_schema_with_relations(
 
 /// Executes a user-provided SQL query with read-only validation.
 pub async fn tool_execute_sql(
-    backend: &dyn DatabaseBackend,
+    backend: &Backend,
     sql_query: &str,
     database_name: &str,
     _parameters: Option<Vec<Value>>,
@@ -110,10 +107,7 @@ pub async fn tool_execute_sql(
 }
 
 /// Creates a database if it does not already exist.
-pub async fn create_database(
-    backend: &dyn DatabaseBackend,
-    database_name: &str,
-) -> Result<String, AppError> {
+pub async fn create_database(backend: &Backend, database_name: &str) -> Result<String, AppError> {
     info!("TOOL: create_database called for database: '{database_name}'");
     validate_identifier(database_name)?;
     let result = backend.create_database(database_name).await?;

@@ -4,21 +4,19 @@
 //! using sqlx's `MySqlPool`.
 
 use crate::config::Config;
-use crate::db::backend::DatabaseBackend;
 use crate::db::identifier::{backtick_escape, validate_identifier};
 use crate::error::AppError;
-use async_trait::async_trait;
 use serde_json::{json, Map, Value};
-use sqlparser::dialect::{Dialect, MySqlDialect};
 use sqlx::mysql::{MySqlPoolOptions, MySqlRow};
 use sqlx::{Column, MySqlPool, Row};
 use std::collections::HashMap;
 use tracing::{error, info};
 
 /// MySQL/MariaDB database backend.
+#[derive(Clone)]
 pub struct MysqlBackend {
     pool: MySqlPool,
-    read_only: bool,
+    pub read_only: bool,
 }
 
 impl MysqlBackend {
@@ -148,9 +146,8 @@ impl MysqlBackend {
     }
 }
 
-#[async_trait]
-impl DatabaseBackend for MysqlBackend {
-    async fn list_databases(&self) -> Result<Vec<String>, AppError> {
+impl MysqlBackend {
+    pub async fn list_databases(&self) -> Result<Vec<String>, AppError> {
         let results = self.query_to_json("SHOW DATABASES", None).await?;
         Ok(results
             .into_iter()
@@ -161,7 +158,7 @@ impl DatabaseBackend for MysqlBackend {
             .collect())
     }
 
-    async fn list_tables(&self, database: &str) -> Result<Vec<String>, AppError> {
+    pub async fn list_tables(&self, database: &str) -> Result<Vec<String>, AppError> {
         validate_identifier(database)?;
         let results = self.query_to_json("SHOW TABLES", Some(database)).await?;
         Ok(results
@@ -174,7 +171,7 @@ impl DatabaseBackend for MysqlBackend {
             .collect())
     }
 
-    async fn get_table_schema(&self, database: &str, table: &str) -> Result<Value, AppError> {
+    pub async fn get_table_schema(&self, database: &str, table: &str) -> Result<Value, AppError> {
         validate_identifier(database)?;
         validate_identifier(table)?;
 
@@ -208,7 +205,7 @@ impl DatabaseBackend for MysqlBackend {
         Ok(json!(schema))
     }
 
-    async fn get_table_schema_with_relations(
+    pub async fn get_table_schema_with_relations(
         &self,
         database: &str,
         table: &str,
@@ -305,7 +302,7 @@ impl DatabaseBackend for MysqlBackend {
         }))
     }
 
-    async fn execute_query(
+    pub async fn execute_query(
         &self,
         sql: &str,
         database: Option<&str>,
@@ -313,7 +310,7 @@ impl DatabaseBackend for MysqlBackend {
         self.query_to_json(sql, database).await
     }
 
-    async fn create_database(&self, name: &str) -> Result<Value, AppError> {
+    pub async fn create_database(&self, name: &str) -> Result<Value, AppError> {
         if self.read_only {
             return Err(AppError::ReadOnlyViolation);
         }
@@ -349,13 +346,5 @@ impl DatabaseBackend for MysqlBackend {
             "message": format!("Database '{name}' created successfully."),
             "database_name": name,
         }))
-    }
-
-    fn dialect(&self) -> Box<dyn Dialect> {
-        Box::new(MySqlDialect {})
-    }
-
-    fn read_only(&self) -> bool {
-        self.read_only
     }
 }

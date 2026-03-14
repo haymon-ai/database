@@ -3,21 +3,19 @@
 //! Implements [`DatabaseBackend`] for `PostgreSQL` databases.
 
 use crate::config::Config;
-use crate::db::backend::DatabaseBackend;
 use crate::db::identifier::validate_identifier;
 use crate::error::AppError;
-use async_trait::async_trait;
 use serde_json::{json, Map, Value};
-use sqlparser::dialect::{Dialect, PostgreSqlDialect};
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Column, PgPool, Row};
 use std::collections::HashMap;
 use tracing::info;
 
 /// `PostgreSQL` database backend.
+#[derive(Clone)]
 pub struct PostgresBackend {
     pool: PgPool,
-    read_only: bool,
+    pub read_only: bool,
 }
 
 impl PostgresBackend {
@@ -50,9 +48,8 @@ impl PostgresBackend {
     }
 }
 
-#[async_trait]
-impl DatabaseBackend for PostgresBackend {
-    async fn list_databases(&self) -> Result<Vec<String>, AppError> {
+impl PostgresBackend {
+    pub async fn list_databases(&self) -> Result<Vec<String>, AppError> {
         let rows: Vec<(String,)> = sqlx::query_as(
             "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname",
         )
@@ -62,7 +59,7 @@ impl DatabaseBackend for PostgresBackend {
         Ok(rows.into_iter().map(|r| r.0).collect())
     }
 
-    async fn list_tables(&self, _database: &str) -> Result<Vec<String>, AppError> {
+    pub async fn list_tables(&self, _database: &str) -> Result<Vec<String>, AppError> {
         let rows: Vec<(String,)> = sqlx::query_as(
             "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename",
         )
@@ -72,7 +69,7 @@ impl DatabaseBackend for PostgresBackend {
         Ok(rows.into_iter().map(|r| r.0).collect())
     }
 
-    async fn get_table_schema(&self, _database: &str, table: &str) -> Result<Value, AppError> {
+    pub async fn get_table_schema(&self, _database: &str, table: &str) -> Result<Value, AppError> {
         validate_identifier(table)?;
         let rows: Vec<PgRow> = sqlx::query(
             r"SELECT column_name, data_type, is_nullable, column_default,
@@ -110,7 +107,7 @@ impl DatabaseBackend for PostgresBackend {
         Ok(json!(schema))
     }
 
-    async fn get_table_schema_with_relations(
+    pub async fn get_table_schema_with_relations(
         &self,
         database: &str,
         table: &str,
@@ -178,7 +175,7 @@ impl DatabaseBackend for PostgresBackend {
         }))
     }
 
-    async fn execute_query(
+    pub async fn execute_query(
         &self,
         sql: &str,
         _database: Option<&str>,
@@ -201,7 +198,7 @@ impl DatabaseBackend for PostgresBackend {
         Ok(results)
     }
 
-    async fn create_database(&self, name: &str) -> Result<Value, AppError> {
+    pub async fn create_database(&self, name: &str) -> Result<Value, AppError> {
         if self.read_only {
             return Err(AppError::ReadOnlyViolation);
         }
@@ -224,13 +221,5 @@ impl DatabaseBackend for PostgresBackend {
             "message": format!("Database '{name}' created successfully."),
             "database_name": name,
         }))
-    }
-
-    fn dialect(&self) -> Box<dyn Dialect> {
-        Box::new(PostgreSqlDialect {})
-    }
-
-    fn read_only(&self) -> bool {
-        self.read_only
     }
 }

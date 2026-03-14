@@ -36,7 +36,7 @@ mod server;
 mod tools;
 
 use config::Config;
-use db::backend::DatabaseBackend;
+use db::backend::Backend;
 use db::DatabaseType;
 use rmcp::transport::streamable_http_server::{
     session::local::LocalSessionManager, StreamableHttpServerConfig, StreamableHttpService,
@@ -123,16 +123,16 @@ async fn main() {
     }
 
     // Create the appropriate database backend
-    let backend: Arc<dyn DatabaseBackend> = match cli.database_type {
+    let backend: Backend = match cli.database_type {
         DatabaseType::Mysql => match db::mysql::MysqlBackend::new(&config).await {
-            Ok(b) => Arc::new(b),
+            Ok(b) => Backend::Mysql(b),
             Err(e) => {
                 eprintln!("Failed to connect to MySQL: {e}");
                 std::process::exit(1);
             }
         },
         DatabaseType::Postgres => match db::postgres::PostgresBackend::new(&config).await {
-            Ok(b) => Arc::new(b),
+            Ok(b) => Backend::Postgres(b),
             Err(e) => {
                 eprintln!("Failed to connect to PostgreSQL: {e}");
                 std::process::exit(1);
@@ -144,7 +144,7 @@ async fn main() {
                 std::process::exit(1);
             });
             match db::sqlite::SqliteBackend::new(db_path, config.read_only).await {
-                Ok(b) => Arc::new(b),
+                Ok(b) => Backend::Sqlite(b),
                 Err(e) => {
                     eprintln!("Failed to open SQLite: {e}");
                     std::process::exit(1);
@@ -176,7 +176,7 @@ async fn run_stdio(server: DbMcpServer) {
     running.waiting().await.ok();
 }
 
-async fn run_http(backend: Arc<dyn DatabaseBackend>, config: Arc<Config>, host: &str, port: u16) {
+async fn run_http(backend: Backend, config: Arc<Config>, host: &str, port: u16) {
     let bind_addr = format!("{host}:{port}");
     info!("Starting MCP server via HTTP transport on {bind_addr}...");
 

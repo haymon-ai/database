@@ -3,7 +3,7 @@
 //! Defines [`DbMcpServer`] which implements the MCP `ServerHandler`
 //! trait and registers all 6 database tools using rmcp macros.
 
-use crate::db::backend::DatabaseBackend;
+use crate::db::backend::Backend;
 use crate::tools::database;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
@@ -12,7 +12,6 @@ use rmcp::schemars;
 use rmcp::schemars::JsonSchema;
 use rmcp::{tool, tool_handler, tool_router, ServerHandler};
 use serde::Deserialize;
-use std::sync::Arc;
 
 /// Parameters for listing tables in a database.
 #[derive(Deserialize, JsonSchema)]
@@ -42,13 +41,13 @@ pub struct ExecuteSqlParam {
 /// MCP server backed by a database backend trait.
 #[derive(Clone)]
 pub struct DbMcpServer {
-    pub backend: Arc<dyn DatabaseBackend>,
+    pub backend: Backend,
     tool_router: ToolRouter<Self>,
 }
 
 impl DbMcpServer {
     /// Creates a new MCP server with the given database backend.
-    pub fn new(backend: Arc<dyn DatabaseBackend>) -> Self {
+    pub fn new(backend: Backend) -> Self {
         Self {
             backend,
             tool_router: Self::tool_router(),
@@ -61,7 +60,7 @@ impl DbMcpServer {
     /// List all accessible databases.
     #[tool(description = "List all accessible databases on the connected database server")]
     pub async fn list_databases(&self) -> Result<String, String> {
-        database::list_databases(self.backend.as_ref())
+        database::list_databases(&self.backend)
             .await
             .map_err(|e| e.to_string())
     }
@@ -72,7 +71,7 @@ impl DbMcpServer {
         &self,
         params: Parameters<DatabaseNameParam>,
     ) -> Result<String, String> {
-        database::list_tables(self.backend.as_ref(), &params.0.database_name)
+        database::list_tables(&self.backend, &params.0.database_name)
             .await
             .map_err(|e| e.to_string())
     }
@@ -83,13 +82,9 @@ impl DbMcpServer {
         &self,
         params: Parameters<TableSchemaParam>,
     ) -> Result<String, String> {
-        database::get_table_schema(
-            self.backend.as_ref(),
-            &params.0.database_name,
-            &params.0.table_name,
-        )
-        .await
-        .map_err(|e| e.to_string())
+        database::get_table_schema(&self.backend, &params.0.database_name, &params.0.table_name)
+            .await
+            .map_err(|e| e.to_string())
     }
 
     /// Get table schema with foreign key relationships.
@@ -99,7 +94,7 @@ impl DbMcpServer {
         params: Parameters<TableSchemaParam>,
     ) -> Result<String, String> {
         database::get_table_schema_with_relations(
-            self.backend.as_ref(),
+            &self.backend,
             &params.0.database_name,
             &params.0.table_name,
         )
@@ -111,7 +106,7 @@ impl DbMcpServer {
     #[tool(description = "Execute a SQL query against a specified database")]
     pub async fn execute_sql(&self, params: Parameters<ExecuteSqlParam>) -> Result<String, String> {
         database::tool_execute_sql(
-            self.backend.as_ref(),
+            &self.backend,
             &params.0.sql_query,
             &params.0.database_name,
             None,
@@ -126,7 +121,7 @@ impl DbMcpServer {
         &self,
         params: Parameters<DatabaseNameParam>,
     ) -> Result<String, String> {
-        database::create_database(self.backend.as_ref(), &params.0.database_name)
+        database::create_database(&self.backend, &params.0.database_name)
             .await
             .map_err(|e| e.to_string())
     }
