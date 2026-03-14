@@ -61,7 +61,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Seed database
-        run: docker exec ${{ job.services.mariadb.id }} mariadb -u root -ppassword mcp < tests/mysql/setup.sql
+        run: docker exec -i ${{ job.services.mariadb.id }} mariadb -u root -ppassword mcp < tests/mysql/setup.sql
       - run: cargo test --test mysql -- --test-threads=1
         env:
           DB_HOST: 127.0.0.1
