@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: sql-mcp
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: sql-mcp
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: sql-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      - name: Package artifact
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ../../../sql-mcp-${{ matrix.target }}.tar.gz ${{ matrix.artifact }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sql-mcp-${{ matrix.target }}
+          path: sql-mcp-${{ matrix.target }}.tar.gz
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: artifacts/*.tar.gz
