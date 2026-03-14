@@ -1,6 +1,6 @@
-//! SQLite backend implementation via sqlx.
+//! `SQLite` backend implementation via sqlx.
 //!
-//! Implements [`DatabaseBackend`] for SQLite file-based databases.
+//! Implements [`DatabaseBackend`] for `SQLite` file-based databases.
 
 use crate::db::backend::DatabaseBackend;
 use crate::db::identifier::validate_identifier;
@@ -13,14 +13,14 @@ use sqlx::{Column, Row, SqlitePool};
 use std::collections::HashMap;
 use tracing::info;
 
-/// SQLite file-based database backend.
+/// `SQLite` file-based database backend.
 pub struct SqliteBackend {
     pool: SqlitePool,
     read_only: bool,
 }
 
 impl SqliteBackend {
-    /// Creates a new SQLite backend from a file path.
+    /// Creates a new `SQLite` backend from a file path.
     pub async fn new(db_path: &str, read_only: bool) -> Result<Self, AppError> {
         let url = format!("sqlite:{db_path}?mode=rwc");
 
@@ -151,7 +151,7 @@ impl DatabaseBackend for SqliteBackend {
             for col in row.columns() {
                 let name = col.name().to_string();
                 let val: Option<String> = row.try_get(col.ordinal()).ok();
-                map.insert(name, val.map(Value::String).unwrap_or(Value::Null));
+                map.insert(name, val.map_or(Value::Null, Value::String));
             }
             results.push(map);
         }

@@ -1,6 +1,6 @@
 //! AST-based SQL validation for read-only mode enforcement.
 //!
-//! Parses SQL using sqlparser's MySQL dialect and validates statement
+//! Parses SQL using sqlparser's `MySQL` dialect and validates statement
 //! type, single-statement enforcement, and dangerous function blocking.
 
 use crate::error::AppError;
@@ -15,7 +15,7 @@ use sqlparser::parser::Parser;
 /// Parses the query using the given dialect and checks:
 /// 1. Exactly one statement (multi-statement injection blocked)
 /// 2. Statement type is read-only (SELECT, SHOW, DESCRIBE, USE, EXPLAIN)
-/// 3. No dangerous functions (LOAD_FILE)
+/// 3. No dangerous functions (`LOAD_FILE`)
 /// 4. No INTO OUTFILE/DUMPFILE clauses
 pub fn validate_read_only_with_dialect(sql: &str, dialect: &dyn Dialect) -> Result<(), AppError> {
     let trimmed = sql.trim();
@@ -59,14 +59,11 @@ pub fn validate_read_only_with_dialect(sql: &str, dialect: &dyn Dialect) -> Resu
         | Statement::ShowCollation { .. }
         | Statement::ShowFunctions { .. }
         | Statement::ShowViews { .. }
-        | Statement::ShowObjects(_) => {
-            // All SHOW variants are read-only
-        }
-        Statement::ExplainTable { .. } | Statement::Explain { .. } => {
-            // DESCRIBE / EXPLAIN are read-only
-        }
-        Statement::Use(_) => {
-            // USE database is a session command, read-only
+        | Statement::ShowObjects(_)
+        | Statement::ExplainTable { .. }
+        | Statement::Explain { .. }
+        | Statement::Use(_) => {
+            // SHOW, DESCRIBE, EXPLAIN, USE are all read-only
         }
         _ => {
             return Err(AppError::ReadOnlyViolation);
@@ -82,7 +79,7 @@ pub fn validate_read_only(sql: &str) -> Result<(), AppError> {
     validate_read_only_with_dialect(sql, &MySqlDialect {})
 }
 
-/// Check for dangerous function calls like LOAD_FILE() in the AST.
+/// Check for dangerous function calls like `LOAD_FILE()` in the AST.
 fn check_dangerous_functions(stmt: &Statement) -> Result<(), AppError> {
     let mut checker = DangerousFunctionChecker { found: None };
     let _ = stmt.visit(&mut checker);

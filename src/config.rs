@@ -24,7 +24,7 @@ pub struct Config {
     pub db_ssl_verify_identity: bool,
 
     pub read_only: bool,
-    pub max_pool_size: usize,
+    pub max_pool_size: u32,
 
     pub allowed_origins: Vec<String>,
     pub allowed_hosts: Vec<String>,
@@ -52,7 +52,7 @@ impl Config {
         let db_password = env::var("DB_PASSWORD")
             .map_err(|_| "DB_PASSWORD is required but not set in environment or .env file")?;
 
-        let max_pool_size: usize = env::var("MCP_MAX_POOL_SIZE")
+        let max_pool_size: u32 = env::var("MCP_MAX_POOL_SIZE")
             .unwrap_or_else(|_| "10".into())
             .parse()
             .map_err(|_| "MCP_MAX_POOL_SIZE must be a positive integer")?;
@@ -93,19 +93,21 @@ impl Config {
                 == "true",
             max_pool_size,
 
-            allowed_origins: env::var("ALLOWED_ORIGINS")
-                .map(|s| s.split(',').map(|o| o.trim().to_string()).collect())
-                .unwrap_or_else(|_| {
+            allowed_origins: env::var("ALLOWED_ORIGINS").map_or_else(
+                |_| {
                     vec![
                         "http://localhost".into(),
                         "http://127.0.0.1".into(),
                         "https://localhost".into(),
                         "https://127.0.0.1".into(),
                     ]
-                }),
-            allowed_hosts: env::var("ALLOWED_HOSTS")
-                .map(|s| s.split(',').map(|h| h.trim().to_string()).collect())
-                .unwrap_or_else(|_| vec!["localhost".into(), "127.0.0.1".into()]),
+                },
+                |s| s.split(',').map(|o| o.trim().to_string()).collect(),
+            ),
+            allowed_hosts: env::var("ALLOWED_HOSTS").map_or_else(
+                |_| vec!["localhost".into(), "127.0.0.1".into()],
+                |s| s.split(',').map(|h| h.trim().to_string()).collect(),
+            ),
 
             log_level: env::var("LOG_LEVEL").unwrap_or_else(|_| "info".into()),
             log_file: env::var("LOG_FILE").unwrap_or_else(|_| "logs/mcp_server.log".into()),

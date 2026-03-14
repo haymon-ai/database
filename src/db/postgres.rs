@@ -1,6 +1,6 @@
-//! PostgreSQL backend implementation via sqlx.
+//! `PostgreSQL` backend implementation via sqlx.
 //!
-//! Implements [`DatabaseBackend`] for PostgreSQL databases.
+//! Implements [`DatabaseBackend`] for `PostgreSQL` databases.
 
 use crate::config::Config;
 use crate::db::backend::DatabaseBackend;
@@ -14,14 +14,14 @@ use sqlx::{Column, PgPool, Row};
 use std::collections::HashMap;
 use tracing::info;
 
-/// PostgreSQL database backend.
+/// `PostgreSQL` database backend.
 pub struct PostgresBackend {
     pool: PgPool,
     read_only: bool,
 }
 
 impl PostgresBackend {
-    /// Creates a new PostgreSQL backend from configuration.
+    /// Creates a new `PostgreSQL` backend from configuration.
     pub async fn new(config: &Config) -> Result<Self, AppError> {
         let url = format!(
             "postgres://{}:{}@{}:{}/{}",
@@ -33,7 +33,7 @@ impl PostgresBackend {
         );
 
         let pool = PgPoolOptions::new()
-            .max_connections(config.max_pool_size as u32)
+            .max_connections(config.max_pool_size)
             .connect(&url)
             .await
             .map_err(|e| AppError::Connection(format!("Failed to connect to PostgreSQL: {e}")))?;
@@ -75,11 +75,11 @@ impl DatabaseBackend for PostgresBackend {
     async fn get_table_schema(&self, _database: &str, table: &str) -> Result<Value, AppError> {
         validate_identifier(table)?;
         let rows: Vec<PgRow> = sqlx::query(
-            r#"SELECT column_name, data_type, is_nullable, column_default,
+            r"SELECT column_name, data_type, is_nullable, column_default,
                       character_maximum_length
                FROM information_schema.columns
                WHERE table_schema = 'public' AND table_name = $1
-               ORDER BY ordinal_position"#,
+               ORDER BY ordinal_position",
         )
         .bind(table)
         .fetch_all(&self.pool)
@@ -128,7 +128,7 @@ impl DatabaseBackend for PostgresBackend {
 
         // Get FK info
         let fk_rows: Vec<PgRow> = sqlx::query(
-            r#"SELECT
+            r"SELECT
                 kcu.column_name,
                 tc.constraint_name,
                 ccu.table_name AS referenced_table,
@@ -147,7 +147,7 @@ impl DatabaseBackend for PostgresBackend {
                 AND rc.constraint_schema = tc.table_schema
             WHERE tc.constraint_type = 'FOREIGN KEY'
                 AND tc.table_name = $1
-                AND tc.table_schema = 'public'"#,
+                AND tc.table_schema = 'public'",
         )
         .bind(table)
         .fetch_all(&self.pool)
@@ -194,7 +194,7 @@ impl DatabaseBackend for PostgresBackend {
             for col in row.columns() {
                 let name = col.name().to_string();
                 let val: Option<String> = row.try_get(col.ordinal()).ok();
-                map.insert(name, val.map(Value::String).unwrap_or(Value::Null));
+                map.insert(name, val.map_or(Value::Null, Value::String));
             }
             results.push(map);
         }

@@ -4,7 +4,7 @@
 //! `list_databases`, `list_tables`, `get_table_schema`,
 //! `get_table_schema_with_relations`, `execute_sql`, and `create_database`.
 //!
-//! Supports MySQL/MariaDB, PostgreSQL, and SQLite backends via `--database-type`.
+//! Supports MySQL/MariaDB, `PostgreSQL`, and `SQLite` backends via `--database-type`.
 //! Supports stdio and HTTP transport modes. Read-only mode is enabled by
 //! default, enforcing AST-based SQL validation to block write operations.
 //!
@@ -60,7 +60,7 @@ struct Cli {
     #[arg(long, default_value = "mysql")]
     database_type: DatabaseType,
 
-    /// SQLite database file path
+    /// `SQLite` database file path
     #[arg(long)]
     db_path: Option<String>,
 

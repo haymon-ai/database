@@ -1,7 +1,7 @@
 //! MySQL/MariaDB backend implementation via sqlx.
 //!
-//! Implements [`DatabaseBackend`] for MySQL and MariaDB databases
-//! using sqlx's MySqlPool.
+//! Implements [`DatabaseBackend`] for `MySQL` and `MariaDB` databases
+//! using sqlx's `MySqlPool`.
 
 use crate::config::Config;
 use crate::db::backend::DatabaseBackend;
@@ -22,7 +22,7 @@ pub struct MysqlBackend {
 }
 
 impl MysqlBackend {
-    /// Creates a new MySQL backend from configuration.
+    /// Creates a new `MySQL` backend from configuration.
     ///
     /// # Errors
     ///
@@ -38,7 +38,7 @@ impl MysqlBackend {
         );
 
         let pool = MySqlPoolOptions::new()
-            .max_connections(config.max_pool_size as u32)
+            .max_connections(config.max_pool_size)
             .connect(&url)
             .await
             .map_err(|e| AppError::Connection(format!("Failed to connect to MySQL: {e}")))?;
@@ -196,7 +196,7 @@ impl DatabaseBackend for MysqlBackend {
                     col_name.to_string(),
                     json!({
                         "type": row.get("Type").unwrap_or(&Value::Null),
-                        "nullable": row.get("Null").and_then(|v| v.as_str()).map(|s| s.to_uppercase() == "YES").unwrap_or(false),
+                        "nullable": row.get("Null").and_then(|v| v.as_str()).is_some_and(|s| s.to_uppercase() == "YES"),
                         "key": row.get("Key").unwrap_or(&Value::Null),
                         "default": row.get("Default").unwrap_or(&Value::Null),
                         "extra": row.get("Extra").unwrap_or(&Value::Null),
@@ -235,7 +235,7 @@ impl DatabaseBackend for MysqlBackend {
                     col_name.to_string(),
                     json!({
                         "type": row.get("Type").unwrap_or(&Value::Null),
-                        "nullable": row.get("Null").and_then(|v| v.as_str()).map(|s| s.to_uppercase() == "YES").unwrap_or(false),
+                        "nullable": row.get("Null").and_then(|v| v.as_str()).is_some_and(|s| s.to_uppercase() == "YES"),
                         "key": row.get("Key").unwrap_or(&Value::Null),
                         "default": row.get("Default").unwrap_or(&Value::Null),
                         "extra": row.get("Extra").unwrap_or(&Value::Null),
@@ -246,7 +246,7 @@ impl DatabaseBackend for MysqlBackend {
         }
 
         // 2. Get FK relationships
-        let fk_sql = r#"
+        let fk_sql = r"
             SELECT
                 kcu.COLUMN_NAME as column_name,
                 kcu.CONSTRAINT_NAME as constraint_name,
@@ -262,7 +262,7 @@ impl DatabaseBackend for MysqlBackend {
               AND kcu.TABLE_NAME = ?
               AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
             ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION
-        "#;
+        ";
 
         let fk_rows: Vec<MySqlRow> = sqlx::query(fk_sql)
             .bind(database)

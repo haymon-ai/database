@@ -1,3 +1,3 @@
-//! MCP tool implementations for MariaDB database operations.
+//! MCP tool implementations for `MariaDB` database operations.
 
 pub mod database;

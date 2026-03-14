@@ -19,7 +19,7 @@ pub enum AppError {
     #[error("Query blocked: only SELECT, SHOW, DESC, DESCRIBE, USE queries are allowed in read-only mode")]
     ReadOnlyViolation,
 
-    /// LOAD_FILE() function blocked for security.
+    /// `LOAD_FILE()` function blocked for security.
     #[error("Operation forbidden: LOAD_FILE() is not allowed for security reasons")]
     LoadFileBlocked,
 

@@ -1,7 +1,7 @@
 //! Database backend trait for multi-database support.
 //!
 //! Defines the [`DatabaseBackend`] trait that all database implementations
-//! (MySQL, PostgreSQL, SQLite) must satisfy.
+//! (`MySQL`, `PostgreSQL`, `SQLite`) must satisfy.
 
 use crate::error::AppError;
 use async_trait::async_trait;
@@ -10,7 +10,7 @@ use sqlparser::dialect::Dialect;
 
 /// Abstraction over database-specific operations.
 ///
-/// Each supported database (MySQL, PostgreSQL, SQLite) implements this trait
+/// Each supported database (`MySQL`, `PostgreSQL`, `SQLite`) implements this trait
 /// to provide uniform access to schema exploration and query execution.
 #[async_trait]
 pub trait DatabaseBackend: Send + Sync {
