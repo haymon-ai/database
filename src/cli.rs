@@ -25,7 +25,7 @@ use tracing::info;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "db-mcp", about = "Database MCP Server")]
+#[command(name = "sql-mcp", about = "Database MCP Server")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
@@ -62,7 +62,7 @@ struct Cli {
     #[arg(
         long = "db-ssl",
         env = "DB_SSL",
-        default_value_t = false,
+        default_value_t = Config::DEFAULT_DB_SSL,
         global = true
     )]
     db_ssl: bool,
@@ -83,7 +83,7 @@ struct Cli {
     #[arg(
         long = "db-ssl-verify-cert",
         env = "DB_SSL_VERIFY_CERT",
-        default_value_t = true,
+        default_value_t = Config::DEFAULT_DB_SSL_VERIFY_CERT,
         global = true
     )]
     db_ssl_verify_cert: bool,

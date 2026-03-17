@@ -3,8 +3,8 @@
 //! All configuration fields live directly on [`Config`] as a flat struct.
 //! Database connection is configured via individual variables (`DB_HOST`,
 //! `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_BACKEND`) instead
-//! of a single DSN URL. Values are resolved from three sources with clear
-//! precedence: CLI flags > environment variables > `.env` file > defaults.
+//! of a single DSN URL. Values are resolved with clear precedence:
+//! CLI flags > environment variables > defaults.
 //!
 //! All defaults (backend-aware port, user, host) are resolved at construction
 //! time in the `From<&Cli>` conversion — consumers access plain values directly.
@@ -170,6 +170,10 @@ impl Config {
     pub const DEFAULT_DB_BACKEND: DatabaseBackend = DatabaseBackend::Mysql;
     /// Default database host.
     pub const DEFAULT_DB_HOST: &'static str = "localhost";
+    /// Default SSL enabled state.
+    pub const DEFAULT_DB_SSL: bool = false;
+    /// Default SSL certificate verification.
+    pub const DEFAULT_DB_SSL_VERIFY_CERT: bool = true;
     /// Default read-only mode.
     pub const DEFAULT_DB_READ_ONLY: bool = true;
     /// Default connection pool size.
