@@ -5,7 +5,7 @@
 
 use crate::config::Config;
 use crate::db::backend::DatabaseBackend;
-use crate::db::identifier::{backtick_escape, validate_identifier};
+use crate::db::identifier::validate_identifier;
 use crate::error::AppError;
 use serde_json::{Map, Value, json};
 use sqlx::mysql::{MySqlPoolOptions, MySqlRow};
@@ -101,6 +101,14 @@ impl MysqlBackend {
         }
     }
 
+    /// Wraps `name` in backticks for safe use in `MySQL` SQL statements.
+    ///
+    /// Escapes internal backticks by doubling them.
+    fn quote_identifier(name: &str) -> String {
+        let escaped = name.replace('`', "``");
+        format!("`{escaped}`")
+    }
+
     /// Executes raw SQL and converts rows to JSON maps.
     ///
     /// Uses the text protocol via `Executor::fetch_all(&str)` instead of prepared
@@ -121,7 +129,7 @@ impl MysqlBackend {
         // Switch database if needed
         if let Some(db) = database {
             validate_identifier(db)?;
-            let use_sql = format!("USE {}", backtick_escape(db));
+            let use_sql = format!("USE {}", Self::quote_identifier(db));
             conn.execute(use_sql.as_str())
                 .await
                 .map_err(|e| AppError::Query(e.to_string()))?;
@@ -178,13 +186,16 @@ impl DatabaseBackend for MysqlBackend {
 
     async fn list_tables(&self, database: &str) -> Result<Vec<String>, AppError> {
         validate_identifier(database)?;
-        let sql = format!(
-            "SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = '{database}' ORDER BY TABLE_NAME"
-        );
-        let results = self.query_to_json(&sql, None).await?;
-        Ok(results
-            .into_iter()
-            .filter_map(|row| row.get("name").and_then(|v| v.as_str().map(String::from)))
+        let rows: Vec<MySqlRow> = sqlx::query(
+            "SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME",
+        )
+        .bind(database)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::Query(e.to_string()))?;
+        Ok(rows
+            .iter()
+            .filter_map(|row| row.try_get::<String, _>("name").ok())
             .collect())
     }
 
@@ -194,8 +205,8 @@ impl DatabaseBackend for MysqlBackend {
 
         let sql = format!(
             "DESCRIBE {}.{}",
-            backtick_escape(database),
-            backtick_escape(table)
+            Self::quote_identifier(database),
+            Self::quote_identifier(table)
         );
         let results = self.query_to_json(&sql, None).await?;
 
@@ -233,8 +244,8 @@ impl DatabaseBackend for MysqlBackend {
         // 1. Get basic schema
         let describe_sql = format!(
             "DESCRIBE {}.{}",
-            backtick_escape(database),
-            backtick_escape(table)
+            Self::quote_identifier(database),
+            Self::quote_identifier(table)
         );
         let schema_results = self.query_to_json(&describe_sql, None).await?;
 
@@ -348,7 +359,7 @@ impl DatabaseBackend for MysqlBackend {
 
         sqlx::query(&format!(
             "CREATE DATABASE IF NOT EXISTS {}",
-            backtick_escape(name)
+            Self::quote_identifier(name)
         ))
         .execute(&self.pool)
         .await
@@ -367,5 +378,22 @@ impl DatabaseBackend for MysqlBackend {
 
     fn read_only(&self) -> bool {
         self.read_only
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quote_identifier_wraps_in_backticks() {
+        assert_eq!(MysqlBackend::quote_identifier("users"), "`users`");
+        assert_eq!(MysqlBackend::quote_identifier("eu-docker"), "`eu-docker`");
+    }
+
+    #[test]
+    fn quote_identifier_escapes_backticks() {
+        assert_eq!(MysqlBackend::quote_identifier("test`db"), "`test``db`");
+        assert_eq!(MysqlBackend::quote_identifier("a`b`c"), "`a``b``c`");
     }
 }
