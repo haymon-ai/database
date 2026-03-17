@@ -109,6 +109,14 @@ impl MysqlBackend {
         format!("`{escaped}`")
     }
 
+    /// Wraps a value in single quotes for use as a SQL string literal.
+    ///
+    /// Escapes internal single quotes by doubling them.
+    fn quote_string(value: &str) -> String {
+        let escaped = value.replace('\'', "''");
+        format!("'{escaped}'")
+    }
+
     /// Executes raw SQL and converts rows to JSON maps.
     ///
     /// Uses the text protocol via `Executor::fetch_all(&str)` instead of prepared
@@ -186,16 +194,14 @@ impl DatabaseBackend for MysqlBackend {
 
     async fn list_tables(&self, database: &str) -> Result<Vec<String>, AppError> {
         validate_identifier(database)?;
-        let rows: Vec<MySqlRow> = sqlx::query(
-            "SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME",
-        )
-        .bind(database)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| AppError::Query(e.to_string()))?;
-        Ok(rows
-            .iter()
-            .filter_map(|row| row.try_get::<String, _>("name").ok())
+        let sql = format!(
+            "SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = {} ORDER BY TABLE_NAME",
+            Self::quote_string(database)
+        );
+        let results = self.query_to_json(&sql, None).await?;
+        Ok(results
+            .into_iter()
+            .filter_map(|row| row.get("name").and_then(|v| v.as_str().map(String::from)))
             .collect())
     }
 
