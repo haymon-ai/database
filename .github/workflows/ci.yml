@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [master]
   pull_request:
 
 env:
@@ -17,6 +18,8 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+          ref: ${{ github.event.pull_request.head.sha }}
+
       - uses: cocogitto/cocogitto-action@v4
         with:
           command: check

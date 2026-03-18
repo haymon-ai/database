@@ -1,26 +1,16 @@
+#:schema https://docs.cocogitto.io/cog-schema.json
+
 from_latest_tag = true
 ignore_merge_commits = true
 tag_prefix = "v"
 branch_whitelist = ["main", "master", "release/**"]
 skip_ci = "[skip ci]"
 
-# Allowed scopes (enforce consistency)
-scopes = [
-    "cli",
-    "config",
-    "db",
-    "mysql",
-    "postgres",
-    "sqlite",
-    "mcp",
-    "http",
-    "sql",
-    "ci",
-    "deps",
-]
-
 # Bump hooks
 pre_bump_hooks = [
+    "cargo test --lib",
+    "cargo clippy",
+    "cargo fmt --check",
     "cargo build --release",
     "cargo set-version {{version}}",
     "cargo check --release",
@@ -49,3 +39,7 @@ repository = "sql-mcp"
 # Commit type customization
 [commit_types]
 hotfix = { changelog_title = "Hotfixes", bump_patch = true }
+chore = { omit_from_changelog = true }
+test = { omit_from_changelog = true }
+ci = { omit_from_changelog = true }
+deps = { omit_from_changelog = true }
