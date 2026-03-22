@@ -100,16 +100,32 @@ The script handles container lifecycle, port assignment, seeding, and cleanup au
 
 CI automatically runs on every push and pull request:
 
-1. `cargo fmt --check` — formatting
-2. `cargo clippy -- -D warnings` — linting
-3. `cargo test --lib` — unit tests
-4. Integration tests against MariaDB 12, MySQL 9, PostgreSQL 18, and SQLite
+1. Commit message validation — conventional commit format ([cocogitto](https://github.com/cocogitto/cocogitto))
+2. `cargo fmt --check` — formatting
+3. `cargo clippy -- -D warnings` — linting
+4. `cargo test --lib` — unit tests
+5. Integration tests against MariaDB 12, MySQL 9, PostgreSQL 18, and SQLite
 
 All checks must pass before a PR can be merged.
 
 ## Commit Message Convention
 
-This project requires [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/). Every commit message must follow this format:
+This project requires [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) and uses [cocogitto](https://github.com/cocogitto/cocogitto) to enforce them locally and in CI.
+
+### Setup (One-Time)
+
+Install cocogitto and the commit-msg git hook:
+
+```bash
+cargo install --locked cocogitto
+cog install-hook commit-msg
+```
+
+The hook validates every commit message against the conventional commit specification before allowing the commit. If your message doesn't conform, the commit is rejected with an error showing the expected format.
+
+### Message Format
+
+Every commit message must follow this format:
 
 ```
 <type>[optional scope]: <description>
@@ -137,13 +153,15 @@ This project requires [Conventional Commits](https://www.conventionalcommits.org
 
 ### Scopes
 
-Scopes are optional and freeform. Common scopes in this project include:
+Scopes are optional but validated. If you include a scope, it must be one of the following:
 
+- `cli` — command-line interface
 - `config` — configuration and CLI parsing
 - `db` — database backend logic
-- `cli` — command-line interface
 - `http` — HTTP transport layer
 - `sqlx_to_json` — row-to-JSON conversion crate
+
+Scopeless commits (e.g., `fix: resolve crash`) are always valid.
 
 ### Examples
 
@@ -206,4 +224,32 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/):
 
 ### Release Process
 
-Releases are triggered by pushing a version tag (e.g., `v0.2.0`). The CI pipeline automatically builds release binaries for all supported platforms and creates a GitHub release.
+Releases are managed with [cocogitto](https://github.com/cocogitto/cocogitto). To create a release:
+
+```bash
+# Preview what would happen (no changes made)
+cog bump --auto --dry-run
+
+# Execute the release
+cog bump --auto
+```
+
+The `cog bump --auto` command:
+
+1. Calculates the next version from commit history (`fix` = patch, `feat` = minor, `BREAKING CHANGE` = major)
+2. Runs quality gates (`cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test --lib`)
+3. Updates the version in `Cargo.toml`
+4. Generates/updates `CHANGELOG.md`
+5. Creates a version commit and tag (e.g., `v0.2.0`)
+6. Pushes the commit and tag to the remote
+
+The pushed tag triggers the CI release workflow, which builds binaries for all supported platforms and creates a GitHub release with the changelog.
+
+You can also force a specific version:
+
+```bash
+cog bump --major            # force major bump
+cog bump --minor            # force minor bump
+cog bump --patch            # force patch bump
+cog bump --version 1.0.0    # set exact version
+```
