@@ -1,17 +1,14 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import Image from 'next/image';
-import { appName, gitConfig } from './shared';
+import { appName, basePath, gitConfig } from './shared';
 
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
       title: (
-        <Image
-          src="/logo.svg"
+        <img
+          src={`${basePath}/logo.svg`}
           alt={appName}
-          width={120}
-          height={28}
-          style={{ display: 'block', height: 'auto', width: 'auto' }}
+          style={{ display: 'block', height: 28, width: 'auto' }}
         />
       ),
     },

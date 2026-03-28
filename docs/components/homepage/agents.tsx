@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import { basePath } from '@/lib/shared';
 
 interface SupportedItem {
   name: string;
@@ -55,11 +55,10 @@ export function Agents() {
             rel="noopener noreferrer"
             className="flex flex-col items-center gap-3 rounded-sm border border-black/[0.08] bg-white p-5 transition-all hover:border-black/20 hover:shadow-sm"
           >
-            <Image
-              src={agent.logo}
+            <img
+              src={`${basePath}${agent.logo}`}
               alt={`${agent.name} logo`}
-              width={40}
-              height={40}
+              className="h-10 w-10"
             />
             <span className="text-sm font-medium text-black">
               {agent.name}

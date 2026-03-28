@@ -12,6 +12,7 @@ const config = {
   images: { unoptimized: true },
   basePath,
   assetPrefix: basePath ? `${basePath}/` : '',
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
 };
 
 export default withMDX(config);

@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import { basePath } from '@/lib/shared';
 
 interface SupportedItem {
   name: string;
@@ -49,11 +49,10 @@ export function Databases() {
             rel="noopener noreferrer"
             className="flex flex-col items-center gap-4 rounded-sm border border-black/[0.08] bg-white p-6 transition-all hover:border-black/20 hover:shadow-sm"
           >
-            <Image
-              src={db.logo}
+            <img
+              src={`${basePath}${db.logo}`}
               alt={`${db.name} logo`}
-              width={48}
-              height={48}
+              className="h-12 w-12"
             />
             <span className="text-sm font-medium text-black">
               {db.name}
