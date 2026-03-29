@@ -9,7 +9,7 @@ export function Hero() {
         href="/docs"
         className="inline-flex items-center gap-2 rounded-sm border border-black/10 px-4 py-1.5 text-sm text-gray-600 transition-colors hover:border-black/20 hover:bg-gray-50"
       >
-        <span className="inline-block h-2 w-2 rounded-full bg-[#ff4800]" />
+        <span className="inline-block h-2 w-2 rounded-full bg-[#151715]" />
         Open source MCP server
         <span aria-hidden="true">&rarr;</span>
       </Link>

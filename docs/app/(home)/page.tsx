@@ -12,6 +12,9 @@ export default function HomePage() {
       <Databases />
       <hr className="mx-auto w-full max-w-4xl border-black/[0.08]" />
       <Agents />
+      <footer className="w-full bg-black py-6 text-center text-sm text-neutral-400">
+        &copy; {new Date().getFullYear()} Andreas Penz
+      </footer>
     </div>
   );
 }

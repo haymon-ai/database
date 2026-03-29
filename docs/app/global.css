@@ -53,6 +53,15 @@ figure.shiki span[style] {
   border-color: #2a2a2a !important;
 }
 
+/* Search: less rounded to match a rectangular style */
+[data-search-full] {
+  border-radius: 0.375rem !important; /* rounded-md (6px) */
+}
+
+[data-search-full] kbd {
+  border-radius: 0.25rem !important; /* rounded (4px) */
+}
+
 html {
   scrollbar-gutter: stable;
 }
