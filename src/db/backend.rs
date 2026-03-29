@@ -10,6 +10,8 @@ use crate::db::postgres::PostgresBackend;
 use crate::db::sqlite::SqliteBackend;
 use crate::db::validation::validate_read_only_with_dialect;
 use crate::error::AppError;
+use crate::server::Server;
+use rmcp::handler::server::router::tool::ToolRouter;
 use serde_json::Value;
 use sqlparser::dialect::Dialect;
 use tracing::{error, info};
@@ -124,6 +126,19 @@ impl DatabaseBackend for Backend {
 }
 
 impl Backend {
+    /// Builds the [`ToolRouter`] for the active backend variant.
+    ///
+    /// Each backend decides which tools to register based on
+    /// its capabilities and the `read_only` flag.
+    #[must_use]
+    pub fn build_tool_router(&self, read_only: bool) -> ToolRouter<Server> {
+        match self {
+            Self::Mysql(_) => MysqlBackend::build_tool_router(read_only),
+            Self::Postgres(_) => PostgresBackend::build_tool_router(read_only),
+            Self::Sqlite(_) => SqliteBackend::build_tool_router(read_only),
+        }
+    }
+
     /// Lists all accessible databases as a JSON array.
     ///
     /// # Errors
