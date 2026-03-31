@@ -2,6 +2,9 @@
 //!
 //! Provides [`PostgresBackend`] implementing the [`server::McpBackend`] trait.
 
-pub mod postgres;
+mod connection;
+mod operations;
+mod schema;
+mod tools;
 
-pub use postgres::PostgresBackend;
+pub use connection::PostgresBackend;

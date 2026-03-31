@@ -2,6 +2,9 @@
 //!
 //! Provides [`SqliteBackend`] implementing the [`server::McpBackend`] trait.
 
-pub mod sqlite;
+mod connection;
+mod operations;
+mod schema;
+mod tools;
 
-pub use sqlite::SqliteBackend;
+pub use connection::SqliteBackend;

@@ -2,6 +2,9 @@
 //!
 //! Provides [`MysqlBackend`] implementing the [`server::McpBackend`] trait.
 
-pub mod mysql;
+mod connection;
+mod operations;
+mod schema;
+mod tools;
 
-pub use mysql::MysqlBackend;
+pub use connection::MysqlBackend;
