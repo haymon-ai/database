@@ -9,8 +9,8 @@
 
 use backend::validation::validate_read_only_with_dialect;
 use config::{DatabaseBackend, DatabaseConfig};
-use server::Server;
-use sqlite::SqliteBackend;
+use rmcp::ServerHandler;
+use sqlite::{SqliteBackend, SqliteHandler};
 
 fn sqlite_config(db_path: &str, read_only: bool) -> DatabaseConfig {
     DatabaseConfig {
@@ -164,21 +164,21 @@ async fn it_has_consistent_seed_data() {
 
 #[tokio::test]
 async fn it_excludes_list_databases_and_create_database_tools() {
-    let b = backend().await;
-    let mut server = Server::new();
-    server.register(&b);
+    let db_path = std::env::var("DB_PATH").expect("DB_PATH must be set");
+    let config = sqlite_config(&db_path, false);
+    let handler = SqliteHandler::new(&config).await.expect("handler creation failed");
 
     assert!(
-        server.get_tool("list_databases").is_none(),
+        handler.get_tool("list_databases").is_none(),
         "SQLite must not expose list_databases"
     );
     assert!(
-        server.get_tool("create_database").is_none(),
+        handler.get_tool("create_database").is_none(),
         "SQLite must not expose create_database"
     );
 
     // Verify core tools are present
-    assert!(server.get_tool("list_tables").is_some());
-    assert!(server.get_tool("read_query").is_some());
-    assert!(server.get_tool("write_query").is_some());
+    assert!(handler.get_tool("list_tables").is_some());
+    assert!(handler.get_tool("read_query").is_some());
+    assert!(handler.get_tool("write_query").is_some());
 }

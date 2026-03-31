@@ -81,11 +81,8 @@ impl PostgresBackend {
     }
 
     /// Wraps `name` in double quotes for safe use in `PostgreSQL` SQL statements.
-    ///
-    /// Escapes internal double quotes by doubling them.
     pub(crate) fn quote_identifier(name: &str) -> String {
-        let escaped = name.replace('"', "\"\"");
-        format!("\"{escaped}\"")
+        backend::identifier::quote_identifier(name, '"')
     }
 
     /// Returns a connection pool for the requested database.
@@ -192,18 +189,6 @@ mod tests {
             name: Some("mydb".into()),
             ..DatabaseConfig::default()
         }
-    }
-
-    #[test]
-    fn quote_identifier_wraps_in_double_quotes() {
-        assert_eq!(PostgresBackend::quote_identifier("users"), "\"users\"");
-        assert_eq!(PostgresBackend::quote_identifier("eu-docker"), "\"eu-docker\"");
-    }
-
-    #[test]
-    fn quote_identifier_escapes_double_quotes() {
-        assert_eq!(PostgresBackend::quote_identifier("test\"db"), "\"test\"\"db\"");
-        assert_eq!(PostgresBackend::quote_identifier("a\"b\"c"), "\"a\"\"b\"\"c\"");
     }
 
     #[test]

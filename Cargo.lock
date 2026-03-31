@@ -487,6 +487,7 @@ dependencies = [
  "server",
  "sqlite",
  "sqlparser",
+ "thiserror",
  "tokio",
  "tokio-util",
  "tower-http",
@@ -1875,6 +1876,7 @@ dependencies = [
 name = "server"
 version = "0.3.1"
 dependencies = [
+ "backend",
  "rmcp",
  "serde",
  "serde_json",

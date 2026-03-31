@@ -6,7 +6,6 @@
 
 /// Errors that can occur during MCP server operation.
 #[derive(Debug, thiserror::Error)]
-#[allow(dead_code)]
 pub enum AppError {
     /// Database connection failed.
     #[error("Database connection error: {0}")]

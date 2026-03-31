@@ -47,7 +47,7 @@ impl MysqlBackend {
                         "key": row.get("Key").unwrap_or(&Value::Null),
                         "default": row.get("Default").unwrap_or(&Value::Null),
                         "extra": row.get("Extra").unwrap_or(&Value::Null),
-                        "foreign_key": null,
+                        "foreign_key": Value::Null,
                     }),
                 );
             }

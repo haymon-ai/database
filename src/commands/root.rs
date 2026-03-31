@@ -11,7 +11,11 @@
 //! - `version` — prints the version and exits
 
 use config::{Config, DatabaseBackend, DatabaseConfig, HttpConfig};
-use server::Server;
+use rmcp::model::{
+    CallToolRequestParams, CallToolResult, ErrorData, ListToolsResult, PaginatedRequestParams, ServerInfo,
+};
+use rmcp::service::RequestContext;
+use rmcp::{RoleServer, ServerHandler};
 use std::process::ExitCode;
 use tracing::info;
 
@@ -19,6 +23,29 @@ use super::http::HttpCommand;
 use super::stdio::StdioCommand;
 
 use clap::{Parser, Subcommand};
+
+/// Application-level errors for server startup and transport.
+///
+/// Only instantiated once at program exit, so variant size is irrelevant.
+#[derive(Debug, thiserror::Error)]
+#[allow(clippy::large_enum_variant)]
+pub enum RunError {
+    /// Database backend initialization failed.
+    #[error(transparent)]
+    Backend(#[from] backend::AppError),
+
+    /// MCP transport failed to initialize.
+    #[error("transport error: {0}")]
+    Transport(#[from] rmcp::service::ServerInitializeError),
+
+    /// Network I/O error (e.g., TCP bind failure).
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    /// Missing or invalid configuration at runtime.
+    #[error("{0}")]
+    Config(String),
+}
 
 /// Log severity levels for the MCP server.
 ///
@@ -215,24 +242,69 @@ impl From<&Arguments> for Config {
     }
 }
 
-/// Creates a [`Server`] with backend tools registered based on configuration.
-pub async fn create_server(config: &Config) -> Result<Server, Box<dyn std::error::Error>> {
-    let mut server = Server::new();
-    match config.database.backend {
-        DatabaseBackend::Sqlite => {
-            let backend = sqlite::SqliteBackend::new(&config.database).await?;
-            server.register(&backend);
+/// Unified handler enum dispatching to the active backend.
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
+enum Handler {
+    Sqlite(sqlite::SqliteHandler),
+    Postgres(postgres::PostgresHandler),
+    Mysql(mysql::MysqlHandler),
+}
+
+/// Delegates a [`ServerHandler`] method call to the inner handler.
+macro_rules! dispatch {
+    ($self:expr, $method:ident $(, $arg:expr)*) => {
+        match $self {
+            Handler::Sqlite(h) => h.$method($($arg),*),
+            Handler::Postgres(h) => h.$method($($arg),*),
+            Handler::Mysql(h) => h.$method($($arg),*),
         }
-        DatabaseBackend::Postgres => {
-            let backend = postgres::PostgresBackend::new(&config.database).await?;
-            server.register(&backend);
+    };
+    (await $self:expr, $method:ident $(, $arg:expr)*) => {
+        match $self {
+            Handler::Sqlite(h) => h.$method($($arg),*).await,
+            Handler::Postgres(h) => h.$method($($arg),*).await,
+            Handler::Mysql(h) => h.$method($($arg),*).await,
         }
-        DatabaseBackend::Mysql | DatabaseBackend::Mariadb => {
-            let backend = mysql::MysqlBackend::new(&config.database).await?;
-            server.register(&backend);
-        }
+    };
+}
+
+impl ServerHandler for Handler {
+    fn get_info(&self) -> ServerInfo {
+        dispatch!(self, get_info)
     }
-    Ok(server)
+
+    async fn list_tools(
+        &self,
+        request: Option<PaginatedRequestParams>,
+        context: RequestContext<RoleServer>,
+    ) -> Result<ListToolsResult, ErrorData> {
+        dispatch!(await self, list_tools, request, context)
+    }
+
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResult, ErrorData> {
+        dispatch!(await self, call_tool, request, context)
+    }
+
+    fn get_tool(&self, name: &str) -> Option<rmcp::model::Tool> {
+        dispatch!(self, get_tool, name)
+    }
+}
+
+/// Creates a [`Handler`] based on the configured database backend.
+async fn create_handler(config: &Config) -> Result<Handler, backend::AppError> {
+    let handler = match config.database.backend {
+        DatabaseBackend::Sqlite => Handler::Sqlite(sqlite::SqliteHandler::new(&config.database).await?),
+        DatabaseBackend::Postgres => Handler::Postgres(postgres::PostgresHandler::new(&config.database).await?),
+        DatabaseBackend::Mysql | DatabaseBackend::Mariadb => {
+            Handler::Mysql(mysql::MysqlHandler::new(&config.database).await?)
+        }
+    };
+    Ok(handler)
 }
 
 /// Parses CLI arguments, initializes the application, and runs the MCP server.
@@ -244,13 +316,9 @@ pub async fn create_server(config: &Config) -> Result<Server, Box<dyn std::error
 /// - Database connection fails (invalid URL, unreachable host, auth failure).
 /// - TCP bind fails for HTTP transport (port in use, permission denied).
 /// - MCP stdio transport fails to start.
-///
-/// # Panics
-///
-/// Panics if the HTTP subcommand is selected but server config is missing
-/// (should be unreachable via normal CLI usage).
 #[tokio::main]
-pub async fn run() -> Result<ExitCode, Box<dyn std::error::Error>> {
+#[allow(clippy::result_large_err)]
+pub async fn run() -> Result<ExitCode, RunError> {
     let arguments = Arguments::parse();
     if matches!(arguments.command, Some(Command::Version)) {
         println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
@@ -276,10 +344,10 @@ pub async fn run() -> Result<ExitCode, Box<dyn std::error::Error>> {
         info!("Server running in READ-ONLY mode. Write operations are disabled.");
     }
 
-    let server = create_server(&config).await?;
+    let handler = create_handler(&config).await?;
     match &arguments.command {
-        Some(Command::Http(cmd)) => cmd.execute(&config, server).await?,
-        _ => StdioCommand.execute(server).await?,
+        Some(Command::Http(cmd)) => cmd.execute(&config, handler).await?,
+        _ => StdioCommand.execute(handler).await?,
     }
 
     Ok(ExitCode::SUCCESS)

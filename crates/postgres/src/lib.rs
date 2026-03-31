@@ -1,10 +1,12 @@
 //! `PostgreSQL` backend crate.
 //!
-//! Provides [`PostgresBackend`] implementing the [`server::McpBackend`] trait.
+//! Provides [`PostgresBackend`] for database operations and
+//! [`PostgresHandler`] implementing the MCP `ServerHandler` trait.
 
 mod connection;
+mod handler;
 mod operations;
 mod schema;
-mod tools;
 
 pub use connection::PostgresBackend;
+pub use handler::PostgresHandler;

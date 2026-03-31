@@ -54,11 +54,8 @@ impl SqliteBackend {
     }
 
     /// Wraps `name` in double quotes for safe use in `SQLite` SQL statements.
-    ///
-    /// Escapes internal double quotes by doubling them.
     pub(crate) fn quote_identifier(name: &str) -> String {
-        let escaped = name.replace('"', "\"\"");
-        format!("\"{escaped}\"")
+        backend::identifier::quote_identifier(name, '"')
     }
 }
 
@@ -72,18 +69,6 @@ fn connect_options(config: &DatabaseConfig) -> SqliteConnectOptions {
 mod tests {
     use super::*;
     use config::DatabaseBackend;
-
-    #[test]
-    fn quote_identifier_wraps_in_double_quotes() {
-        assert_eq!(SqliteBackend::quote_identifier("users"), "\"users\"");
-        assert_eq!(SqliteBackend::quote_identifier("eu-docker"), "\"eu-docker\"");
-    }
-
-    #[test]
-    fn quote_identifier_escapes_double_quotes() {
-        assert_eq!(SqliteBackend::quote_identifier("test\"db"), "\"test\"\"db\"");
-        assert_eq!(SqliteBackend::quote_identifier("a\"b\"c"), "\"a\"\"b\"\"c\"");
-    }
 
     #[test]
     fn try_from_sets_filename() {

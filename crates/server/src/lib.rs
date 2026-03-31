@@ -1,11 +1,9 @@
-//! Backend-agnostic MCP server and tool routing.
+//! Shared MCP server utilities.
 //!
-//! Provides [`Server`] which implements the MCP `ServerHandler` trait,
-//! and [`McpBackend`] which backends implement to register their tools.
+//! Provides [`map_error`], [`server_info`], and shared tool implementation
+//! functions used by per-backend handler implementations.
 
-pub mod handler;
-pub mod server;
-pub mod traits;
+mod server;
+pub mod tools;
 
-pub use server::Server;
-pub use traits::McpBackend;
+pub use server::{map_error, server_info};

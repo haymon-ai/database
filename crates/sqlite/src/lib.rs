@@ -1,10 +1,12 @@
 //! `SQLite` backend crate.
 //!
-//! Provides [`SqliteBackend`] implementing the [`server::McpBackend`] trait.
+//! Provides [`SqliteBackend`] for database operations and
+//! [`SqliteHandler`] implementing the MCP `ServerHandler` trait.
 
 mod connection;
+mod handler;
 mod operations;
 mod schema;
-mod tools;
 
 pub use connection::SqliteBackend;
+pub use handler::SqliteHandler;

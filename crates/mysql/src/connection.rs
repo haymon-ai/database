@@ -52,11 +52,8 @@ impl MysqlBackend {
     }
 
     /// Wraps `name` in backticks for safe use in `MySQL` SQL statements.
-    ///
-    /// Escapes internal backticks by doubling them.
     pub(crate) fn quote_identifier(name: &str) -> String {
-        let escaped = name.replace('`', "``");
-        format!("`{escaped}`")
+        backend::identifier::quote_identifier(name, '`')
     }
 
     /// Wraps a value in single quotes for use as a SQL string literal.
@@ -165,18 +162,6 @@ mod tests {
             name: Some("mydb".into()),
             ..DatabaseConfig::default()
         }
-    }
-
-    #[test]
-    fn quote_identifier_wraps_in_backticks() {
-        assert_eq!(MysqlBackend::quote_identifier("users"), "`users`");
-        assert_eq!(MysqlBackend::quote_identifier("eu-docker"), "`eu-docker`");
-    }
-
-    #[test]
-    fn quote_identifier_escapes_backticks() {
-        assert_eq!(MysqlBackend::quote_identifier("test`db"), "`test``db`");
-        assert_eq!(MysqlBackend::quote_identifier("a`b`c"), "`a``b``c`");
     }
 
     #[test]
