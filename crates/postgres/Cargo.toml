@@ -8,10 +8,10 @@ repository.workspace = true
 [dependencies]
 database-mcp-backend = { workspace = true }
 database-mcp-config = { workspace = true }
+database-mcp-server = { workspace = true }
 moka = { workspace = true }
 rmcp = { workspace = true }
 serde_json = { workspace = true }
-database-mcp-server = { workspace = true }
 sqlparser = { workspace = true }
 sqlx = { workspace = true, features = ["postgres"] }
 sqlx-to-json = { workspace = true }

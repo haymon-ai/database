@@ -75,15 +75,15 @@ workspace = true
 
 [dependencies]
 axum = { workspace = true }
-database-mcp-backend = { workspace = true }
 clap = { workspace = true }
+database-mcp-backend = { workspace = true }
 database-mcp-config = { workspace = true }
-mimalloc = { workspace = true }
 database-mcp-mysql = { workspace = true }
 database-mcp-postgres = { workspace = true }
-rmcp = { workspace = true }
 database-mcp-server = { workspace = true }
 database-mcp-sqlite = { workspace = true }
+mimalloc = { workspace = true }
+rmcp = { workspace = true }
 sqlparser = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
