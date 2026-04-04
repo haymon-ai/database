@@ -3,8 +3,8 @@
 //! Builds [`MySqlConnectOptions`] from a [`DatabaseConfig`] and checks
 //! for dangerous server privileges on startup.
 
-use database_mcp_backend::error::AppError;
 use database_mcp_config::DatabaseConfig;
+use database_mcp_server::AppError;
 use sqlx::MySqlPool;
 use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions, MySqlSslMode};
 use tracing::{error, info};
@@ -53,7 +53,7 @@ impl MysqlBackend {
 
     /// Wraps `name` in backticks for safe use in `MySQL` SQL statements.
     pub(crate) fn quote_identifier(name: &str) -> String {
-        database_mcp_backend::identifier::quote_identifier(name, '`')
+        database_mcp_sql::identifier::quote_identifier(name, '`')
     }
 
     /// Wraps a value in single quotes for use as a SQL string literal.

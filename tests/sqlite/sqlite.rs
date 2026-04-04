@@ -7,9 +7,9 @@
 //! ./tests/run.sh --filter sqlite
 //! ```
 
-use database_mcp_backend::validation::validate_read_only_with_dialect;
 use database_mcp_config::{DatabaseBackend, DatabaseConfig};
-use database_mcp_sqlite::{SqliteBackend, SqliteHandler};
+use database_mcp_sql::validation::validate_read_only_with_dialect;
+use database_mcp_sqlite::SqliteBackend;
 use rmcp::ServerHandler;
 
 fn sqlite_config(db_path: &str, read_only: bool) -> DatabaseConfig {
@@ -166,7 +166,10 @@ async fn it_has_consistent_seed_data() {
 async fn it_excludes_list_databases_and_create_database_tools() {
     let db_path = std::env::var("DB_PATH").expect("DB_PATH must be set");
     let config = sqlite_config(&db_path, false);
-    let handler = SqliteHandler::new(&config).await.expect("handler creation failed");
+    let backend = database_mcp_sqlite::SqliteBackend::new(&config)
+        .await
+        .expect("backend creation failed");
+    let handler = database_mcp_server::Server::new(backend);
 
     assert!(
         handler.get_tool("list_databases").is_none(),

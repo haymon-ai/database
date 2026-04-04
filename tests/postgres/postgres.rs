@@ -4,9 +4,9 @@
 //! ./tests/run.sh --filter postgres
 //! ```
 
-use database_mcp_backend::validation::validate_read_only_with_dialect;
 use database_mcp_config::{DatabaseBackend, DatabaseConfig};
 use database_mcp_postgres::PostgresBackend;
+use database_mcp_sql::validation::validate_read_only_with_dialect;
 
 fn test_config() -> DatabaseConfig {
     DatabaseConfig {

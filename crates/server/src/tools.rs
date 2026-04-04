@@ -3,7 +3,6 @@
 //! Extracts the common logging, validation, and serialization logic
 //! from per-backend MCP tool handlers into reusable functions.
 
-use database_mcp_backend::error::AppError;
 use rmcp::model::ErrorData;
 use serde::Serialize;
 use serde_json::Value;
@@ -16,7 +15,9 @@ use crate::map_error;
 /// # Errors
 ///
 /// Returns [`ErrorData`] if the backend query or JSON serialization fails.
-pub async fn list_databases(list_fn: impl Future<Output = Result<Vec<String>, AppError>>) -> Result<String, ErrorData> {
+pub async fn list_databases(
+    list_fn: impl Future<Output = Result<Vec<String>, impl std::fmt::Display>>,
+) -> Result<String, ErrorData> {
     info!("TOOL: list_databases called");
     let db_list = list_fn.await.map_err(map_error)?;
     info!("TOOL: list_databases completed. Databases found: {}", db_list.len());
@@ -29,7 +30,7 @@ pub async fn list_databases(list_fn: impl Future<Output = Result<Vec<String>, Ap
 ///
 /// Returns [`ErrorData`] if the backend query or JSON serialization fails.
 pub async fn list_tables(
-    list_fn: impl Future<Output = Result<Vec<String>, AppError>>,
+    list_fn: impl Future<Output = Result<Vec<String>, impl std::fmt::Display>>,
     database_name: &str,
 ) -> Result<String, ErrorData> {
     info!("TOOL: list_tables called. database_name={database_name}");
@@ -44,7 +45,7 @@ pub async fn list_tables(
 ///
 /// Returns [`ErrorData`] if the backend query or JSON serialization fails.
 pub async fn get_table_schema(
-    schema_fn: impl Future<Output = Result<impl Serialize, AppError>>,
+    schema_fn: impl Future<Output = Result<impl Serialize, impl std::fmt::Display>>,
     database_name: &str,
     table_name: &str,
 ) -> Result<String, ErrorData> {
@@ -62,11 +63,11 @@ pub async fn get_table_schema(
 /// # Errors
 ///
 /// Returns [`ErrorData`] if validation, the backend query, or JSON serialization fails.
-pub async fn read_query(
-    query_fn: impl Future<Output = Result<Value, AppError>>,
+pub async fn read_query<E: std::fmt::Display>(
+    query_fn: impl Future<Output = Result<Value, impl std::fmt::Display>>,
     sql_query: &str,
     database_name: &str,
-    validate: impl FnOnce(&str) -> Result<(), AppError>,
+    validate: impl FnOnce(&str) -> Result<(), E>,
 ) -> Result<String, ErrorData> {
     info!(
         "TOOL: execute_sql called. database_name={database_name}, sql_query={}",
@@ -87,7 +88,7 @@ pub async fn read_query(
 ///
 /// Returns [`ErrorData`] if the backend query or JSON serialization fails.
 pub async fn write_query(
-    query_fn: impl Future<Output = Result<Value, AppError>>,
+    query_fn: impl Future<Output = Result<Value, impl std::fmt::Display>>,
     sql_query: &str,
     database_name: &str,
 ) -> Result<String, ErrorData> {
@@ -108,7 +109,7 @@ pub async fn write_query(
 ///
 /// Returns [`ErrorData`] if the backend query or JSON serialization fails.
 pub async fn create_database(
-    create_fn: impl Future<Output = Result<Value, AppError>>,
+    create_fn: impl Future<Output = Result<Value, impl std::fmt::Display>>,
     database_name: &str,
 ) -> Result<String, ErrorData> {
     info!("TOOL: create_database called for database: '{database_name}'");
