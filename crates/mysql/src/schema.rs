@@ -11,9 +11,9 @@ use serde_json::{Value, json};
 use sqlx::Row;
 use sqlx::mysql::MySqlRow;
 
-use super::MysqlBackend;
+use super::MysqlAdapter;
 
-impl MysqlBackend {
+impl MysqlAdapter {
     /// Returns column definitions with foreign key relationships.
     ///
     /// # Errors

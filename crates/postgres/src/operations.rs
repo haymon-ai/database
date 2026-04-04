@@ -6,9 +6,9 @@ use serde_json::{Value, json};
 use sqlx::postgres::PgRow;
 use sqlx_to_json::RowExt;
 
-use super::PostgresBackend;
+use super::PostgresAdapter;
 
-impl PostgresBackend {
+impl PostgresAdapter {
     // `list_databases` uses the default pool intentionally — `pg_database`
     // is a server-wide catalog that returns all databases regardless of
     // which database the connection targets.

@@ -11,10 +11,10 @@ use rmcp::model::{ErrorData, ToolAnnotations};
 
 use database_mcp_server::Server;
 
-use super::PostgresBackend;
+use super::PostgresAdapter;
 
 /// Type alias kept module-private for brevity in tool impls.
-type PostgresHandler = Server<PostgresBackend>;
+type PostgresHandler = Server<PostgresAdapter>;
 
 /// Tool to list all accessible databases.
 pub(super) struct ListDatabasesTool;

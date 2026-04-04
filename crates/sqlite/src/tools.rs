@@ -11,10 +11,10 @@ use rmcp::model::{ErrorData, ToolAnnotations};
 
 use database_mcp_server::Server;
 
-use super::SqliteBackend;
+use super::SqliteAdapter;
 
 /// Type alias kept module-private for brevity in tool impls.
-type SqliteHandler = Server<SqliteBackend>;
+type SqliteHandler = Server<SqliteAdapter>;
 
 /// Tool to list all tables in a database.
 pub(super) struct ListTablesTool;

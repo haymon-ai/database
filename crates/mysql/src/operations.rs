@@ -10,9 +10,9 @@ use sqlx::Executor;
 use sqlx::mysql::MySqlRow;
 use sqlx_to_json::RowExt;
 
-use super::MysqlBackend;
+use super::MysqlAdapter;
 
-impl MysqlBackend {
+impl MysqlAdapter {
     /// Executes raw SQL and converts rows to JSON maps.
     ///
     /// Uses the text protocol via `Executor::fetch_all(&str)` instead of prepared

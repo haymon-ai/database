@@ -1,4 +1,4 @@
-//! MySQL/MariaDB backend definition and connection configuration.
+//! MySQL/MariaDB adapter definition and connection configuration.
 //!
 //! Builds [`MySqlConnectOptions`] from a [`DatabaseConfig`] and checks
 //! for dangerous server privileges on startup.
@@ -9,23 +9,23 @@ use sqlx::MySqlPool;
 use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions, MySqlSslMode};
 use tracing::{error, info};
 
-/// MySQL/MariaDB database backend.
+/// MySQL/MariaDB database adapter.
 #[derive(Clone)]
-pub struct MysqlBackend {
+pub struct MysqlAdapter {
     pub(crate) config: DatabaseConfig,
     pub(crate) pool: MySqlPool,
 }
 
-impl std::fmt::Debug for MysqlBackend {
+impl std::fmt::Debug for MysqlAdapter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MysqlBackend")
+        f.debug_struct("MysqlAdapter")
             .field("read_only", &self.config.read_only)
             .finish_non_exhaustive()
     }
 }
 
-impl MysqlBackend {
-    /// Creates a new `MySQL` backend from configuration.
+impl MysqlAdapter {
+    /// Creates a new `MySQL` adapter from configuration.
     ///
     /// # Errors
     ///

@@ -1,4 +1,4 @@
-//! `PostgreSQL` backend definition and connection configuration.
+//! `PostgreSQL` adapter definition and connection configuration.
 
 use database_mcp_config::DatabaseConfig;
 use database_mcp_server::AppError;
@@ -11,28 +11,28 @@ use tracing::info;
 /// Maximum number of database connection pools to cache (including the default).
 const POOL_CACHE_CAPACITY: u64 = 6;
 
-/// `PostgreSQL` database backend.
+/// `PostgreSQL` database adapter.
 ///
 /// All connection pools — including the default — live in a single
 /// concurrent cache keyed by database name. No external mutex required.
 #[derive(Clone)]
-pub struct PostgresBackend {
+pub struct PostgresAdapter {
     pub(crate) config: DatabaseConfig,
     default_db: String,
     pools: Cache<String, PgPool>,
 }
 
-impl std::fmt::Debug for PostgresBackend {
+impl std::fmt::Debug for PostgresAdapter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PostgresBackend")
+        f.debug_struct("PostgresAdapter")
             .field("read_only", &self.config.read_only)
             .field("default_db", &self.default_db)
             .finish_non_exhaustive()
     }
 }
 
-impl PostgresBackend {
-    /// Creates a new `PostgreSQL` backend from configuration.
+impl PostgresAdapter {
+    /// Creates a new `PostgreSQL` adapter from configuration.
     ///
     /// Stores a clone of the configuration for constructing connection options
     /// for non-default databases at runtime. The initial pool is placed into

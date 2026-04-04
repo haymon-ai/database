@@ -1,17 +1,17 @@
 //! MCP handler for the MySQL/MariaDB backend.
 //!
-//! Implements [`Backend`] on [`MysqlBackend`] to register
+//! Implements [`Backend`] on [`MysqlAdapter`] to register
 //! MySQL-specific MCP tools.
 
 use database_mcp_server::{Backend, Server};
 use rmcp::handler::server::tool::ToolRouter;
 
-use super::MysqlBackend;
+use super::MysqlAdapter;
 use super::tools::{
     CreateDatabaseTool, GetTableSchemaTool, ListDatabasesTool, ListTablesTool, ReadQueryTool, WriteQueryTool,
 };
 
-impl Backend for MysqlBackend {
+impl Backend for MysqlAdapter {
     fn provide_tool_router(&self) -> ToolRouter<Server<Self>> {
         let router = ToolRouter::new()
             .with_async_tool::<ListDatabasesTool>()

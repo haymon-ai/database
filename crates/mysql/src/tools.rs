@@ -11,10 +11,10 @@ use rmcp::model::{ErrorData, ToolAnnotations};
 
 use database_mcp_server::Server;
 
-use super::MysqlBackend;
+use super::MysqlAdapter;
 
 /// Type alias kept module-private for brevity in tool impls.
-type MysqlHandler = Server<MysqlBackend>;
+type MysqlHandler = Server<MysqlAdapter>;
 
 /// Tool to list all accessible databases.
 pub(super) struct ListDatabasesTool;

@@ -5,9 +5,9 @@ use serde_json::Value;
 use sqlx::sqlite::SqliteRow;
 use sqlx_to_json::RowExt;
 
-use super::SqliteBackend;
+use super::SqliteAdapter;
 
-impl SqliteBackend {
+impl SqliteAdapter {
     /// Lists all tables in a database.
     ///
     /// # Errors

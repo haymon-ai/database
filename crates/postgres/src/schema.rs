@@ -8,9 +8,9 @@ use serde_json::{Value, json};
 use sqlx::Row;
 use sqlx::postgres::PgRow;
 
-use super::PostgresBackend;
+use super::PostgresAdapter;
 
-impl PostgresBackend {
+impl PostgresAdapter {
     /// Returns column definitions with foreign key relationships.
     ///
     /// # Errors

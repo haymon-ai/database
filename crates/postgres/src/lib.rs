@@ -1,12 +1,12 @@
 //! `PostgreSQL` backend crate.
 //!
-//! Provides [`PostgresBackend`] for database operations with MCP
+//! Provides [`PostgresAdapter`] for database operations with MCP
 //! tool registration via [`Backend`](database_mcp_server::Backend).
 
-mod backend;
+mod adapter;
 mod operations;
 mod schema;
 mod server;
 mod tools;
 
-pub use backend::PostgresBackend;
+pub use adapter::PostgresAdapter;

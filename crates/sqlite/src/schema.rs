@@ -8,9 +8,9 @@ use serde_json::{Value, json};
 use sqlx::Row;
 use sqlx::sqlite::SqliteRow;
 
-use super::SqliteBackend;
+use super::SqliteAdapter;
 
-impl SqliteBackend {
+impl SqliteAdapter {
     /// Returns column definitions with foreign key relationships.
     ///
     /// # Errors

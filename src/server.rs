@@ -7,10 +7,10 @@
 use std::sync::Arc;
 
 use database_mcp_config::{Config, DatabaseBackend};
-use database_mcp_mysql::MysqlBackend;
-use database_mcp_postgres::PostgresBackend;
+use database_mcp_mysql::MysqlAdapter;
+use database_mcp_postgres::PostgresAdapter;
 use database_mcp_server::{Backend, Server};
-use database_mcp_sqlite::SqliteBackend;
+use database_mcp_sqlite::SqliteAdapter;
 use rmcp::service::{DynService, NotificationContext, RequestContext, ServiceExt};
 use rmcp::{RoleServer, Service};
 
@@ -66,9 +66,9 @@ impl Service<RoleServer> for ServerHandler {
 /// unreachable host, authentication failure).
 pub async fn create_handler(config: &Config) -> Result<ServerHandler, database_mcp_server::AppError> {
     let handler = match config.database.backend {
-        DatabaseBackend::Sqlite => SqliteBackend::new(&config.database).await?.into(),
-        DatabaseBackend::Postgres => PostgresBackend::new(&config.database).await?.into(),
-        DatabaseBackend::Mysql | DatabaseBackend::Mariadb => MysqlBackend::new(&config.database).await?.into(),
+        DatabaseBackend::Sqlite => SqliteAdapter::new(&config.database).await?.into(),
+        DatabaseBackend::Postgres => PostgresAdapter::new(&config.database).await?.into(),
+        DatabaseBackend::Mysql | DatabaseBackend::Mariadb => MysqlAdapter::new(&config.database).await?.into(),
     };
     Ok(handler)
 }
