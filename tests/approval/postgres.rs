@@ -8,19 +8,22 @@ use database_mcp_config::{DatabaseBackend, DatabaseConfig};
 use database_mcp_postgres::PostgresAdapter;
 
 /// Creates a `PostgreSQL` adapter from `DB_HOST` and `DB_PORT` environment variables.
-///
-/// Returns `None` if `DB_HOST` is not set or connection fails.
-async fn adapter(read_only: bool) -> Option<PostgresAdapter> {
+async fn adapter(read_only: bool) -> PostgresAdapter {
     let config = DatabaseConfig {
         backend: DatabaseBackend::Postgres,
-        host: std::env::var("DB_HOST").ok()?,
-        port: std::env::var("DB_PORT").ok()?.parse().ok()?,
+        host: std::env::var("DB_HOST").expect("DB_HOST must be set"),
+        port: std::env::var("DB_PORT")
+            .expect("DB_PORT must be set")
+            .parse()
+            .expect("DB_PORT must be a valid port number"),
         user: "postgres".into(),
         name: Some("app".into()),
         read_only,
         ..DatabaseConfig::default()
     };
-    PostgresAdapter::new(&config).await.ok()
+    PostgresAdapter::new(&config)
+        .await
+        .expect("PostgreSQL connection failed")
 }
 
 #[tokio::test]

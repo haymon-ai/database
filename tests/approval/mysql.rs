@@ -8,18 +8,19 @@ use database_mcp_config::{DatabaseBackend, DatabaseConfig};
 use database_mcp_mysql::MysqlAdapter;
 
 /// Creates a `MySQL` adapter from `DB_HOST` and `DB_PORT` environment variables.
-///
-/// Returns `None` if `DB_HOST` is not set or connection fails.
-async fn adapter(read_only: bool) -> Option<MysqlAdapter> {
+async fn adapter(read_only: bool) -> MysqlAdapter {
     let config = DatabaseConfig {
         backend: DatabaseBackend::Mysql,
-        host: std::env::var("DB_HOST").ok()?,
-        port: std::env::var("DB_PORT").ok()?.parse().ok()?,
+        host: std::env::var("DB_HOST").expect("DB_HOST must be set"),
+        port: std::env::var("DB_PORT")
+            .expect("DB_PORT must be set")
+            .parse()
+            .expect("DB_PORT must be a valid port number"),
         name: Some("app".into()),
         read_only,
         ..DatabaseConfig::default()
     };
-    MysqlAdapter::new(&config).await.ok()
+    MysqlAdapter::new(&config).await.expect("MySQL connection failed")
 }
 
 #[tokio::test]

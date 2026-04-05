@@ -8,15 +8,13 @@ use rmcp::service::{Peer, RunningService, ServiceExt};
 /// Connects an MCP adapter over a duplex transport, runs a closure, then cleans up.
 ///
 /// Handles the full client lifecycle: duplex creation, server spawn, closure
-/// execution, client cancellation, and server join. Does nothing when the
-/// adapter is `None` (backend unavailable).
-pub async fn run_with_client<S, F, Fut>(adapter: Option<S>, f: F)
+/// execution, client cancellation, and server join.
+pub async fn run_with_client<S, F, Fut>(adapter: S, f: F)
 where
     S: ServiceExt<rmcp::RoleServer> + Send + 'static,
     F: FnOnce(Peer<rmcp::RoleClient>) -> Fut,
     Fut: Future<Output = ()>,
 {
-    let Some(adapter) = adapter else { return };
     let (server_transport, client_transport) = tokio::io::duplex(4096);
 
     let server_handle = tokio::spawn(async move {

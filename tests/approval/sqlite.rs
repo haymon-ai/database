@@ -8,16 +8,14 @@ use database_mcp_config::{DatabaseBackend, DatabaseConfig};
 use database_mcp_sqlite::SqliteAdapter;
 
 /// Creates a `SQLite` adapter from the `DB_PATH` environment variable.
-///
-/// Returns `None` if `DB_PATH` is not set.
-async fn adapter(read_only: bool) -> Option<SqliteAdapter> {
+async fn adapter(read_only: bool) -> SqliteAdapter {
     let config = DatabaseConfig {
         backend: DatabaseBackend::Sqlite,
-        name: Some(std::env::var("DB_PATH").ok()?),
+        name: Some(std::env::var("DB_PATH").expect("DB_PATH must be set")),
         read_only,
         ..DatabaseConfig::default()
     };
-    Some(SqliteAdapter::new(&config).await.expect("SQLite open failed"))
+    SqliteAdapter::new(&config).await.expect("SQLite open failed")
 }
 
 #[tokio::test]
