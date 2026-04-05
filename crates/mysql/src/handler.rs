@@ -11,8 +11,6 @@ use super::MysqlAdapter;
 #[rmcp::tool_handler(router = self.build_tool_router())]
 impl rmcp::ServerHandler for MysqlAdapter {
     fn get_info(&self) -> ServerInfo {
-        server_info().with_instructions(
-            "Database MCP Server - provides database exploration and query tools for MySQL and MariaDB",
-        )
+        server_info()
     }
 }

@@ -8,8 +8,10 @@ expression: info
     "tools": {}
   },
   "serverInfo": {
-    "name": "database-mcp-server",
-    "version": "[version]"
-  },
-  "instructions": "Database MCP Server - provides database exploration and query tools for PostgreSQL"
+    "name": "database-mcp",
+    "title": "Database MCP Server",
+    "version": "[version]",
+    "description": "Database MCP Server for MySQL, MariaDB, PostgreSQL, and SQLite",
+    "websiteUrl": "https://database.haymon.ai"
+  }
 }
