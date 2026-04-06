@@ -98,7 +98,8 @@ mod tests {
 
     #[tokio::test]
     async fn none_timeout_runs_without_limit() {
-        let result: Result<i32, AppError> = execute_with_timeout(None, "SELECT 1", async { Ok::<_, TestError>(1) }).await;
+        let result: Result<i32, AppError> =
+            execute_with_timeout(None, "SELECT 1", async { Ok::<_, TestError>(1) }).await;
         assert_eq!(result.expect("should succeed"), 1);
     }
 
