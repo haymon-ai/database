@@ -111,7 +111,6 @@ async fn test_blocks_writes_in_read_only_mode() {
     assert!(response.is_err(), "Expected error for write in read-only mode");
 }
 
-
 #[tokio::test]
 async fn test_query_timeout_fast_query_succeeds() {
     let config = DatabaseConfig {
@@ -141,7 +140,6 @@ async fn test_query_timeout_disabled_with_none() {
     let response = adapter.tool_read_query(parameters).await;
     assert!(response.is_ok(), "Query should succeed without timeout");
 }
-
 
 #[tokio::test]
 async fn test_drop_table_success() {
@@ -180,7 +178,6 @@ async fn test_drop_table_nonexistent() {
     let response = adapter.tool_drop_table(drop_params).await;
     assert!(response.is_err(), "Expected error for nonexistent table");
 }
-
 
 #[tokio::test]
 async fn test_explain_query_select() {

@@ -223,7 +223,6 @@ async fn test_drop_database_invalid_identifier() {
     assert!(response.is_err(), "Expected error for empty database name");
 }
 
-
 #[tokio::test]
 async fn test_lists_tables_cross_database() {
     let adapter = adapter(false).await;
@@ -325,7 +324,6 @@ async fn test_uses_default_pool_for_matching_database() {
     );
 }
 
-
 #[tokio::test]
 async fn test_query_timeout_cancels_slow_query() {
     let config = DatabaseConfig {
@@ -370,7 +368,6 @@ async fn test_query_timeout_disabled_with_zero() {
     let response = adapter.tool_read_query(parameters).await;
     assert!(response.is_ok(), "Fast query should succeed without timeout");
 }
-
 
 #[tokio::test]
 async fn test_drop_table_success() {
@@ -454,7 +451,6 @@ async fn test_drop_table_invalid_identifier() {
     let response = adapter.tool_drop_table(drop_params).await;
     assert!(response.is_err(), "Expected error for empty table name");
 }
-
 
 #[tokio::test]
 async fn test_explain_query_select() {
