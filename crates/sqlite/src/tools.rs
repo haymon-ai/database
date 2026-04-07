@@ -5,8 +5,9 @@
 //! [`AsyncTool`] implementations.
 
 use super::types::{DropTableRequest, ExplainQueryRequest, GetTableSchemaRequest, QueryRequest};
+use database_mcp_server::types::ListTablesResponse;
 use rmcp::handler::server::tool::ToolRouter;
-use rmcp::handler::server::wrapper::Parameters;
+use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::model::{CallToolResult, Content, ErrorData};
 use rmcp::tool;
 
@@ -43,9 +44,9 @@ impl SqliteAdapter {
             open_world_hint = false
         )
     )]
-    pub async fn tool_list_tables(&self) -> Result<CallToolResult, ErrorData> {
-        let result = self.list_tables().await?;
-        Ok(CallToolResult::success(vec![Content::json(result)?]))
+    pub async fn tool_list_tables(&self) -> Result<Json<ListTablesResponse>, ErrorData> {
+        let tables = self.list_tables().await?;
+        Ok(Json(ListTablesResponse { tables }))
     }
 
     /// Get column definitions (type, nullable, key, default) and foreign key

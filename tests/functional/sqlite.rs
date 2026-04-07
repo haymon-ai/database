@@ -34,7 +34,7 @@ async fn test_lists_tables() {
     let adapter = adapter(false).await;
 
     let response = adapter.tool_list_tables().await.unwrap();
-    let tables: Vec<String> = response.into_typed().unwrap();
+    let tables = response.0.tables;
 
     for expected in ["users", "posts", "tags", "post_tags"] {
         assert!(
@@ -161,7 +161,7 @@ async fn test_drop_table_success() {
 
     // Verify it's gone
     let response = adapter.tool_list_tables().await.unwrap();
-    let tables: Vec<String> = response.into_typed().unwrap();
+    let tables = response.0.tables;
     assert!(
         !tables.iter().any(|t| t == "drop_test_simple"),
         "Table should not exist after drop"

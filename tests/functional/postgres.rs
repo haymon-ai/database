@@ -58,7 +58,7 @@ async fn test_lists_tables() {
     });
 
     let response = adapter.tool_list_tables(parameters).await.unwrap();
-    let tables: Vec<String> = response.into_typed().unwrap();
+    let tables = response.0.tables;
 
     for expected in ["users", "posts", "tags", "post_tags"] {
         assert!(
@@ -232,7 +232,7 @@ async fn test_lists_tables_cross_database() {
     });
 
     let response = adapter.tool_list_tables(parameters).await.unwrap();
-    let tables: Vec<String> = response.into_typed().unwrap();
+    let tables = response.0.tables;
 
     assert!(
         tables.iter().any(|t| t == "events"),
@@ -329,7 +329,7 @@ async fn test_uses_default_pool_for_matching_database() {
     });
 
     let response = adapter.tool_list_tables(parameters).await.unwrap();
-    let tables: Vec<String> = response.into_typed().unwrap();
+    let tables = response.0.tables;
 
     assert!(
         tables.iter().any(|t| t == "users"),
@@ -412,7 +412,7 @@ async fn test_drop_table_success() {
         database_name: "app".into(),
     });
     let response = adapter.tool_list_tables(tables_params).await.unwrap();
-    let tables: Vec<String> = response.into_typed().unwrap();
+    let tables = response.0.tables;
     assert!(
         !tables.iter().any(|t| t == "drop_test_simple"),
         "Table should not exist after drop"

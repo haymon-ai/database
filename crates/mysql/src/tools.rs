@@ -7,10 +7,10 @@
 use super::types::DropTableRequest;
 use database_mcp_server::types::{
     CreateDatabaseRequest, DropDatabaseRequest, ExplainQueryRequest, GetTableSchemaRequest, ListTablesRequest,
-    QueryRequest,
+    ListTablesResponse, QueryRequest,
 };
 use rmcp::handler::server::tool::ToolRouter;
-use rmcp::handler::server::wrapper::Parameters;
+use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::model::{CallToolResult, Content, ErrorData};
 use rmcp::tool;
 
@@ -67,9 +67,9 @@ impl MysqlAdapter {
     pub async fn tool_list_tables(
         &self,
         Parameters(request): Parameters<ListTablesRequest>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let result = self.list_tables(&request.database_name).await?;
-        Ok(CallToolResult::success(vec![Content::json(result)?]))
+    ) -> Result<Json<ListTablesResponse>, ErrorData> {
+        let tables = self.list_tables(&request.database_name).await?;
+        Ok(Json(ListTablesResponse { tables }))
     }
 
     /// Get column definitions (type, nullable, key, default) and foreign key
