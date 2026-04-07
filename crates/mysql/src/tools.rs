@@ -6,8 +6,8 @@
 
 use super::types::DropTableRequest;
 use database_mcp_server::types::{
-    CreateDatabaseRequest, DropDatabaseRequest, ExplainQueryRequest, GetTableSchemaRequest, ListTablesRequest,
-    ListTablesResponse, QueryRequest,
+    CreateDatabaseRequest, DropDatabaseRequest, ExplainQueryRequest, GetTableSchemaRequest, ListDatabasesResponse,
+    ListTablesRequest, ListTablesResponse, QueryRequest,
 };
 use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::{Json, Parameters};
@@ -48,9 +48,9 @@ impl MysqlAdapter {
             open_world_hint = false
         )
     )]
-    pub async fn tool_list_databases(&self) -> Result<CallToolResult, ErrorData> {
-        let result = self.list_databases().await?;
-        Ok(CallToolResult::success(vec![Content::json(result)?]))
+    pub async fn tool_list_databases(&self) -> Result<Json<ListDatabasesResponse>, ErrorData> {
+        let databases = self.list_databases().await?;
+        Ok(Json(ListDatabasesResponse { databases }))
     }
 
     /// List all tables in a specific database.

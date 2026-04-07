@@ -6,6 +6,13 @@ use rmcp::schemars;
 use rmcp::schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// Response for the `list_databases` tool.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ListDatabasesResponse {
+    /// Sorted list of database names.
+    pub databases: Vec<String>,
+}
+
 /// Request for the `list_tables` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 pub struct ListTablesRequest {

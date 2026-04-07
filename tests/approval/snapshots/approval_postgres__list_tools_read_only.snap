@@ -76,6 +76,24 @@ expression: tools
       "properties": {},
       "type": "object"
     },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Response for the `list_databases` tool.",
+      "properties": {
+        "databases": {
+          "description": "Sorted list of database names.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "databases"
+      ],
+      "title": "ListDatabasesResponse",
+      "type": "object"
+    },
     "annotations": {
       "readOnlyHint": true,
       "destructiveHint": false,

@@ -45,7 +45,7 @@ async fn test_lists_databases() {
     let adapter = adapter(false).await;
 
     let response = adapter.tool_list_databases().await.unwrap();
-    let dbs: Vec<String> = response.into_typed().unwrap();
+    let dbs = response.0.databases;
 
     assert!(dbs.iter().any(|db| db == "app"), "Expected 'app' in: {dbs:?}");
 }
@@ -152,7 +152,7 @@ async fn test_creates_database() {
     assert!(!value.is_null());
 
     let response = adapter.tool_list_databases().await.unwrap();
-    let dbs: Vec<String> = response.into_typed().unwrap();
+    let dbs = response.0.databases;
 
     assert!(dbs.iter().any(|db| db == "app_new"), "New db not in list");
 }
@@ -163,7 +163,7 @@ async fn test_drops_database() {
 
     // Verify seeded database exists
     let response = adapter.tool_list_databases().await.unwrap();
-    let dbs: Vec<String> = response.into_typed().unwrap();
+    let dbs = response.0.databases;
     assert!(dbs.iter().any(|db| db == "canary"), "canary should exist before drop");
 
     // Drop it
@@ -176,7 +176,7 @@ async fn test_drops_database() {
 
     // Verify it's gone
     let response = adapter.tool_list_databases().await.unwrap();
-    let dbs: Vec<String> = response.into_typed().unwrap();
+    let dbs = response.0.databases;
     assert!(
         !dbs.iter().any(|db| db == "canary"),
         "canary should not exist after drop"
@@ -285,7 +285,7 @@ async fn test_lists_databases_includes_cross_db() {
     let adapter = adapter(false).await;
 
     let response = adapter.tool_list_databases().await.unwrap();
-    let dbs: Vec<String> = response.into_typed().unwrap();
+    let dbs = response.0.databases;
 
     assert!(
         dbs.iter().any(|db| db == "analytics"),
