@@ -104,8 +104,7 @@ impl PostgresAdapter {
     ) -> Result<CallToolResult, ErrorData> {
         validate_read_only_with_dialect(&request.query, &sqlparser::dialect::PostgreSqlDialect {})?;
 
-        let db = Some(request.database_name.trim()).filter(|s| !s.is_empty());
-        let result = self.execute_query(&request.query, db).await?;
+        let result = self.read_query(&request).await?;
         Ok(CallToolResult::success(vec![Content::json(result)?]))
     }
 
@@ -123,8 +122,7 @@ impl PostgresAdapter {
         &self,
         Parameters(request): Parameters<QueryRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let db = Some(request.database_name.trim()).filter(|s| !s.is_empty());
-        let result = self.execute_query(&request.query, db).await?;
+        let result = self.write_query(&request).await?;
         Ok(CallToolResult::success(vec![Content::json(result)?]))
     }
 
@@ -142,7 +140,7 @@ impl PostgresAdapter {
         &self,
         Parameters(request): Parameters<CreateDatabaseRequest>,
     ) -> Result<Json<MessageResponse>, ErrorData> {
-        Ok(Json(self.create_database(&request.database_name).await?))
+        Ok(Json(self.create_database(&request).await?))
     }
 
     /// Return the execution plan for a SQL query.
@@ -159,9 +157,7 @@ impl PostgresAdapter {
         &self,
         Parameters(request): Parameters<ExplainQueryRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let result = self
-            .explain_query(&request.database_name, &request.query, request.analyze)
-            .await?;
+        let result = self.explain_query(&request).await?;
         Ok(CallToolResult::success(vec![Content::json(result)?]))
     }
 
@@ -180,10 +176,7 @@ impl PostgresAdapter {
         &self,
         Parameters(request): Parameters<DropTableRequest>,
     ) -> Result<Json<MessageResponse>, ErrorData> {
-        Ok(Json(
-            self.drop_table(&request.database_name, &request.table_name, request.cascade)
-                .await?,
-        ))
+        Ok(Json(self.drop_table(&request).await?))
     }
 
     /// Drop an existing database. Cannot drop the currently connected database.
@@ -200,6 +193,6 @@ impl PostgresAdapter {
         &self,
         Parameters(request): Parameters<DropDatabaseRequest>,
     ) -> Result<Json<MessageResponse>, ErrorData> {
-        Ok(Json(self.drop_database(&request.database_name).await?))
+        Ok(Json(self.drop_database(&request).await?))
     }
 }

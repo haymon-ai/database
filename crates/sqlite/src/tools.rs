@@ -82,7 +82,7 @@ impl SqliteAdapter {
     ) -> Result<CallToolResult, ErrorData> {
         validate_read_only_with_dialect(&request.query, &sqlparser::dialect::SQLiteDialect {})?;
 
-        let result = self.execute_query(&request.query).await?;
+        let result = self.read_query(&request).await?;
         Ok(CallToolResult::success(vec![Content::json(result)?]))
     }
 
@@ -100,7 +100,7 @@ impl SqliteAdapter {
         &self,
         Parameters(request): Parameters<ExplainQueryRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let result = self.explain_query(&request.query).await?;
+        let result = self.explain_query(&request).await?;
         Ok(CallToolResult::success(vec![Content::json(result)?]))
     }
 
@@ -118,7 +118,7 @@ impl SqliteAdapter {
         &self,
         Parameters(request): Parameters<DropTableRequest>,
     ) -> Result<Json<MessageResponse>, ErrorData> {
-        Ok(Json(self.drop_table(&request.table_name).await?))
+        Ok(Json(self.drop_table(&request).await?))
     }
 
     /// Execute a write SQL query (INSERT, UPDATE, DELETE, CREATE, ALTER, DROP).
@@ -135,7 +135,7 @@ impl SqliteAdapter {
         &self,
         Parameters(request): Parameters<QueryRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let result = self.execute_query(&request.query).await?;
+        let result = self.write_query(&request).await?;
         Ok(CallToolResult::success(vec![Content::json(result)?]))
     }
 }

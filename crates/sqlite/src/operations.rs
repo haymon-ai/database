@@ -1,5 +1,6 @@
 //! `SQLite` database query operations.
 
+use super::types::{DropTableRequest, ExplainQueryRequest, QueryRequest};
 use database_mcp_server::AppError;
 use database_mcp_server::types::{ListTablesResponse, MessageResponse};
 use database_mcp_sql::identifier::validate_identifier;
@@ -36,10 +37,11 @@ impl SqliteAdapter {
     /// Returns [`AppError::ReadOnlyViolation`] in read-only mode,
     /// [`AppError::InvalidIdentifier`] for invalid names,
     /// or [`AppError::Query`] if the backend reports an error.
-    pub(crate) async fn drop_table(&self, table: &str) -> Result<MessageResponse, AppError> {
+    pub(crate) async fn drop_table(&self, request: &DropTableRequest) -> Result<MessageResponse, AppError> {
         if self.config.read_only {
             return Err(AppError::ReadOnlyViolation);
         }
+        let table = &request.table_name;
         validate_identifier(table)?;
 
         let drop_sql = format!("DROP TABLE {}", Self::quote_identifier(table));
@@ -63,8 +65,8 @@ impl SqliteAdapter {
     /// # Errors
     ///
     /// Returns [`AppError::Query`] if the backend reports an error.
-    pub(crate) async fn explain_query(&self, query: &str) -> Result<Value, AppError> {
-        let explain_sql = format!("EXPLAIN QUERY PLAN {query}");
+    pub(crate) async fn explain_query(&self, request: &ExplainQueryRequest) -> Result<Value, AppError> {
+        let explain_sql = format!("EXPLAIN QUERY PLAN {}", request.query);
         let rows: Vec<SqliteRow> = execute_with_timeout(
             self.config.query_timeout,
             &explain_sql,
@@ -75,14 +77,28 @@ impl SqliteAdapter {
     }
 
     /// Executes a SQL query and returns rows as JSON.
+    async fn execute_query(&self, sql: &str) -> Result<Value, AppError> {
+        let rows: Vec<SqliteRow> =
+            execute_with_timeout(self.config.query_timeout, sql, sqlx::query(sql).fetch_all(&self.pool)).await?;
+        Ok(Value::Array(rows.iter().map(RowExt::to_json).collect()))
+    }
+
+    /// Executes a read-only SQL query.
     ///
     /// # Errors
     ///
     /// Returns [`AppError`] if the query fails.
-    pub(crate) async fn execute_query(&self, sql: &str) -> Result<Value, AppError> {
-        let rows: Vec<SqliteRow> =
-            execute_with_timeout(self.config.query_timeout, sql, sqlx::query(sql).fetch_all(&self.pool)).await?;
-        Ok(Value::Array(rows.iter().map(RowExt::to_json).collect()))
+    pub(crate) async fn read_query(&self, request: &QueryRequest) -> Result<Value, AppError> {
+        self.execute_query(&request.query).await
+    }
+
+    /// Executes a write SQL query.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppError`] if the query fails.
+    pub(crate) async fn write_query(&self, request: &QueryRequest) -> Result<Value, AppError> {
+        self.execute_query(&request.query).await
     }
 }
 

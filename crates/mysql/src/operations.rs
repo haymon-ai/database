@@ -3,8 +3,12 @@
 //! Provides methods for listing databases, tables, executing queries,
 //! creating databases, dropping databases, and explaining queries.
 
+use super::types::DropTableRequest;
 use database_mcp_server::AppError;
-use database_mcp_server::types::{ListDatabasesResponse, ListTablesRequest, ListTablesResponse, MessageResponse};
+use database_mcp_server::types::{
+    CreateDatabaseRequest, DropDatabaseRequest, ExplainQueryRequest, ListDatabasesResponse, ListTablesRequest,
+    ListTablesResponse, MessageResponse, QueryRequest,
+};
 use database_mcp_sql::identifier::validate_identifier;
 use database_mcp_sql::timeout::execute_with_timeout;
 use database_mcp_sql::validation::validate_read_only_with_dialect;
@@ -91,12 +95,28 @@ impl MysqlAdapter {
     }
 
     /// Executes a SQL query and returns rows as JSON.
+    async fn execute_query(&self, sql: &str, database: Option<&str>) -> Result<Value, AppError> {
+        self.query_to_json(sql, database).await
+    }
+
+    /// Executes a read-only SQL query.
     ///
     /// # Errors
     ///
     /// Returns [`AppError`] if the query fails.
-    pub(crate) async fn execute_query(&self, sql: &str, database: Option<&str>) -> Result<Value, AppError> {
-        self.query_to_json(sql, database).await
+    pub(crate) async fn read_query(&self, request: &QueryRequest) -> Result<Value, AppError> {
+        let db = Some(request.database_name.trim()).filter(|s| !s.is_empty());
+        self.execute_query(&request.query, db).await
+    }
+
+    /// Executes a write SQL query.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppError`] if the query fails.
+    pub(crate) async fn write_query(&self, request: &QueryRequest) -> Result<Value, AppError> {
+        let db = Some(request.database_name.trim()).filter(|s| !s.is_empty());
+        self.execute_query(&request.query, db).await
     }
 
     /// Returns the execution plan for a query.
@@ -109,18 +129,18 @@ impl MysqlAdapter {
     /// Returns [`AppError::ReadOnlyViolation`] if `analyze` is true,
     /// read-only mode is enabled, and the query is a write statement.
     /// Returns [`AppError::Query`] if the backend reports an error.
-    pub(crate) async fn explain_query(&self, database: &str, query: &str, analyze: bool) -> Result<Value, AppError> {
-        if analyze && self.config.read_only {
-            validate_read_only_with_dialect(query, &sqlparser::dialect::MySqlDialect {})?;
+    pub(crate) async fn explain_query(&self, request: &ExplainQueryRequest) -> Result<Value, AppError> {
+        if request.analyze && self.config.read_only {
+            validate_read_only_with_dialect(&request.query, &sqlparser::dialect::MySqlDialect {})?;
         }
 
-        let explain_sql = if analyze {
-            format!("EXPLAIN ANALYZE {query}")
+        let explain_sql = if request.analyze {
+            format!("EXPLAIN ANALYZE {}", request.query)
         } else {
-            format!("EXPLAIN FORMAT=JSON {query}")
+            format!("EXPLAIN FORMAT=JSON {}", request.query)
         };
 
-        self.query_to_json(&explain_sql, Some(database)).await
+        self.query_to_json(&explain_sql, Some(&request.database_name)).await
     }
 
     /// Creates a database if it doesn't exist.
@@ -128,10 +148,11 @@ impl MysqlAdapter {
     /// # Errors
     ///
     /// Returns [`AppError`] if read-only or the query fails.
-    pub(crate) async fn create_database(&self, name: &str) -> Result<MessageResponse, AppError> {
+    pub(crate) async fn create_database(&self, request: &CreateDatabaseRequest) -> Result<MessageResponse, AppError> {
         if self.config.read_only {
             return Err(AppError::ReadOnlyViolation);
         }
+        let name = &request.database_name;
         validate_identifier(name)?;
 
         // Check existence — use Vec<u8> because MySQL 9 returns BINARY columns
@@ -172,15 +193,17 @@ impl MysqlAdapter {
     /// Returns [`AppError::ReadOnlyViolation`] in read-only mode,
     /// [`AppError::InvalidIdentifier`] for invalid names,
     /// or [`AppError::Query`] if the backend reports an error.
-    pub(crate) async fn drop_table(&self, database: &str, table: &str) -> Result<MessageResponse, AppError> {
+    pub(crate) async fn drop_table(&self, request: &DropTableRequest) -> Result<MessageResponse, AppError> {
         if self.config.read_only {
             return Err(AppError::ReadOnlyViolation);
         }
+        let database = &request.database_name;
+        let table = &request.table_name;
         validate_identifier(database)?;
         validate_identifier(table)?;
 
         let pool = self.pool.clone();
-        let db = database.to_string();
+        let db = database.clone();
         let drop_sql = format!("DROP TABLE {}", Self::quote_identifier(table));
         let drop_sql_label = drop_sql.clone();
 
@@ -210,10 +233,11 @@ impl MysqlAdapter {
     /// [`AppError::InvalidIdentifier`] for invalid names,
     /// or [`AppError::Query`] if the target is the active database
     /// or the backend reports an error.
-    pub(crate) async fn drop_database(&self, name: &str) -> Result<MessageResponse, AppError> {
+    pub(crate) async fn drop_database(&self, request: &DropDatabaseRequest) -> Result<MessageResponse, AppError> {
         if self.config.read_only {
             return Err(AppError::ReadOnlyViolation);
         }
+        let name = &request.database_name;
         validate_identifier(name)?;
 
         // Guard: prevent dropping the currently connected database.
