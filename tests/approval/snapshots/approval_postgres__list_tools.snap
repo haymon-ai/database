@@ -22,6 +22,21 @@ expression: tools
       "title": "CreateDatabaseRequest",
       "type": "object"
     },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Response for tools with no structured return data.",
+      "properties": {
+        "message": {
+          "description": "Description of the completed operation.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "MessageResponse",
+      "type": "object"
+    },
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": false,
@@ -45,6 +60,21 @@ expression: tools
         "database_name"
       ],
       "title": "DropDatabaseRequest",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Response for tools with no structured return data.",
+      "properties": {
+        "message": {
+          "description": "Description of the completed operation.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "MessageResponse",
       "type": "object"
     },
     "annotations": {
@@ -80,6 +110,21 @@ expression: tools
         "table_name"
       ],
       "title": "DropTableRequest",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Response for tools with no structured return data.",
+      "properties": {
+        "message": {
+          "description": "Description of the completed operation.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "MessageResponse",
       "type": "object"
     },
     "annotations": {

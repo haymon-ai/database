@@ -156,8 +156,7 @@ async fn test_drop_table_success() {
         table_name: "drop_test_simple".into(),
     });
     let response = adapter.tool_drop_table(drop_params).await.unwrap();
-    let value: Value = response.into_typed().unwrap();
-    assert_eq!(value["status"], "success");
+    assert!(response.0.message.contains("dropped successfully"));
 
     // Verify it's gone
     let response = adapter.tool_list_tables().await.unwrap();

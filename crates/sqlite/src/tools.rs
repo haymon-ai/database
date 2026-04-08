@@ -5,7 +5,7 @@
 //! [`AsyncTool`] implementations.
 
 use super::types::{DropTableRequest, ExplainQueryRequest, GetTableSchemaRequest, QueryRequest};
-use database_mcp_server::types::ListTablesResponse;
+use database_mcp_server::types::{ListTablesResponse, MessageResponse};
 use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::model::{CallToolResult, Content, ErrorData};
@@ -118,9 +118,8 @@ impl SqliteAdapter {
     pub async fn tool_drop_table(
         &self,
         Parameters(request): Parameters<DropTableRequest>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let result = self.drop_table(&request.table_name).await?;
-        Ok(CallToolResult::success(vec![Content::json(result)?]))
+    ) -> Result<Json<MessageResponse>, ErrorData> {
+        Ok(Json(self.drop_table(&request.table_name).await?))
     }
 
     /// Execute a write SQL query (INSERT, UPDATE, DELETE, CREATE, ALTER, DROP).

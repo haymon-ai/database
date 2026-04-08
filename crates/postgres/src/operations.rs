@@ -4,11 +4,11 @@
 //! creating databases, dropping databases, and explaining queries.
 
 use database_mcp_server::AppError;
-use database_mcp_server::types::{ListDatabasesResponse, ListTablesRequest, ListTablesResponse};
+use database_mcp_server::types::{ListDatabasesResponse, ListTablesRequest, ListTablesResponse, MessageResponse};
 use database_mcp_sql::identifier::validate_identifier;
 use database_mcp_sql::timeout::execute_with_timeout;
 use database_mcp_sql::validation::validate_read_only_with_dialect;
-use serde_json::{Value, json};
+use serde_json::Value;
 use sqlx::postgres::PgRow;
 use sqlx_to_json::RowExt;
 
@@ -39,7 +39,11 @@ impl PostgresAdapter {
     ///
     /// Returns [`AppError`] if the identifier is invalid or the query fails.
     pub(crate) async fn list_tables(&self, request: &ListTablesRequest) -> Result<ListTablesResponse, AppError> {
-        let db = if request.database_name.is_empty() { None } else { Some(request.database_name.as_str()) };
+        let db = if request.database_name.is_empty() {
+            None
+        } else {
+            Some(request.database_name.as_str())
+        };
         let pool = self.get_pool(db).await?;
         let sql = "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename";
         let rows: Vec<(String,)> =
@@ -99,7 +103,7 @@ impl PostgresAdapter {
     /// # Errors
     ///
     /// Returns [`AppError`] if read-only or the query fails.
-    pub(crate) async fn create_database(&self, name: &str) -> Result<Value, AppError> {
+    pub(crate) async fn create_database(&self, name: &str) -> Result<MessageResponse, AppError> {
         if self.config.read_only {
             return Err(AppError::ReadOnlyViolation);
         }
@@ -123,11 +127,9 @@ impl PostgresAdapter {
             e
         })?;
 
-        Ok(json!({
-            "status": "success",
-            "message": format!("Database '{name}' created successfully."),
-            "database_name": name,
-        }))
+        Ok(MessageResponse {
+            message: format!("Database '{name}' created successfully."),
+        })
     }
 
     /// Drops a table from a database.
@@ -141,7 +143,12 @@ impl PostgresAdapter {
     /// Returns [`AppError::ReadOnlyViolation`] in read-only mode,
     /// [`AppError::InvalidIdentifier`] for invalid names,
     /// or [`AppError::Query`] if the backend reports an error.
-    pub(crate) async fn drop_table(&self, database: &str, table: &str, cascade: bool) -> Result<Value, AppError> {
+    pub(crate) async fn drop_table(
+        &self,
+        database: &str,
+        table: &str,
+        cascade: bool,
+    ) -> Result<MessageResponse, AppError> {
         if self.config.read_only {
             return Err(AppError::ReadOnlyViolation);
         }
@@ -162,11 +169,9 @@ impl PostgresAdapter {
         )
         .await?;
 
-        Ok(json!({
-            "status": "success",
-            "message": format!("Table '{table}' dropped successfully."),
-            "table_name": table,
-        }))
+        Ok(MessageResponse {
+            message: format!("Table '{table}' dropped successfully."),
+        })
     }
 
     /// Drops an existing database.
@@ -180,7 +185,7 @@ impl PostgresAdapter {
     /// [`AppError::InvalidIdentifier`] for invalid names,
     /// or [`AppError::Query`] if the target is the active database
     /// or the backend reports an error.
-    pub(crate) async fn drop_database(&self, name: &str) -> Result<Value, AppError> {
+    pub(crate) async fn drop_database(&self, name: &str) -> Result<MessageResponse, AppError> {
         if self.config.read_only {
             return Err(AppError::ReadOnlyViolation);
         }
@@ -207,10 +212,8 @@ impl PostgresAdapter {
         // are not reused.
         self.pools.invalidate(name).await;
 
-        Ok(json!({
-            "status": "success",
-            "message": format!("Database '{name}' dropped successfully."),
-            "database_name": name,
-        }))
+        Ok(MessageResponse {
+            message: format!("Database '{name}' dropped successfully."),
+        })
     }
 }

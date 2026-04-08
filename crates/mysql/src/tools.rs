@@ -7,7 +7,7 @@
 use super::types::DropTableRequest;
 use database_mcp_server::types::{
     CreateDatabaseRequest, DropDatabaseRequest, ExplainQueryRequest, GetTableSchemaRequest, ListDatabasesResponse,
-    ListTablesRequest, ListTablesResponse, QueryRequest,
+    ListTablesRequest, ListTablesResponse, MessageResponse, QueryRequest,
 };
 use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::{Json, Parameters};
@@ -144,9 +144,8 @@ impl MysqlAdapter {
     pub async fn tool_create_database(
         &self,
         Parameters(request): Parameters<CreateDatabaseRequest>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let result = self.create_database(&request.database_name).await?;
-        Ok(CallToolResult::success(vec![Content::json(result)?]))
+    ) -> Result<Json<MessageResponse>, ErrorData> {
+        Ok(Json(self.create_database(&request.database_name).await?))
     }
 
     /// Return the execution plan for a SQL query.
@@ -182,9 +181,10 @@ impl MysqlAdapter {
     pub async fn tool_drop_table(
         &self,
         Parameters(request): Parameters<DropTableRequest>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let result = self.drop_table(&request.database_name, &request.table_name).await?;
-        Ok(CallToolResult::success(vec![Content::json(result)?]))
+    ) -> Result<Json<MessageResponse>, ErrorData> {
+        Ok(Json(
+            self.drop_table(&request.database_name, &request.table_name).await?,
+        ))
     }
 
     /// Drop an existing database. Cannot drop the currently connected database.
@@ -200,8 +200,7 @@ impl MysqlAdapter {
     pub async fn tool_drop_database(
         &self,
         Parameters(request): Parameters<DropDatabaseRequest>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let result = self.drop_database(&request.database_name).await?;
-        Ok(CallToolResult::success(vec![Content::json(result)?]))
+    ) -> Result<Json<MessageResponse>, ErrorData> {
+        Ok(Json(self.drop_database(&request.database_name).await?))
     }
 }

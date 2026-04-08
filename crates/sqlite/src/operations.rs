@@ -1,10 +1,10 @@
 //! `SQLite` database query operations.
 
 use database_mcp_server::AppError;
-use database_mcp_server::types::ListTablesResponse;
+use database_mcp_server::types::{ListTablesResponse, MessageResponse};
 use database_mcp_sql::identifier::validate_identifier;
 use database_mcp_sql::timeout::execute_with_timeout;
-use serde_json::{Value, json};
+use serde_json::Value;
 use sqlx::sqlite::SqliteRow;
 use sqlx_to_json::RowExt;
 
@@ -36,7 +36,7 @@ impl SqliteAdapter {
     /// Returns [`AppError::ReadOnlyViolation`] in read-only mode,
     /// [`AppError::InvalidIdentifier`] for invalid names,
     /// or [`AppError::Query`] if the backend reports an error.
-    pub(crate) async fn drop_table(&self, table: &str) -> Result<Value, AppError> {
+    pub(crate) async fn drop_table(&self, table: &str) -> Result<MessageResponse, AppError> {
         if self.config.read_only {
             return Err(AppError::ReadOnlyViolation);
         }
@@ -50,11 +50,9 @@ impl SqliteAdapter {
         )
         .await?;
 
-        Ok(json!({
-            "status": "success",
-            "message": format!("Table '{table}' dropped successfully."),
-            "table_name": table,
-        }))
+        Ok(MessageResponse {
+            message: format!("Table '{table}' dropped successfully."),
+        })
     }
 
     /// Returns the execution plan for a query.

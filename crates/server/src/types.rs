@@ -6,6 +6,13 @@ use rmcp::schemars;
 use rmcp::schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// Response for tools with no structured return data.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct MessageResponse {
+    /// Description of the completed operation.
+    pub message: String,
+}
+
 /// Response for the `list_databases` tool.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ListDatabasesResponse {

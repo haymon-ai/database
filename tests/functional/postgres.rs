@@ -147,9 +147,7 @@ async fn test_creates_database() {
     });
 
     let response = adapter.tool_create_database(parameters).await.unwrap();
-    let value: Value = response.into_typed().unwrap();
-
-    assert!(!value.is_null());
+    assert!(response.0.message.contains("created successfully"));
 
     let response = adapter.tool_list_databases().await.unwrap();
     let dbs = response.0.databases;
@@ -171,8 +169,7 @@ async fn test_drops_database() {
         database_name: "canary".into(),
     });
     let response = adapter.tool_drop_database(drop_params).await.unwrap();
-    let value: Value = response.into_typed().unwrap();
-    assert_eq!(value["status"], "success");
+    assert!(response.0.message.contains("dropped successfully"));
 
     // Verify it's gone
     let response = adapter.tool_list_databases().await.unwrap();
@@ -192,8 +189,10 @@ async fn test_drop_active_database_blocked() {
 
     let response = adapter.tool_drop_database(parameters).await;
 
-    assert!(response.is_err(), "Expected error when dropping active database");
-    let err_msg = format!("{:?}", response.unwrap_err());
+    let err_msg = format!(
+        "{:?}",
+        response.err().expect("Expected error when dropping active database")
+    );
     assert!(
         err_msg.contains("currently connected"),
         "Expected 'currently connected' in error, got: {err_msg}"
@@ -404,8 +403,7 @@ async fn test_drop_table_success() {
         cascade: false,
     });
     let response = adapter.tool_drop_table(drop_params).await.unwrap();
-    let value: Value = response.into_typed().unwrap();
-    assert_eq!(value["status"], "success");
+    assert!(response.0.message.contains("dropped successfully"));
 
     // Verify it's gone
     let tables_params = Parameters(ListTablesRequest {
@@ -484,8 +482,7 @@ async fn test_drop_table_cascade() {
         cascade: true,
     });
     let response = adapter.tool_drop_table(drop_params).await.unwrap();
-    let value: Value = response.into_typed().unwrap();
-    assert_eq!(value["status"], "success");
+    assert!(response.0.message.contains("dropped successfully"));
 
     // Clean up child table (still exists, just lost FK constraint)
     let cleanup = Parameters(QueryRequest {
