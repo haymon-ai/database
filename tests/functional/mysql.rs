@@ -333,7 +333,7 @@ async fn test_query_timeout_cancels_slow_query() {
     let elapsed = start.elapsed();
 
     assert!(response.is_err(), "Expected timeout error");
-    let err_msg = format!("{:?}", response.map(|_| ()).unwrap_err());
+    let err_msg = response.map(|_| ()).unwrap_err().to_string();
     assert!(
         err_msg.contains("timed out"),
         "Expected timeout message, got: {err_msg}"
