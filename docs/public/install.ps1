@@ -75,29 +75,6 @@
         Write-Host ""
     }
 
-    function Show-Guidance {
-        Write-Host ""
-        Write-Host "What's next?" -ForegroundColor Cyan
-        Write-Host ""
-        Write-Host "  Add database-mcp to your MCP client config (.mcp.json):"
-        Write-Host ""
-        Write-Host '    {'
-        Write-Host '      "mcpServers": {'
-        Write-Host '        "database-mcp": {'
-        Write-Host '          "command": "database-mcp",'
-        Write-Host '          "env": {'
-        Write-Host '            "DB_BACKEND": "postgres",'
-        Write-Host '            "DB_HOST": "localhost",'
-        Write-Host '            "DB_USER": "postgres"'
-        Write-Host '          }'
-        Write-Host '        }'
-        Write-Host '      }'
-        Write-Host '    }'
-        Write-Host ""
-        Write-Host "  Documentation: https://database.haymon.ai/docs/"
-        Write-Host ""
-    }
-
     # --- Main flow ---
 
     $BinaryName = "database-mcp"
@@ -188,9 +165,6 @@
 
         # Check PATH and add if needed
         Add-ToPath -Dir $BinDir
-
-        # Print guidance
-        Show-Guidance
     }
     catch {
         Write-Host ""

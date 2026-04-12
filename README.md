@@ -21,14 +21,22 @@ A single-binary [MCP](https://modelcontextprotocol.io/) server for SQL databases
 
 ## Install
 
+**macOS, Linux, WSL**:
+
 ```bash
 curl -fsSL https://database.haymon.ai/install.sh | bash
 ```
 
-On Windows (PowerShell):
+**Windows PowerShell**:
 
 ```powershell
 irm https://database.haymon.ai/install.ps1 | iex
+```
+
+**Windows CMD**:
+
+```batch
+curl -fsSL https://database.haymon.ai/install.cmd -o install.cmd && install.cmd && del install.cmd
 ```
 
 See the [installation docs](https://database.haymon.ai/docs/installation) for Docker, Cargo, and other methods.

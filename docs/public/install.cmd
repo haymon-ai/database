@@ -129,28 +129,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "  Write-Host '  Restart your terminal for the change to take effect.'; Write-Host ''" ^
     "}"
 
-REM Print guidance
-echo.
-echo What's next?
-echo.
-echo   Add database-mcp to your MCP client config (.mcp.json):
-echo.
-echo     {
-echo       "mcpServers": {
-echo         "database-mcp": {
-echo           "command": "database-mcp",
-echo           "env": {
-echo             "DB_BACKEND": "postgres",
-echo             "DB_HOST": "localhost",
-echo             "DB_USER": "postgres"
-echo           }
-echo         }
-echo       }
-echo     }
-echo.
-echo   Documentation: https://database.haymon.ai/docs/
-echo.
-
 goto :cleanup_ok
 
 :cleanup_fail

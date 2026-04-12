@@ -156,30 +156,6 @@ main() {
 
     # T013/T014: Upgrade messaging integrated into resolve_install_dir above
 
-    # T015: Post-install guidance
-    print_guidance() {
-        echo ""
-        info "What's next?"
-        echo ""
-        echo "  Add database-mcp to your MCP client config (.mcp.json):"
-        echo ""
-        echo "    {"
-        echo "      \"mcpServers\": {"
-        echo "        \"database-mcp\": {"
-        echo "          \"command\": \"database-mcp\","
-        echo "          \"env\": {"
-        echo "            \"DB_BACKEND\": \"postgres\","
-        echo "            \"DB_HOST\": \"localhost\","
-        echo "            \"DB_USER\": \"postgres\""
-        echo "          }"
-        echo "        }"
-        echo "      }"
-        echo "    }"
-        echo ""
-        echo "  Documentation: https://database.haymon.ai/docs/"
-        echo ""
-    }
-
     # T016: PATH check and instructions
     check_path() {
         _dir="$1"
@@ -290,9 +266,6 @@ main() {
 
     # T016: Check PATH
     check_path "$BIN_DIR"
-
-    # T015: Print guidance
-    print_guidance
 }
 
 main "$@"
