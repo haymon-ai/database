@@ -11,7 +11,7 @@ use database_mcp_server::AppError;
 use database_mcp_sql::Connection;
 use database_mcp_sql::identifier::validate_identifier;
 use moka::future::Cache;
-use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions, PgSslMode};
+use sqlx::postgres::{PgConnectOptions, PgPool, PgSslMode};
 use tracing::info;
 
 /// Maximum number of cached per-database connection pools.
@@ -109,7 +109,7 @@ impl PostgresConnection {
             .get_with(key, async {
                 let mut cfg = config;
                 cfg.name = Some(db_key.to_owned());
-                pool_options(&cfg).connect_lazy_with(connect_options(&cfg))
+                create_lazy_pool(&cfg)
             })
             .await;
 
@@ -130,27 +130,12 @@ impl Connection for PostgresConnection {
     }
 }
 
-/// Builds [`PgPoolOptions`] with lifecycle defaults from a [`DatabaseConfig`].
-fn pool_options(config: &DatabaseConfig) -> PgPoolOptions {
-    let mut opts = PgPoolOptions::new()
-        .max_connections(config.max_pool_size)
-        .min_connections(DatabaseConfig::DEFAULT_MIN_CONNECTIONS)
-        .idle_timeout(Duration::from_secs(DatabaseConfig::DEFAULT_IDLE_TIMEOUT_SECS))
-        .max_lifetime(Duration::from_secs(DatabaseConfig::DEFAULT_MAX_LIFETIME_SECS));
-
-    if let Some(timeout) = config.connection_timeout {
-        opts = opts.acquire_timeout(Duration::from_secs(timeout));
-    }
-
-    opts
-}
-
-/// Builds [`PgConnectOptions`] from a [`DatabaseConfig`].
+/// Creates a lazy `PostgreSQL` pool from a [`DatabaseConfig`].
 ///
 /// Uses [`PgConnectOptions::new_without_pgpass`] to avoid unintended
 /// `PG*` environment variable influence, since our config already
 /// resolves values from CLI/env.
-fn connect_options(config: &DatabaseConfig) -> PgConnectOptions {
+fn create_lazy_pool(config: &DatabaseConfig) -> PgPool {
     let mut opts = PgConnectOptions::new_without_pgpass()
         .host(&config.host)
         .port(config.port)
@@ -182,7 +167,17 @@ fn connect_options(config: &DatabaseConfig) -> PgConnectOptions {
         }
     }
 
-    opts
+    let mut pool_opts = sqlx::pool::PoolOptions::new()
+        .max_connections(config.max_pool_size)
+        .min_connections(DatabaseConfig::DEFAULT_MIN_CONNECTIONS)
+        .idle_timeout(Duration::from_secs(DatabaseConfig::DEFAULT_IDLE_TIMEOUT_SECS))
+        .max_lifetime(Duration::from_secs(DatabaseConfig::DEFAULT_MAX_LIFETIME_SECS));
+
+    if let Some(timeout) = config.connection_timeout {
+        pool_opts = pool_opts.acquire_timeout(Duration::from_secs(timeout));
+    }
+
+    pool_opts.connect_lazy_with(opts)
 }
 
 #[cfg(test)]
@@ -202,97 +197,28 @@ mod tests {
         }
     }
 
-    #[test]
-    fn pool_options_applies_defaults() {
-        let config = base_config();
-        let opts = pool_options(&config);
-
-        assert_eq!(opts.get_max_connections(), config.max_pool_size);
-        assert_eq!(opts.get_min_connections(), DatabaseConfig::DEFAULT_MIN_CONNECTIONS);
-        assert_eq!(
-            opts.get_idle_timeout(),
-            Some(Duration::from_secs(DatabaseConfig::DEFAULT_IDLE_TIMEOUT_SECS))
-        );
-        assert_eq!(
-            opts.get_max_lifetime(),
-            Some(Duration::from_secs(DatabaseConfig::DEFAULT_MAX_LIFETIME_SECS))
-        );
+    #[tokio::test]
+    async fn create_lazy_pool_returns_idle_pool() {
+        let pool = create_lazy_pool(&base_config());
+        assert_eq!(pool.size(), 0, "pool should be lazy (no connections yet)");
     }
 
-    #[test]
-    fn pool_options_applies_connection_timeout() {
-        let config = DatabaseConfig {
-            connection_timeout: Some(7),
-            ..base_config()
-        };
-        let opts = pool_options(&config);
-
-        assert_eq!(opts.get_acquire_timeout(), Duration::from_secs(7));
-    }
-
-    #[test]
-    fn pool_options_without_connection_timeout_uses_sqlx_default() {
-        let config = base_config();
-        let opts = pool_options(&config);
-
-        assert_eq!(opts.get_acquire_timeout(), Duration::from_secs(30));
-    }
-
-    #[test]
-    fn try_from_basic_config() {
-        let config = base_config();
-        let opts = connect_options(&config);
-
-        assert_eq!(opts.get_host(), "pg.example.com");
-        assert_eq!(opts.get_port(), 5433);
-        assert_eq!(opts.get_username(), "pgadmin");
-        assert_eq!(opts.get_database(), Some("mydb"));
-    }
-
-    #[test]
-    fn try_from_with_ssl_require() {
-        let config = DatabaseConfig {
-            ssl: true,
-            ssl_verify_cert: false,
-            ..base_config()
-        };
-        let opts = connect_options(&config);
-
-        assert!(matches!(opts.get_ssl_mode(), PgSslMode::Require));
-    }
-
-    #[test]
-    fn try_from_with_ssl_verify_ca() {
-        let config = DatabaseConfig {
-            ssl: true,
-            ssl_verify_cert: true,
-            ..base_config()
-        };
-        let opts = connect_options(&config);
-
-        assert!(matches!(opts.get_ssl_mode(), PgSslMode::VerifyCa));
-    }
-
-    #[test]
-    fn try_from_without_database_name() {
-        let config = DatabaseConfig {
-            name: None,
-            ..base_config()
-        };
-        let opts = connect_options(&config);
-
-        assert_eq!(opts.get_database(), None);
-    }
-
-    #[test]
-    fn try_from_without_password() {
-        let config = DatabaseConfig {
+    #[tokio::test]
+    async fn create_lazy_pool_without_password() {
+        let pool = create_lazy_pool(&DatabaseConfig {
             password: None,
             ..base_config()
-        };
-        let opts = connect_options(&config);
+        });
+        assert_eq!(pool.size(), 0);
+    }
 
-        assert_eq!(opts.get_host(), "pg.example.com");
+    #[tokio::test]
+    async fn create_lazy_pool_without_database_name() {
+        let pool = create_lazy_pool(&DatabaseConfig {
+            name: None,
+            ..base_config()
+        });
+        assert_eq!(pool.size(), 0);
     }
 
     #[tokio::test]

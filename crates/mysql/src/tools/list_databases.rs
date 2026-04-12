@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use database_mcp_server::AppError;
 use database_mcp_server::types::ListDatabasesResponse;
-use database_mcp_sql::connection::Connection;
+use database_mcp_sql::Connection as _;
 use rmcp::handler::server::common::schema_for_empty_input;
 use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
 use rmcp::model::{ErrorData, JsonObject, ToolAnnotations};

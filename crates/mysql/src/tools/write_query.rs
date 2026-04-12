@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use database_mcp_server::AppError;
 use database_mcp_server::types::{QueryRequest, QueryResponse};
-use database_mcp_sql::connection::Connection;
+use database_mcp_sql::Connection as _;
 use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
 use rmcp::model::{ErrorData, ToolAnnotations};
 use serde_json::Value;

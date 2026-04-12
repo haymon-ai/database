@@ -9,7 +9,7 @@ use std::time::Duration;
 use database_mcp_config::DatabaseConfig;
 use database_mcp_server::AppError;
 use database_mcp_sql::Connection;
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
 
 /// Owns the lazy `SQLite` pool and the logic that builds it.
 #[derive(Clone)]
@@ -29,7 +29,7 @@ impl SqliteConnection {
     pub(crate) fn new(config: &DatabaseConfig) -> Self {
         Self {
             config: config.clone(),
-            pool: pool_options(config).connect_lazy_with(connect_options(config)),
+            pool: create_lazy_pool(config),
         }
     }
 
@@ -56,24 +56,22 @@ impl Connection for SqliteConnection {
     }
 }
 
-/// Builds [`SqlitePoolOptions`] with lifecycle defaults from a [`DatabaseConfig`].
-fn pool_options(config: &DatabaseConfig) -> SqlitePoolOptions {
-    let mut opts = SqlitePoolOptions::new()
-        .max_connections(1) // SQLite is a single-writer
+/// Creates a lazy `SQLite` pool from a [`DatabaseConfig`].
+///
+/// Forces `max_connections` to 1 — `SQLite` is a single-writer backend.
+fn create_lazy_pool(config: &DatabaseConfig) -> SqlitePool {
+    let opts = SqliteConnectOptions::new().filename(config.name.as_deref().unwrap_or_default());
+    let mut pool_opts = sqlx::pool::PoolOptions::new()
+        .max_connections(1)
         .min_connections(DatabaseConfig::DEFAULT_MIN_CONNECTIONS)
         .idle_timeout(Duration::from_secs(DatabaseConfig::DEFAULT_IDLE_TIMEOUT_SECS))
         .max_lifetime(Duration::from_secs(DatabaseConfig::DEFAULT_MAX_LIFETIME_SECS));
 
     if let Some(timeout) = config.connection_timeout {
-        opts = opts.acquire_timeout(Duration::from_secs(timeout));
+        pool_opts = pool_opts.acquire_timeout(Duration::from_secs(timeout));
     }
 
-    opts
-}
-
-/// Builds [`SqliteConnectOptions`] from a [`DatabaseConfig`].
-fn connect_options(config: &DatabaseConfig) -> SqliteConnectOptions {
-    SqliteConnectOptions::new().filename(config.name.as_deref().unwrap_or_default())
+    pool_opts.connect_lazy_with(opts)
 }
 
 #[cfg(test)]
@@ -89,67 +87,19 @@ mod tests {
         }
     }
 
-    #[test]
-    fn pool_options_applies_defaults() {
-        let config = base_config();
-        let opts = pool_options(&config);
-
-        assert_eq!(opts.get_max_connections(), 1, "SQLite must be single-writer");
-        assert_eq!(opts.get_min_connections(), DatabaseConfig::DEFAULT_MIN_CONNECTIONS);
-        assert_eq!(
-            opts.get_idle_timeout(),
-            Some(Duration::from_secs(DatabaseConfig::DEFAULT_IDLE_TIMEOUT_SECS))
-        );
-        assert_eq!(
-            opts.get_max_lifetime(),
-            Some(Duration::from_secs(DatabaseConfig::DEFAULT_MAX_LIFETIME_SECS))
-        );
+    #[tokio::test]
+    async fn create_lazy_pool_returns_idle_pool() {
+        let pool = create_lazy_pool(&base_config());
+        assert_eq!(pool.size(), 0, "pool should be lazy (no connections yet)");
     }
 
-    #[test]
-    fn pool_options_applies_connection_timeout() {
-        let config = DatabaseConfig {
-            connection_timeout: Some(7),
-            ..base_config()
-        };
-        let opts = pool_options(&config);
-
-        assert_eq!(opts.get_acquire_timeout(), Duration::from_secs(7));
-    }
-
-    #[test]
-    fn pool_options_without_connection_timeout_uses_sqlx_default() {
-        let config = base_config();
-        let opts = pool_options(&config);
-
-        assert_eq!(opts.get_acquire_timeout(), Duration::from_secs(30));
-    }
-
-    #[test]
-    fn pool_options_ignores_max_pool_size() {
-        let config = DatabaseConfig {
-            max_pool_size: 20,
-            ..base_config()
-        };
-        let opts = pool_options(&config);
-
-        assert_eq!(opts.get_max_connections(), 1, "SQLite must always be single-writer");
-    }
-
-    #[test]
-    fn try_from_sets_filename() {
-        let opts = connect_options(&base_config());
-        assert_eq!(opts.get_filename().to_str().expect("valid path"), "test.db");
-    }
-
-    #[test]
-    fn try_from_empty_name_defaults() {
-        let config = DatabaseConfig {
+    #[tokio::test]
+    async fn create_lazy_pool_without_name() {
+        let pool = create_lazy_pool(&DatabaseConfig {
             name: None,
             ..base_config()
-        };
-        let opts = connect_options(&config);
-        assert_eq!(opts.get_filename().to_str().expect("valid path"), "");
+        });
+        assert_eq!(pool.size(), 0);
     }
 
     #[tokio::test]

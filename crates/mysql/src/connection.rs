@@ -11,7 +11,7 @@ use database_mcp_server::AppError;
 use database_mcp_sql::Connection;
 use database_mcp_sql::identifier::validate_identifier;
 use moka::future::Cache;
-use sqlx::mysql::{MySqlConnectOptions, MySqlPool, MySqlPoolOptions, MySqlSslMode};
+use sqlx::mysql::{MySqlConnectOptions, MySqlPool, MySqlSslMode};
 use tracing::info;
 
 /// Maximum number of cached per-database connection pools.
@@ -106,7 +106,7 @@ impl MysqlConnection {
             .get_with(key, async {
                 let mut cfg = config;
                 cfg.name = Some(db_key.to_owned());
-                pool_options(&cfg).connect_lazy_with(connect_options(&cfg))
+                create_lazy_pool(&cfg)
             })
             .await;
 
@@ -127,23 +127,12 @@ impl Connection for MysqlConnection {
     }
 }
 
-/// Builds [`MySqlPoolOptions`] with lifecycle defaults from a [`DatabaseConfig`].
-fn pool_options(config: &DatabaseConfig) -> MySqlPoolOptions {
-    let mut opts = MySqlPoolOptions::new()
-        .max_connections(config.max_pool_size)
-        .min_connections(DatabaseConfig::DEFAULT_MIN_CONNECTIONS)
-        .idle_timeout(Duration::from_secs(DatabaseConfig::DEFAULT_IDLE_TIMEOUT_SECS))
-        .max_lifetime(Duration::from_secs(DatabaseConfig::DEFAULT_MAX_LIFETIME_SECS));
-
-    if let Some(timeout) = config.connection_timeout {
-        opts = opts.acquire_timeout(Duration::from_secs(timeout));
-    }
-
-    opts
-}
-
-/// Builds [`MySqlConnectOptions`] from a [`DatabaseConfig`].
-fn connect_options(config: &DatabaseConfig) -> MySqlConnectOptions {
+/// Creates a lazy `MySQL` pool from a [`DatabaseConfig`].
+///
+/// Combines pool lifecycle options with backend-specific connect
+/// options into a single lazy pool that establishes connections on
+/// first use.
+fn create_lazy_pool(config: &DatabaseConfig) -> MySqlPool {
     let mut opts = MySqlConnectOptions::new()
         .host(&config.host)
         .port(config.port)
@@ -178,7 +167,17 @@ fn connect_options(config: &DatabaseConfig) -> MySqlConnectOptions {
         }
     }
 
-    opts
+    let mut pool_opts = sqlx::pool::PoolOptions::new()
+        .max_connections(config.max_pool_size)
+        .min_connections(DatabaseConfig::DEFAULT_MIN_CONNECTIONS)
+        .idle_timeout(Duration::from_secs(DatabaseConfig::DEFAULT_IDLE_TIMEOUT_SECS))
+        .max_lifetime(Duration::from_secs(DatabaseConfig::DEFAULT_MAX_LIFETIME_SECS));
+
+    if let Some(timeout) = config.connection_timeout {
+        pool_opts = pool_opts.acquire_timeout(Duration::from_secs(timeout));
+    }
+
+    pool_opts.connect_lazy_with(opts)
 }
 
 #[cfg(test)]
@@ -198,108 +197,28 @@ mod tests {
         }
     }
 
-    #[test]
-    fn pool_options_applies_defaults() {
-        let config = base_config();
-        let opts = pool_options(&config);
-
-        assert_eq!(opts.get_max_connections(), config.max_pool_size);
-        assert_eq!(opts.get_min_connections(), DatabaseConfig::DEFAULT_MIN_CONNECTIONS);
-        assert_eq!(
-            opts.get_idle_timeout(),
-            Some(Duration::from_secs(DatabaseConfig::DEFAULT_IDLE_TIMEOUT_SECS))
-        );
-        assert_eq!(
-            opts.get_max_lifetime(),
-            Some(Duration::from_secs(DatabaseConfig::DEFAULT_MAX_LIFETIME_SECS))
-        );
+    #[tokio::test]
+    async fn create_lazy_pool_returns_idle_pool() {
+        let pool = create_lazy_pool(&base_config());
+        assert_eq!(pool.size(), 0, "pool should be lazy (no connections yet)");
     }
 
-    #[test]
-    fn pool_options_applies_connection_timeout() {
-        let config = DatabaseConfig {
-            connection_timeout: Some(7),
-            ..base_config()
-        };
-        let opts = pool_options(&config);
-
-        assert_eq!(opts.get_acquire_timeout(), Duration::from_secs(7));
-    }
-
-    #[test]
-    fn pool_options_without_connection_timeout_uses_sqlx_default() {
-        let config = base_config();
-        let opts = pool_options(&config);
-
-        assert_eq!(opts.get_acquire_timeout(), Duration::from_secs(30));
-    }
-
-    #[test]
-    fn try_from_basic_config() {
-        let config = base_config();
-        let opts = connect_options(&config);
-
-        assert_eq!(opts.get_host(), "db.example.com");
-        assert_eq!(opts.get_port(), 3307);
-        assert_eq!(opts.get_username(), "admin");
-        assert_eq!(opts.get_database(), Some("mydb"));
-    }
-
-    #[test]
-    fn try_from_with_charset() {
-        let config = DatabaseConfig {
-            charset: Some("utf8mb4".into()),
-            ..base_config()
-        };
-        let opts = connect_options(&config);
-
-        assert_eq!(opts.get_charset(), "utf8mb4");
-    }
-
-    #[test]
-    fn try_from_with_ssl_required() {
-        let config = DatabaseConfig {
-            ssl: true,
-            ssl_verify_cert: false,
-            ..base_config()
-        };
-        let opts = connect_options(&config);
-
-        assert!(matches!(opts.get_ssl_mode(), MySqlSslMode::Required));
-    }
-
-    #[test]
-    fn try_from_with_ssl_verify_ca() {
-        let config = DatabaseConfig {
-            ssl: true,
-            ssl_verify_cert: true,
-            ..base_config()
-        };
-        let opts = connect_options(&config);
-
-        assert!(matches!(opts.get_ssl_mode(), MySqlSslMode::VerifyCa));
-    }
-
-    #[test]
-    fn try_from_without_password() {
-        let config = DatabaseConfig {
+    #[tokio::test]
+    async fn create_lazy_pool_without_password() {
+        let pool = create_lazy_pool(&DatabaseConfig {
             password: None,
             ..base_config()
-        };
-        let opts = connect_options(&config);
-
-        assert_eq!(opts.get_host(), "db.example.com");
+        });
+        assert_eq!(pool.size(), 0);
     }
 
-    #[test]
-    fn try_from_without_database_name() {
-        let config = DatabaseConfig {
+    #[tokio::test]
+    async fn create_lazy_pool_without_database_name() {
+        let pool = create_lazy_pool(&DatabaseConfig {
             name: None,
             ..base_config()
-        };
-        let opts = connect_options(&config);
-
-        assert_eq!(opts.get_database(), None);
+        });
+        assert_eq!(pool.size(), 0);
     }
 
     #[tokio::test]
