@@ -430,7 +430,10 @@ mod tests {
     #[test]
     fn sqlite_requires_db_name() {
         let config = base_config(DatabaseBackend::Sqlite);
-        let errors = config.database.validate().unwrap_err();
+        let errors = config
+            .database
+            .validate()
+            .expect_err("sqlite without db name must fail");
         assert!(errors.iter().any(|e| matches!(e, ConfigError::MissingSqliteDbName)));
     }
 
@@ -446,7 +449,10 @@ mod tests {
             },
             ..base_config(DatabaseBackend::Mysql)
         };
-        let errors = config.database.validate().unwrap_err();
+        let errors = config
+            .database
+            .validate()
+            .expect_err("missing ssl cert files must fail");
         assert!(
             errors.len() >= 3,
             "expected at least 3 errors, got {}: {errors:?}",
@@ -464,6 +470,40 @@ mod tests {
     fn query_timeout_default_is_none() {
         let config = DatabaseConfig::default();
         assert!(config.query_timeout.is_none());
+    }
+
+    fn http_config() -> HttpConfig {
+        HttpConfig {
+            host: HttpConfig::DEFAULT_HOST.into(),
+            port: HttpConfig::DEFAULT_PORT,
+            allowed_origins: HttpConfig::default_allowed_origins(),
+            allowed_hosts: HttpConfig::default_allowed_hosts(),
+        }
+    }
+
+    #[test]
+    fn valid_http_config_passes() {
+        assert!(http_config().validate().is_ok());
+    }
+
+    #[test]
+    fn empty_http_host_rejected() {
+        let config = HttpConfig {
+            host: String::new(),
+            ..http_config()
+        };
+        let errors = config.validate().expect_err("empty host must fail");
+        assert!(errors.iter().any(|e| matches!(e, ConfigError::EmptyHttpHost)));
+    }
+
+    #[test]
+    fn whitespace_http_host_rejected() {
+        let config = HttpConfig {
+            host: "   ".into(),
+            ..http_config()
+        };
+        let errors = config.validate().expect_err("whitespace host must fail");
+        assert!(errors.iter().any(|e| matches!(e, ConfigError::EmptyHttpHost)));
     }
 
     #[test]
