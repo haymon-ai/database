@@ -154,8 +154,10 @@ A subcommand is required — running `database-mcp` with no subcommand prints us
 
 | Flag | Env Variable | Default | Description |
 |------|-------------|---------|-------------|
-| `--read-only` | `MCP_READ_ONLY` | `true` | Block write queries |
-| `--max-pool-size` | `MCP_MAX_POOL_SIZE` | `10` | Max connection pool size (min: 1) |
+| `--db-read-only` | `DB_READ_ONLY` | `true` | Block write queries |
+| `--db-max-pool-size` | `DB_MAX_POOL_SIZE` | `5` | Max connection pool size (min: 1) |
+| `--db-connection-timeout` | `DB_CONNECTION_TIMEOUT` | *(unset)* | Connection timeout in seconds (min: 1) |
+| `--db-query-timeout` | `DB_QUERY_TIMEOUT` | `30` | Query execution timeout in seconds |
 
 ### Logging Options
 
@@ -224,7 +226,7 @@ Returns the execution plan for a SQL query. Supports an optional `analyze` param
 
 ```bash
 # Unit tests
-cargo test --lib
+cargo test --workspace --lib --bins
 
 # Integration tests (requires Docker)
 ./tests/run.sh
