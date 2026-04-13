@@ -1,31 +1,48 @@
 //! HTTP transport command.
 //!
 //! Runs the MCP server over Streamable HTTP with CORS support.
-//! Each HTTP session clones the pre-built handler, sharing the
-//! underlying connection pools.
+//! Each HTTP session clones the internally-built handler, sharing
+//! the underlying connection pools.
 
 use clap::{Args, Parser};
 use database_mcp_config::{ConfigError, DatabaseConfig, HttpConfig};
 use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
-use std::process::ExitCode;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
+use tower_http::cors::CorsLayer;
 use tracing::info;
 
 use crate::commands::common::{self, DatabaseArguments};
 use crate::error::Error;
 
 /// HTTP transport flags embedded in [`HttpCommand`].
+///
+/// `host` and `port` use explicit `id = "http-*"` overrides so their
+/// clap argument ids don't collide with the `host`/`port` fields in
+/// [`DatabaseArguments`] when both are flattened into [`HttpCommand`].
 #[derive(Debug, Args)]
+#[command(next_help_heading = "HTTP Transport")]
 struct HttpArguments {
     /// Bind host for HTTP transport.
-    #[arg(id = "http-host", long = "host", env = "HTTP_HOST", default_value = HttpConfig::DEFAULT_HOST)]
+    #[arg(
+        id = "http-host",
+        long = "host",
+        env = "HTTP_HOST",
+        value_name = "HOST",
+        default_value = HttpConfig::DEFAULT_HOST
+    )]
     host: String,
 
     /// Bind port for HTTP transport.
-    #[arg(id = "http-port", long = "port", env = "HTTP_PORT", default_value_t = HttpConfig::DEFAULT_PORT)]
+    #[arg(
+        id = "http-port",
+        long = "port",
+        env = "HTTP_PORT",
+        value_name = "PORT",
+        default_value_t = HttpConfig::DEFAULT_PORT
+    )]
     port: u16,
 
     /// Allowed CORS origins (comma-separated).
@@ -79,38 +96,20 @@ impl HttpCommand {
     ///
     /// Binds to the configured host/port and serves MCP requests over
     /// Streamable HTTP. Each session clones the internally-built handler,
-    /// sharing the underlying database connection pools. Supports CORS
-    /// and graceful shutdown via Ctrl-C. Returns [`ExitCode::FAILURE`]
-    /// when configuration validation fails.
+    /// sharing the underlying database connection pools. Shuts down
+    /// gracefully on Ctrl-C or `SIGTERM`.
     ///
     /// # Errors
     ///
-    /// Returns an error if TCP bind fails (port in use, permission
-    /// denied) or the HTTP service fails to serve.
-    pub(crate) async fn execute(&self) -> Result<ExitCode, Error> {
+    /// Returns an error if configuration validation fails, TCP bind
+    /// fails (port in use, permission denied), or the HTTP service
+    /// fails to serve.
+    pub(crate) async fn execute(&self) -> Result<(), Error> {
         let db_config = DatabaseConfig::try_from(&self.db_arguments)?;
-        let server = common::create_server(&db_config);
-
         let http_config = HttpConfig::try_from(&self.http_arguments)?;
-        let bind_addr = format!("{}:{}", http_config.host, http_config.port);
-        info!("Starting MCP server via HTTP transport on {bind_addr}...");
 
-        let ct = CancellationToken::new();
-
-        let cors = tower_http::cors::CorsLayer::new()
-            .allow_origin(
-                http_config
-                    .allowed_origins
-                    .iter()
-                    .filter_map(|o| o.parse().ok())
-                    .collect::<Vec<axum::http::HeaderValue>>(),
-            )
-            .allow_methods([
-                axum::http::Method::GET,
-                axum::http::Method::POST,
-                axum::http::Method::OPTIONS,
-            ])
-            .allow_headers([axum::http::header::CONTENT_TYPE, axum::http::header::ACCEPT]);
+        let server = common::create_server(&db_config);
+        let cancel_token = CancellationToken::new();
 
         let service = StreamableHttpService::new(
             move || Ok(server.clone()),
@@ -118,25 +117,72 @@ impl HttpCommand {
             StreamableHttpServerConfig::default()
                 .with_stateful_mode(false)
                 .with_json_response(true)
-                .with_cancellation_token(ct.child_token()),
+                .with_cancellation_token(cancel_token.child_token()),
         );
 
-        let router = axum::Router::new().nest_service("/mcp", service).layer(cors);
+        let router = axum::Router::new()
+            .nest_service("/mcp", service)
+            .layer(build_cors_layer(&http_config));
+
+        let bind_addr = format!("{}:{}", http_config.host, http_config.port);
+        info!("Starting MCP server via HTTP transport on {bind_addr}...");
 
         let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
         info!("Listening on http://{bind_addr}/mcp");
 
-        let ct_shutdown = ct.clone();
-        tokio::spawn(async move {
-            tokio::signal::ctrl_c().await.ok();
-            info!("Ctrl-C received, shutting down...");
-            ct_shutdown.cancel();
-        });
-
         axum::serve(listener, router)
-            .with_graceful_shutdown(async move { ct.cancelled().await })
+            .with_graceful_shutdown(async move {
+                shutdown_signal().await;
+                cancel_token.cancel();
+            })
             .await?;
 
-        Ok(ExitCode::SUCCESS)
+        Ok(())
+    }
+}
+
+/// Builds a CORS layer from the configured allowed origins.
+fn build_cors_layer(http_config: &HttpConfig) -> CorsLayer {
+    let origins: Vec<axum::http::HeaderValue> = http_config
+        .allowed_origins
+        .iter()
+        .filter_map(|origin| origin.parse().ok())
+        .collect();
+
+    CorsLayer::new()
+        .allow_origin(origins)
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::OPTIONS,
+        ])
+        .allow_headers([axum::http::header::CONTENT_TYPE, axum::http::header::ACCEPT])
+}
+
+/// Future that resolves when the process should shut down.
+///
+/// Listens for Ctrl-C on all platforms and `SIGTERM` on Unix, which
+/// is the signal `docker stop`, `systemctl stop`, and Kubernetes
+/// send to request graceful termination. Whichever arrives first
+/// wins.
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c().await.expect("failed to install Ctrl-C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        () = ctrl_c => info!("Ctrl-C received, shutting down..."),
+        () = terminate => info!("SIGTERM received, shutting down..."),
     }
 }

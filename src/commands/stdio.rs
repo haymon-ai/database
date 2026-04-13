@@ -6,8 +6,7 @@
 use clap::Parser;
 use database_mcp_config::DatabaseConfig;
 use rmcp::ServiceExt;
-use std::process::ExitCode;
-use tracing::info;
+use tracing::{error, info};
 
 use crate::commands::common::{self, DatabaseArguments};
 use crate::error::Error;
@@ -23,21 +22,23 @@ pub(crate) struct StdioCommand {
 impl StdioCommand {
     /// Builds the database configuration, server, and runs the stdio transport.
     ///
-    /// Serves JSON-RPC over stdin/stdout. Returns [`ExitCode::FAILURE`]
-    /// when configuration validation fails.
+    /// Serves JSON-RPC over stdin/stdout.
     ///
     /// # Errors
     ///
-    /// Returns an error if the stdio transport fails to initialize or
-    /// the server encounters a fatal protocol error.
-    pub(crate) async fn execute(&self) -> Result<ExitCode, Error> {
+    /// Returns an error if configuration validation fails, the stdio
+    /// transport fails to initialize, or the server encounters a fatal
+    /// protocol error.
+    pub(crate) async fn execute(&self) -> Result<(), Error> {
         let db_config = DatabaseConfig::try_from(&self.db_arguments)?;
         let server = common::create_server(&db_config);
 
         info!("Starting MCP server via stdio transport...");
         let transport = rmcp::transport::io::stdio();
         let running = server.serve(transport).await?;
-        running.waiting().await.ok();
-        Ok(ExitCode::SUCCESS)
+        if let Err(join_error) = running.waiting().await {
+            error!("stdio server task terminated abnormally: {join_error}");
+        }
+        Ok(())
     }
 }

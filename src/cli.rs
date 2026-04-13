@@ -5,7 +5,6 @@
 //! point that dispatches to the active subcommand.
 
 use clap::{Parser, Subcommand};
-use std::process::ExitCode;
 
 use crate::commands::http::HttpCommand;
 use crate::commands::stdio::StdioCommand;
@@ -68,7 +67,8 @@ struct Arguments {
         env = "LOG_LEVEL",
         default_value_t = LogLevel::Info,
         ignore_case = true,
-        global = true
+        global = true,
+        help_heading = "Logging"
     )]
     log_level: LogLevel,
 }
@@ -78,7 +78,7 @@ struct Arguments {
 enum Command {
     /// Print version information and exit.
     Version,
-    /// Run in stdio mode (default).
+    /// Run in stdio mode.
     Stdio(StdioCommand),
     /// Run in HTTP/SSE mode.
     Http(HttpCommand),
@@ -88,11 +88,12 @@ enum Command {
 ///
 /// # Errors
 ///
-/// Returns an error if the selected subcommand fails (e.g. transport
-/// initialization errors, TCP bind failures, fatal protocol errors).
+/// Returns an error if configuration validation fails or the selected
+/// subcommand fails (transport initialization errors, TCP bind
+/// failures, fatal protocol errors).
 #[tokio::main]
 #[allow(clippy::result_large_err)]
-pub(crate) async fn run() -> Result<ExitCode, Error> {
+pub(crate) async fn run() -> Result<(), Error> {
     let arguments = Arguments::parse();
 
     tracing_subscriber::fmt()
@@ -104,7 +105,7 @@ pub(crate) async fn run() -> Result<ExitCode, Error> {
     match arguments.command {
         Command::Version => {
             println!("{BIN} {VERSION}");
-            Ok(ExitCode::SUCCESS)
+            Ok(())
         }
         Command::Stdio(cmd) => cmd.execute().await,
         Command::Http(cmd) => cmd.execute().await,
@@ -115,12 +116,14 @@ pub(crate) async fn run() -> Result<ExitCode, Error> {
 mod tests {
     use super::*;
     use crate::commands::common::DatabaseArguments;
-    use database_mcp_config::{DatabaseBackend, DatabaseConfig};
+    use database_mcp_config::{ConfigError, DatabaseBackend, DatabaseConfig};
 
+    #[track_caller]
     fn parse(args: &[&str]) -> Arguments {
-        Arguments::try_parse_from(args).unwrap()
+        Arguments::try_parse_from(args).expect("valid CLI arguments")
     }
 
+    #[track_caller]
     fn stdio_db(args: &Arguments) -> &DatabaseArguments {
         match &args.command {
             Command::Stdio(cmd) => &cmd.db_arguments,
@@ -128,6 +131,7 @@ mod tests {
         }
     }
 
+    #[track_caller]
     fn http_db(args: &Arguments) -> &DatabaseArguments {
         match &args.command {
             Command::Http(cmd) => &cmd.db_arguments,
@@ -164,7 +168,7 @@ mod tests {
     #[test]
     fn db_query_timeout_zero_passes_through() {
         let args = parse(&[BIN, "stdio", "--db-query-timeout", "0"]);
-        let config = DatabaseConfig::try_from(stdio_db(&args)).unwrap();
+        let config = DatabaseConfig::try_from(stdio_db(&args)).expect("valid db args");
         assert_eq!(config.query_timeout, Some(0));
     }
 
@@ -192,7 +196,7 @@ mod tests {
         assert_eq!(db.user.as_deref(), Some("pg"));
         assert_eq!(db.name.as_deref(), Some("app"));
 
-        let config = DatabaseConfig::try_from(db).unwrap();
+        let config = DatabaseConfig::try_from(db).expect("valid postgres args");
         assert_eq!(config.backend, DatabaseBackend::Postgres);
         assert_eq!(config.user, "pg");
         assert_eq!(config.name.as_deref(), Some("app"));
@@ -202,5 +206,14 @@ mod tests {
     fn version_subcommand() {
         let args = parse(&[BIN, "version"]);
         assert!(matches!(args.command, Command::Version));
+    }
+
+    #[test]
+    fn try_from_database_arguments_propagates_validation_errors() {
+        // SQLite without --db-name must fail validation inside the TryFrom impl,
+        // surfacing `ConfigError::MissingSqliteDbName` to the caller.
+        let args = parse(&[BIN, "stdio", "--db-backend", "sqlite"]);
+        let errors = DatabaseConfig::try_from(stdio_db(&args)).expect_err("sqlite without --db-name must be rejected");
+        assert!(errors.iter().any(|e| matches!(e, ConfigError::MissingSqliteDbName)));
     }
 }

@@ -38,3 +38,23 @@ fn format_config_errors(errors: &[ConfigError]) -> String {
     }
     s
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_error_display_bullets_each_error() {
+        let error = Error::Config(vec![ConfigError::MissingSqliteDbName, ConfigError::EmptyHttpHost]);
+        let rendered = error.to_string();
+        assert!(rendered.starts_with("configuration validation failed:"));
+        assert!(rendered.contains("\n  - DB_NAME (file path) is required for SQLite"));
+        assert!(rendered.contains("\n  - HTTP_HOST must not be empty"));
+    }
+
+    #[test]
+    fn config_error_from_vec() {
+        let error: Error = vec![ConfigError::EmptyHttpHost].into();
+        assert!(matches!(error, Error::Config(_)));
+    }
+}

@@ -17,6 +17,7 @@ pub(crate) use database_mcp_server::Server;
 
 /// Shared database connection flags embedded in transport subcommands.
 #[derive(Debug, Args)]
+#[command(next_help_heading = "Database")]
 pub(crate) struct DatabaseArguments {
     /// Database backend
     #[arg(long = "db-backend", env = "DB_BACKEND", default_value_t = DatabaseConfig::DEFAULT_BACKEND)]
