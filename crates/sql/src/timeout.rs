@@ -70,7 +70,7 @@ mod tests {
     #[tokio::test]
     async fn slow_query_times_out() {
         let result: Result<i32, AppError> = execute_with_timeout(Some(1), "SELECT SLEEP(60)", async {
-            tokio::time::sleep(Duration::from_secs(60)).await;
+            tokio::time::sleep(Duration::from_mins(1)).await;
             Ok(0)
         })
         .await;

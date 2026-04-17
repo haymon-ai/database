@@ -502,10 +502,7 @@ async fn test_get_table_schema_no_foreign_keys() {
     // id column should have no foreign key
     let id_col = columns["id"].as_object().expect("id object");
     let fk = id_col.get("foreign_key");
-    assert!(
-        fk.is_none() || fk.is_some_and(Value::is_null),
-        "tags.id should not have a foreign key"
-    );
+    assert!(fk.is_none_or(Value::is_null), "tags.id should not have a foreign key");
 }
 
 #[tokio::test]
