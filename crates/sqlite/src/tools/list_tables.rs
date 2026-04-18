@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use database_mcp_server::pagination::Cursor;
+use database_mcp_server::pagination::Pager;
 use database_mcp_server::types::ListTablesResponse;
 
 use database_mcp_sql::Connection as _;
@@ -94,26 +94,21 @@ impl SqliteHandler {
     /// malformed, or an internal-error [`ErrorData`] if the underlying
     /// query fails.
     pub async fn list_tables(&self, request: &ListTablesRequest) -> Result<ListTablesResponse, ErrorData> {
-        let offset = request.cursor.map_or(0, |c| c.offset);
-        let page_size = usize::from(self.config.page_size);
-        let fetch_limit = page_size + 1;
-        let sql = format!(
+        let pager = Pager::new(request.cursor, self.config.page_size);
+        let query = format!(
             r"
             SELECT name
             FROM sqlite_master
             WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
             ORDER BY name
-            LIMIT {fetch_limit} OFFSET {offset}",
+            LIMIT {} OFFSET {}",
+            pager.limit(),
+            pager.offset(),
         );
-        let mut tables: Vec<String> = self.connection.fetch_scalar(sql.as_str(), None).await?;
-        let next_cursor = if tables.len() > page_size {
-            tables.truncate(page_size);
-            Some(Cursor {
-                offset: offset + page_size as u64,
-            })
-        } else {
-            None
-        };
+
+        let rows: Vec<String> = self.connection.fetch_scalar(query.as_str(), None).await?;
+        let (tables, next_cursor) = pager.finalize(rows);
+
         Ok(ListTablesResponse { tables, next_cursor })
     }
 }

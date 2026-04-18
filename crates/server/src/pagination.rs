@@ -23,6 +23,18 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 const CURRENT_VERSION: u8 = 1;
 
+/// Wire-format payload carried inside an encoded [`Cursor`].
+///
+/// The short field names (`o`, `v`) keep encoded cursors compact.
+/// Clients must treat cursors as opaque, so the shape is free to
+/// evolve — `v` exists so older cursors can be rejected with a
+/// deterministic error if the format ever changes.
+#[derive(Serialize, Deserialize)]
+struct Payload {
+    o: u64,
+    v: u8,
+}
+
 /// Opaque pagination cursor carried on paginated tool requests / responses.
 ///
 /// On the wire this serialises as a URL-safe base64 string; in Rust code
@@ -46,7 +58,7 @@ impl<'de> Deserialize<'de> for Cursor {
         let raw = <Cow<'de, str>>::deserialize(deserializer)?;
         decode_cursor(&raw)
             .map(|offset| Self { offset })
-            .map_err(|msg| D::Error::invalid_value(Unexpected::Str(&raw), &msg.as_str()))
+            .map_err(|msg| D::Error::invalid_value(Unexpected::Str(&raw), &msg))
     }
 }
 
@@ -67,44 +79,76 @@ impl JsonSchema for Cursor {
     }
 }
 
-/// Encodes a zero-based page offset as an opaque cursor string.
+/// A single page request resolved from an optional cursor and a page size.
 ///
-/// The returned string is URL-safe base64 over a minified JSON payload.
-/// Round-trips with [`decode_cursor`] for every `u64` value. Exposed
-/// primarily for unit-testing the wire format; tool code should construct
-/// [`Cursor`] values directly.
-#[must_use]
-pub fn encode_cursor(offset: u64) -> String {
-    let payload = format!("{{\"o\":{offset},\"v\":{CURRENT_VERSION}}}");
-    URL_SAFE_NO_PAD.encode(payload)
+/// Paginated tools follow a fetch-one-extra pattern: query `size + 1` rows,
+/// then call [`Self::finalize`] to trim the extra row and emit a next cursor
+/// when present. Construct with [`Self::new`]; read [`Self::offset`] /
+/// [`Self::limit`] when building the SQL statement.
+#[derive(Debug, Clone, Copy)]
+pub struct Pager {
+    offset: u64,
+    size: usize,
+}
+
+impl Pager {
+    /// Builds a page request from an optional cursor and the configured page size.
+    #[must_use]
+    pub fn new(cursor: Option<Cursor>, size: u16) -> Self {
+        Self {
+            offset: cursor.map_or(0, |c| c.offset),
+            size: usize::from(size),
+        }
+    }
+
+    /// Row offset at which this page starts.
+    #[must_use]
+    pub fn offset(&self) -> u64 {
+        self.offset
+    }
+
+    /// Row count to fetch from the backend (`size + 1`, for lookahead).
+    #[must_use]
+    pub fn limit(&self) -> usize {
+        self.size + 1
+    }
+
+    /// Trims over-fetched items to `size` and derives the next cursor.
+    ///
+    /// When `items.len()` exceeds `size`, the tail is dropped and a cursor
+    /// pointing at the next offset is returned. Otherwise the items are
+    /// returned unchanged with `None`.
+    #[must_use]
+    pub fn finalize<T>(&self, mut items: Vec<T>) -> (Vec<T>, Option<Cursor>) {
+        if items.len() > self.size {
+            items.truncate(self.size);
+            let offset = self.offset + self.size as u64;
+            (items, Some(Cursor { offset }))
+        } else {
+            (items, None)
+        }
+    }
+}
+
+/// Encodes a zero-based page offset as an opaque cursor string.
+fn encode_cursor(offset: u64) -> String {
+    let payload = Payload {
+        o: offset,
+        v: CURRENT_VERSION,
+    };
+    let json = serde_json::to_vec(&payload).expect("Payload is infallible to serialize");
+    URL_SAFE_NO_PAD.encode(&json)
 }
 
 /// Decodes a cursor string produced by [`encode_cursor`] back to its offset.
-///
-/// # Errors
-///
-/// Returns a human-readable error message when the input is not valid
-/// URL-safe base64, not valid UTF-8 JSON, does not match the expected
-/// payload shape, or carries an unsupported format version. Exposed
-/// primarily for unit-testing the wire format; tool code receives
-/// pre-decoded [`Cursor`] values via serde.
-pub fn decode_cursor(raw: &str) -> Result<u64, String> {
-    #[derive(Deserialize)]
-    struct Payload {
-        o: u64,
-        v: u8,
-    }
-
+fn decode_cursor(raw: &str) -> Result<u64, &'static str> {
     let bytes = URL_SAFE_NO_PAD
         .decode(raw.as_bytes())
-        .map_err(|_| "invalid pagination cursor: not valid base64".to_owned())?;
+        .map_err(|_| "invalid pagination cursor: not valid base64")?;
     let payload: Payload =
-        serde_json::from_slice(&bytes).map_err(|_| "invalid pagination cursor: payload is malformed".to_owned())?;
+        serde_json::from_slice(&bytes).map_err(|_| "invalid pagination cursor: payload is malformed")?;
     if payload.v != CURRENT_VERSION {
-        return Err(format!(
-            "invalid pagination cursor: format version {} is not supported",
-            payload.v
-        ));
+        return Err("invalid pagination cursor: unsupported format version");
     }
     Ok(payload.o)
 }
@@ -115,7 +159,7 @@ mod tests {
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use serde_json::{Value, json};
 
-    use super::{Cursor, decode_cursor, encode_cursor};
+    use super::{Cursor, Pager, decode_cursor, encode_cursor};
 
     #[test]
     fn encode_decode_round_trips_representative_offsets() {
@@ -191,5 +235,59 @@ mod tests {
         let raw = URL_SAFE_NO_PAD.encode(b"{\"o\":0,\"v\":9}");
         let err = serde_json::from_value::<Cursor>(json!(raw)).expect_err("should fail");
         assert!(err.to_string().contains("version"), "error: {err}");
+    }
+
+    #[test]
+    fn page_defaults_to_offset_zero_without_cursor() {
+        let pager = Pager::new(None, 50);
+        assert_eq!(pager.offset(), 0);
+        assert_eq!(pager.limit(), 51);
+    }
+
+    #[test]
+    fn page_inherits_offset_from_cursor() {
+        let pager = Pager::new(Some(Cursor { offset: 200 }), 50);
+        assert_eq!(pager.offset(), 200);
+        assert_eq!(pager.limit(), 51);
+    }
+
+    #[test]
+    fn page_finalize_emits_next_cursor_when_over_fetched() {
+        let pager = Pager::new(None, 3);
+        let (items, next) = pager.finalize(vec!["a", "b", "c", "d"]);
+        assert_eq!(items, ["a", "b", "c"]);
+        assert_eq!(next, Some(Cursor { offset: 3 }));
+    }
+
+    #[test]
+    fn page_finalize_drops_next_cursor_on_exact_fit() {
+        let pager = Pager::new(None, 3);
+        let (items, next) = pager.finalize(vec!["a", "b", "c"]);
+        assert_eq!(items, ["a", "b", "c"]);
+        assert!(next.is_none());
+    }
+
+    #[test]
+    fn page_finalize_drops_next_cursor_on_short_page() {
+        let pager = Pager::new(None, 3);
+        let (items, next) = pager.finalize(vec!["a"]);
+        assert_eq!(items, ["a"]);
+        assert!(next.is_none());
+    }
+
+    #[test]
+    fn page_finalize_drops_next_cursor_on_empty_result() {
+        let pager = Pager::new(Some(Cursor { offset: 99 }), 3);
+        let (items, next) = pager.finalize(Vec::<&str>::new());
+        assert!(items.is_empty());
+        assert!(next.is_none());
+    }
+
+    #[test]
+    fn page_finalize_advances_offset_by_page_size() {
+        let pager = Pager::new(Some(Cursor { offset: 100 }), 50);
+        let items: Vec<u32> = (0..51).collect();
+        let (_, next) = pager.finalize(items);
+        assert_eq!(next, Some(Cursor { offset: 150 }));
     }
 }

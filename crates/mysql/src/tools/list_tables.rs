@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use database_mcp_server::pagination::Cursor;
+use database_mcp_server::pagination::Pager;
 use database_mcp_server::types::{ListTablesRequest, ListTablesResponse};
 use database_mcp_sql::Connection as _;
 use database_mcp_sql::sanitize::{quote_literal, validate_ident};
@@ -88,32 +88,23 @@ impl MysqlHandler {
     /// malformed, or an internal-error [`ErrorData`] if `database_name`
     /// is invalid or the underlying query fails.
     pub async fn list_tables(&self, request: &ListTablesRequest) -> Result<ListTablesResponse, ErrorData> {
-        let ListTablesRequest { database_name, cursor } = request;
+        validate_ident(&request.database_name)?;
 
-        validate_ident(database_name)?;
-
-        let offset = cursor.map_or(0, |c| c.offset);
-        let page_size = usize::from(self.config.page_size);
-        let fetch_limit = page_size + 1;
-        let sql = format!(
+        let pager = Pager::new(request.cursor, self.config.page_size);
+        let query = format!(
             r"
             SELECT CAST(TABLE_NAME AS CHAR)
             FROM information_schema.TABLES
             WHERE TABLE_SCHEMA = {}
             ORDER BY TABLE_NAME
-            LIMIT {fetch_limit} OFFSET {offset}",
-            quote_literal(database_name),
+            LIMIT {} OFFSET {}",
+            quote_literal(&request.database_name),
+            pager.limit(),
+            pager.offset(),
         );
 
-        let mut tables: Vec<String> = self.connection.fetch_scalar(sql.as_str(), None).await?;
-        let next_cursor = if tables.len() > page_size {
-            tables.truncate(page_size);
-            Some(Cursor {
-                offset: offset + page_size as u64,
-            })
-        } else {
-            None
-        };
+        let rows: Vec<String> = self.connection.fetch_scalar(query.as_str(), None).await?;
+        let (tables, next_cursor) = pager.finalize(rows);
 
         Ok(ListTablesResponse { tables, next_cursor })
     }

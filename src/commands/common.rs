@@ -183,10 +183,8 @@ mod tests {
     }
 
     fn try_parse_with_page_size(value: &str) -> Result<u16, clap::Error> {
-        // SAFETY: tests run sequentially per crate by default; clearing and setting
-        // env vars for the duration of this function is the established clap-test pattern.
-        // We clear the env var so clap doesn't pick up a stale value from the host.
-        // SAFETY: tests run serially by default.
+        // SAFETY: no other test in this file writes DB_PAGE_SIZE concurrently;
+        // removing it here prevents a stale host value from leaking into clap.
         unsafe {
             std::env::remove_var("DB_PAGE_SIZE");
         }

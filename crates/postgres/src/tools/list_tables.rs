@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use database_mcp_server::pagination::Cursor;
+use database_mcp_server::pagination::Pager;
 use database_mcp_server::types::{ListTablesRequest, ListTablesResponse};
 use database_mcp_sql::Connection as _;
 use database_mcp_sql::sanitize::validate_ident;
@@ -88,32 +88,26 @@ impl PostgresHandler {
     /// malformed, or an internal-error [`ErrorData`] if `database_name`
     /// is invalid or the underlying query fails.
     pub async fn list_tables(&self, request: &ListTablesRequest) -> Result<ListTablesResponse, ErrorData> {
-        let ListTablesRequest { database_name, cursor } = request;
-
-        let db = Some(database_name.trim()).filter(|s| !s.is_empty());
-        if let Some(name) = &db {
+        let db = Some(request.database_name.trim()).filter(|s| !s.is_empty());
+        if let Some(name) = db {
             validate_ident(name)?;
         }
-        let offset = cursor.map_or(0, |c| c.offset);
-        let page_size = usize::from(self.config.page_size);
-        let fetch_limit = page_size + 1;
-        let sql = format!(
+        
+        let pager = Pager::new(request.cursor, self.config.page_size);
+        let query = format!(
             r"
             SELECT tablename
             FROM pg_tables
             WHERE schemaname = 'public'
             ORDER BY tablename
-            LIMIT {fetch_limit} OFFSET {offset}",
+            LIMIT {} OFFSET {}",
+            pager.limit(),
+            pager.offset(),
         );
-        let mut tables: Vec<String> = self.connection.fetch_scalar(sql.as_str(), db).await?;
-        let next_cursor = if tables.len() > page_size {
-            tables.truncate(page_size);
-            Some(Cursor {
-                offset: offset + page_size as u64,
-            })
-        } else {
-            None
-        };
+        
+        let rows: Vec<String> = self.connection.fetch_scalar(query.as_str(), db).await?;
+        let (tables, next_cursor) = pager.finalize(rows);
+        
         Ok(ListTablesResponse { tables, next_cursor })
     }
 }

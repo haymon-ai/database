@@ -118,43 +118,33 @@ mod tests {
 
     use super::Arguments;
 
-    fn stdio_help() -> String {
+    fn subcommand_help(name: &str) -> String {
         let mut cmd = Arguments::command();
-        let sub = cmd.find_subcommand_mut("stdio").expect("stdio subcommand");
-        sub.render_long_help().to_string()
+        cmd.find_subcommand_mut(name)
+            .expect("subcommand")
+            .render_long_help()
+            .to_string()
     }
 
-    fn http_help() -> String {
-        let mut cmd = Arguments::command();
-        let sub = cmd.find_subcommand_mut("http").expect("http subcommand");
-        sub.render_long_help().to_string()
+    fn assert_documents_page_size_flag(help: &str) {
+        assert!(
+            help.contains("--db-page-size"),
+            "help missing --db-page-size flag:\n{help}"
+        );
+        assert!(
+            help.contains("DB_PAGE_SIZE"),
+            "help missing DB_PAGE_SIZE env binding:\n{help}"
+        );
+        assert!(help.contains("[default: 100]"), "help missing [default: 100]:\n{help}");
     }
 
     #[test]
     fn stdio_help_documents_db_page_size_flag() {
-        let help = stdio_help();
-        assert!(
-            help.contains("--db-page-size"),
-            "help missing --db-page-size flag:\n{help}"
-        );
-        assert!(
-            help.contains("DB_PAGE_SIZE"),
-            "help missing DB_PAGE_SIZE env binding:\n{help}"
-        );
-        assert!(help.contains("[default: 100]"), "help missing [default: 100]:\n{help}");
+        assert_documents_page_size_flag(&subcommand_help("stdio"));
     }
 
     #[test]
     fn http_help_documents_db_page_size_flag() {
-        let help = http_help();
-        assert!(
-            help.contains("--db-page-size"),
-            "help missing --db-page-size flag:\n{help}"
-        );
-        assert!(
-            help.contains("DB_PAGE_SIZE"),
-            "help missing DB_PAGE_SIZE env binding:\n{help}"
-        );
-        assert!(help.contains("[default: 100]"), "help missing [default: 100]:\n{help}");
+        assert_documents_page_size_flag(&subcommand_help("http"));
     }
 }
