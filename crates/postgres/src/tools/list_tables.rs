@@ -92,7 +92,7 @@ impl PostgresHandler {
         if let Some(name) = db {
             validate_ident(name)?;
         }
-        
+
         let pager = Pager::new(request.cursor, self.config.page_size);
         let query = format!(
             r"
@@ -104,10 +104,10 @@ impl PostgresHandler {
             pager.limit(),
             pager.offset(),
         );
-        
+
         let rows: Vec<String> = self.connection.fetch_scalar(query.as_str(), db).await?;
         let (tables, next_cursor) = pager.finalize(rows);
-        
+
         Ok(ListTablesResponse { tables, next_cursor })
     }
 }
