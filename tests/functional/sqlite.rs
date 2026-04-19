@@ -637,34 +637,15 @@ async fn test_create_drop_table_with_spaces() {
     handler.drop_table(&drop).await.unwrap();
 }
 
-// === Pagination (feature 029) ===
+// === Pagination ===
 
-async fn seed_n_tables(handler: &SqliteHandler, prefix: &str, n: usize) {
-    for i in 1..=n {
-        let create = QueryRequest {
-            query: format!("CREATE TABLE {prefix}_{i:04} (id INTEGER)"),
-        };
-        handler.write_query(&create).await.expect("seed create");
-    }
-}
-
-async fn drop_seeded_tables(handler: &SqliteHandler, prefix: &str, n: usize) {
-    for i in 1..=n {
-        let drop = DropTableRequest {
-            table_name: format!("{prefix}_{i:04}"),
-        };
-        let _ = handler.drop_table(&drop).await;
-    }
-}
-
-/// Collect all tables matching `prefix` by following `nextCursor` to exhaustion.
-async fn collect_all_paged(handler: &SqliteHandler, prefix: &str) -> Vec<String> {
+async fn collect_all_paged(handler: &SqliteHandler) -> Vec<String> {
     let mut all = Vec::new();
     let mut cursor: Option<database_mcp_server::pagination::Cursor> = None;
     loop {
         let request = ListTablesRequest { cursor };
         let response = handler.list_tables(&request).await.expect("list page");
-        all.extend(response.tables.into_iter().filter(|t| t.starts_with(prefix)));
+        all.extend(response.tables);
         match response.next_cursor {
             Some(c) => cursor = Some(c),
             None => break,
@@ -674,92 +655,59 @@ async fn collect_all_paged(handler: &SqliteHandler, prefix: &str) -> Vec<String>
 }
 
 #[tokio::test]
-async fn test_list_tables_pagination_small_table_count_returns_single_page() {
-    let handler = handler(false);
-    let prefix = "pg_small";
-    drop_seeded_tables(&handler, prefix, 37).await;
-    seed_n_tables(&handler, prefix, 37).await;
+async fn test_list_tables_pagination_traverses_pages() {
+    let handler_paged = handler_with_page_size(2);
+    let handler_full = handler(true);
 
-    let response = handler.list_tables(&ListTablesRequest::default()).await.unwrap();
+    let collected = collect_all_paged(&handler_paged).await;
 
-    let mine: Vec<_> = response.tables.iter().filter(|t| t.starts_with(prefix)).collect();
-    // Whole result plus seeded tables must fit in one page (seed is 5 tables + 37 = 42 ≤ 100).
-    assert!(mine.len() >= 37, "expected 37 seeded tables, saw {}", mine.len());
-    assert!(
-        response.next_cursor.is_none(),
-        "response under the default page_size (100) must not emit nextCursor"
-    );
-
-    drop_seeded_tables(&handler, prefix, 37).await;
-}
-
-#[tokio::test]
-async fn test_list_tables_pagination_exactly_at_boundary_no_next_cursor() {
-    let handler = handler(false);
-    let prefix = "pg_exact";
-    drop_seeded_tables(&handler, prefix, 200).await;
-
-    // First clear seeded tables' influence: count the seeded fixture tables that start with prefix (should be zero).
-    // Seed exactly enough to push total to 100 (the default page_size) — 100 minus whatever baseline exists.
-    let baseline = handler
+    let single_page = handler_full
         .list_tables(&ListTablesRequest::default())
         .await
-        .unwrap()
-        .tables
-        .len();
-    let needed = 100 - baseline;
-    if needed == 0 {
-        return;
-    }
-    seed_n_tables(&handler, prefix, needed).await;
-
-    let response = handler.list_tables(&ListTablesRequest::default()).await.unwrap();
-    assert_eq!(response.tables.len(), 100, "expected exactly-100-table page");
-    assert!(
-        response.next_cursor.is_none(),
-        "exactly-at-boundary must NOT emit nextCursor: {:?}",
-        response.next_cursor
-    );
-
-    drop_seeded_tables(&handler, prefix, needed).await;
-}
-
-#[tokio::test]
-async fn test_list_tables_pagination_traverses_over_250_tables() {
-    let handler = handler(false);
-    let prefix = "pg_many";
-    drop_seeded_tables(&handler, prefix, 250).await;
-    seed_n_tables(&handler, prefix, 250).await;
-
-    let collected = collect_all_paged(&handler, prefix).await;
+        .expect("single page");
 
     assert_eq!(
-        collected.len(),
-        250,
-        "expected 250 seeded tables, got {}",
-        collected.len()
+        collected, single_page.tables,
+        "paged traversal must yield identical results (and ordering) to a single full page"
     );
-    let mut sorted = collected.clone();
-    sorted.sort();
-    assert_eq!(collected, sorted, "pages must preserve global name ordering");
-    let unique: std::collections::HashSet<_> = collected.iter().collect();
-    assert_eq!(unique.len(), 250, "no duplicates across pages");
-
-    drop_seeded_tables(&handler, prefix, 250).await;
+    let unique: std::collections::HashSet<&String> = collected.iter().collect();
+    assert_eq!(unique.len(), collected.len(), "no duplicates across pages");
 }
 
 #[tokio::test]
-async fn test_list_tables_pagination_empty_database_returns_no_next_cursor() {
+async fn test_list_tables_pagination_small_table_set_no_next_cursor() {
     let handler = handler(true);
     let response = handler.list_tables(&ListTablesRequest::default()).await.unwrap();
-    // Not strictly empty (seeded fixture exists), but tested database has fewer than the default page_size (100).
     assert!(
-        response.tables.len() < 100,
-        "seeded fixture must stay under the default page_size (100)"
+        response.next_cursor.is_none(),
+        "seeded fixture below default page_size must not emit nextCursor"
+    );
+}
+
+#[tokio::test]
+async fn test_list_tables_pagination_boundary_page_size_equals_total() {
+    let handler_full = handler(true);
+    let total = handler_full
+        .list_tables(&ListTablesRequest::default())
+        .await
+        .expect("discover total")
+        .tables
+        .len();
+    let page_size = u16::try_from(total).expect("seed total fits in u16");
+
+    let handler_boundary = handler_with_page_size(page_size);
+    let response = handler_boundary
+        .list_tables(&ListTablesRequest::default())
+        .await
+        .unwrap();
+    assert_eq!(
+        response.tables.len(),
+        total,
+        "page_size equal to total must return everything on one page"
     );
     assert!(
         response.next_cursor.is_none(),
-        "small table set must not emit nextCursor"
+        "page_size equal to total must NOT emit nextCursor"
     );
 }
 
@@ -783,44 +731,27 @@ async fn test_list_tables_pagination_off_the_end_cursor_returns_empty_page() {
 
 #[tokio::test]
 async fn test_list_tables_respects_configured_page_size() {
-    let handler = handler_with_page_size(50);
-    let prefix = "pg_cfg_50";
-    drop_seeded_tables(&handler, prefix, 120).await;
-    seed_n_tables(&handler, prefix, 120).await;
-
-    let collected = collect_all_paged(&handler, prefix).await;
-
-    assert_eq!(collected.len(), 120, "all 120 seeded tables must be returned");
-
-    // First page must be exactly 50 when total (seed + baseline) exceeds 50.
+    let handler = handler_with_page_size(2);
     let first = handler
         .list_tables(&ListTablesRequest::default())
         .await
         .expect("first page");
-    assert_eq!(first.tables.len(), 50, "configured page_size=50 must cap page 1");
+    assert_eq!(first.tables.len(), 2, "configured page_size=2 must cap page 1");
     assert!(
         first.next_cursor.is_some(),
-        "page 1 must emit nextCursor with total > 50"
+        "page 1 must emit nextCursor when total > page_size"
     );
-
-    drop_seeded_tables(&handler, prefix, 120).await;
 }
 
 #[tokio::test]
 async fn test_list_tables_respects_configured_page_size_minimum() {
     let handler = handler_with_page_size(1);
-    let prefix = "pg_cfg_1";
-    drop_seeded_tables(&handler, prefix, 3).await;
-    seed_n_tables(&handler, prefix, 3).await;
-
     let first = handler
         .list_tables(&ListTablesRequest::default())
         .await
         .expect("first page");
     assert_eq!(first.tables.len(), 1, "page_size=1 must return one table per page");
     assert!(first.next_cursor.is_some(), "page 1 must emit nextCursor");
-
-    drop_seeded_tables(&handler, prefix, 3).await;
 }
 
 #[tokio::test]
