@@ -3,12 +3,15 @@
 //! Type names are normalized to uppercase because sqlx may return either case
 //! depending on the query context. Integer types use size-specific Rust types
 //! (`i16`, `i32`, `i64`) because sqlx enforces strict type matching for
-//! `PostgreSQL`.
+//! `PostgreSQL`. Temporal types (`DATE`, `TIME`, `TIMESTAMP`, `TIMESTAMPTZ`)
+//! are decoded via sqlx's `chrono` integration and serialized as RFC 3339
+//! strings; `TIMESTAMPTZ` is normalized to UTC and emitted with a `Z` suffix.
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde_json::{Map, Value};
 use sqlx::postgres::PgRow;
+use sqlx::types::chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use sqlx::{Column, Row, TypeInfo, ValueRef};
 
 use crate::RowExt;
@@ -52,6 +55,38 @@ impl RowExt for PgRow {
 
                     "JSON" | "JSONB" => self.try_get::<Value, _>(idx).unwrap_or(Value::Null),
 
+                    "DATE" => self.try_get::<NaiveDate, _>(idx).map_or_else(
+                        |e| {
+                            warn_decode_failure(column.name(), &type_name, &e);
+                            Value::Null
+                        },
+                        |v| Value::String(v.format("%Y-%m-%d").to_string()),
+                    ),
+
+                    "TIME" => self.try_get::<NaiveTime, _>(idx).map_or_else(
+                        |e| {
+                            warn_decode_failure(column.name(), &type_name, &e);
+                            Value::Null
+                        },
+                        |v| Value::String(v.format("%H:%M:%S%.f").to_string()),
+                    ),
+
+                    "TIMESTAMP" => self.try_get::<NaiveDateTime, _>(idx).map_or_else(
+                        |e| {
+                            warn_decode_failure(column.name(), &type_name, &e);
+                            Value::Null
+                        },
+                        |v| Value::String(v.format("%Y-%m-%dT%H:%M:%S%.f").to_string()),
+                    ),
+
+                    "TIMESTAMPTZ" => self.try_get::<DateTime<Utc>, _>(idx).map_or_else(
+                        |e| {
+                            warn_decode_failure(column.name(), &type_name, &e);
+                            Value::Null
+                        },
+                        |v| Value::String(v.format("%Y-%m-%dT%H:%M:%S%.fZ").to_string()),
+                    ),
+
                     _ => self.try_get::<String, _>(idx).map_or(Value::Null, Value::String),
                 }
             };
@@ -61,4 +96,14 @@ impl RowExt for PgRow {
 
         Value::Object(map)
     }
+}
+
+/// Emits a `WARN`-level tracing event when a column value fails to decode.
+fn warn_decode_failure(column: &str, db_type: &str, err: &sqlx::Error) {
+    tracing::warn!(
+        column,
+        db_type,
+        error = %err,
+        "failed to decode column value"
+    );
 }
