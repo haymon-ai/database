@@ -2325,7 +2325,6 @@ dependencies = [
  "base64",
  "serde_json",
  "sqlx",
- "tracing",
 ]
 
 [[package]]

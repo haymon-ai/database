@@ -55,37 +55,21 @@ impl RowExt for PgRow {
 
                     "JSON" | "JSONB" => self.try_get::<Value, _>(idx).unwrap_or(Value::Null),
 
-                    "DATE" => self.try_get::<NaiveDate, _>(idx).map_or_else(
-                        |e| {
-                            warn_decode_failure(column.name(), &type_name, &e);
-                            Value::Null
-                        },
-                        |v| Value::String(v.format("%Y-%m-%d").to_string()),
-                    ),
+                    "DATE" => self
+                        .try_get::<NaiveDate, _>(idx)
+                        .map_or(Value::Null, |v| Value::String(v.format("%Y-%m-%d").to_string())),
 
-                    "TIME" => self.try_get::<NaiveTime, _>(idx).map_or_else(
-                        |e| {
-                            warn_decode_failure(column.name(), &type_name, &e);
-                            Value::Null
-                        },
-                        |v| Value::String(v.format("%H:%M:%S%.f").to_string()),
-                    ),
+                    "TIME" => self
+                        .try_get::<NaiveTime, _>(idx)
+                        .map_or(Value::Null, |v| Value::String(v.format("%H:%M:%S%.f").to_string())),
 
-                    "TIMESTAMP" => self.try_get::<NaiveDateTime, _>(idx).map_or_else(
-                        |e| {
-                            warn_decode_failure(column.name(), &type_name, &e);
-                            Value::Null
-                        },
-                        |v| Value::String(v.format("%Y-%m-%dT%H:%M:%S%.f").to_string()),
-                    ),
+                    "TIMESTAMP" => self.try_get::<NaiveDateTime, _>(idx).map_or(Value::Null, |v| {
+                        Value::String(v.format("%Y-%m-%dT%H:%M:%S%.f").to_string())
+                    }),
 
-                    "TIMESTAMPTZ" => self.try_get::<DateTime<Utc>, _>(idx).map_or_else(
-                        |e| {
-                            warn_decode_failure(column.name(), &type_name, &e);
-                            Value::Null
-                        },
-                        |v| Value::String(v.format("%Y-%m-%dT%H:%M:%S%.fZ").to_string()),
-                    ),
+                    "TIMESTAMPTZ" => self.try_get::<DateTime<Utc>, _>(idx).map_or(Value::Null, |v| {
+                        Value::String(v.format("%Y-%m-%dT%H:%M:%S%.fZ").to_string())
+                    }),
 
                     _ => self.try_get::<String, _>(idx).map_or(Value::Null, Value::String),
                 }
@@ -96,14 +80,4 @@ impl RowExt for PgRow {
 
         Value::Object(map)
     }
-}
-
-/// Emits a `WARN`-level tracing event when a column value fails to decode.
-fn warn_decode_failure(column: &str, db_type: &str, err: &sqlx::Error) {
-    tracing::warn!(
-        column,
-        db_type,
-        error = %err,
-        "failed to decode column value"
-    );
 }

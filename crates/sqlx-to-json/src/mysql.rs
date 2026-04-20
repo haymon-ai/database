@@ -56,41 +56,24 @@ impl RowExt for MySqlRow {
 
                     "BLOB" | "TINYBLOB" | "MEDIUMBLOB" | "LONGBLOB" | "BIT" | "GEOMETRY" => bytes_to_json(self, idx),
 
-                    "DATE" => self.try_get::<NaiveDate, _>(idx).map_or_else(
-                        |e| {
-                            warn_decode_failure(column.name(), type_name, &e);
-                            Value::Null
-                        },
-                        |v| Value::String(v.format("%Y-%m-%d").to_string()),
-                    ),
+                    "DATE" => self
+                        .try_get::<NaiveDate, _>(idx)
+                        .map_or(Value::Null, |v| Value::String(v.format("%Y-%m-%d").to_string())),
 
-                    "TIME" => self.try_get::<NaiveTime, _>(idx).map_or_else(
-                        |e| {
-                            warn_decode_failure(column.name(), type_name, &e);
-                            Value::Null
-                        },
-                        |v| Value::String(v.format("%H:%M:%S%.f").to_string()),
-                    ),
+                    "TIME" => self
+                        .try_get::<NaiveTime, _>(idx)
+                        .map_or(Value::Null, |v| Value::String(v.format("%H:%M:%S%.f").to_string())),
 
-                    "DATETIME" => self.try_get::<NaiveDateTime, _>(idx).map_or_else(
-                        |e| {
-                            warn_decode_failure(column.name(), type_name, &e);
-                            Value::Null
-                        },
-                        |v| Value::String(v.format("%Y-%m-%dT%H:%M:%S%.f").to_string()),
-                    ),
+                    "DATETIME" => self.try_get::<NaiveDateTime, _>(idx).map_or(Value::Null, |v| {
+                        Value::String(v.format("%Y-%m-%dT%H:%M:%S%.f").to_string())
+                    }),
 
                     // sqlx-mysql's NaiveDateTime decoder only accepts ColumnType::Datetime,
                     // not Timestamp. DateTime<Utc> accepts both; we then strip the zone
-                    // via naive_utc() so the wire shape matches FR-004 (no Z, no offset)
-                    // and data-model.md §2.2's rule that MySQL TIMESTAMP is naive-on-the-wire.
-                    "TIMESTAMP" => self.try_get::<DateTime<Utc>, _>(idx).map_or_else(
-                        |e| {
-                            warn_decode_failure(column.name(), type_name, &e);
-                            Value::Null
-                        },
-                        |v| Value::String(v.naive_utc().format("%Y-%m-%dT%H:%M:%S%.f").to_string()),
-                    ),
+                    // via naive_utc() so the wire shape matches the naive ISO 8601 form.
+                    "TIMESTAMP" => self.try_get::<DateTime<Utc>, _>(idx).map_or(Value::Null, |v| {
+                        Value::String(v.naive_utc().format("%Y-%m-%dT%H:%M:%S%.f").to_string())
+                    }),
 
                     // All other types (VARCHAR, TEXT, ENUM, etc.) → String
                     _ => self
@@ -111,14 +94,4 @@ fn bytes_to_json(row: &MySqlRow, idx: usize) -> Value {
     row.try_get::<Vec<u8>, _>(idx).map_or(Value::Null, |bytes| {
         String::from_utf8(bytes.clone()).map_or_else(|_| Value::String(BASE64.encode(&bytes)), Value::String)
     })
-}
-
-/// Emits a `WARN`-level tracing event when a column value fails to decode.
-fn warn_decode_failure(column: &str, db_type: &str, err: &sqlx::Error) {
-    tracing::warn!(
-        column,
-        db_type,
-        error = %err,
-        "failed to decode column value"
-    );
 }
