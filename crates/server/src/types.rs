@@ -19,9 +19,7 @@ pub struct MessageResponse {
 /// Request for the `list_databases` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 pub struct ListDatabasesRequest {
-    /// Opaque pagination cursor. Omit (or pass `null`) for the first page.
-    /// On subsequent calls, pass the `nextCursor` returned by the previous
-    /// response verbatim. Cursors are opaque — do not parse, modify, or persist.
+    /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
 }
@@ -55,9 +53,7 @@ pub struct DropDatabaseRequest {
 pub struct ListTablesRequest {
     /// The database name to list tables from. Required. Use `list_databases` first to see available databases.
     pub database_name: String,
-    /// Opaque pagination cursor. Omit (or pass `null`) for the first page.
-    /// On subsequent calls, pass the `nextCursor` returned by the previous
-    /// response verbatim. Cursors are opaque — do not parse, modify, or persist.
+    /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
 }
@@ -106,12 +102,7 @@ pub struct ReadQueryRequest {
     pub query: String,
     /// The database to run the query against. Required. Use `list_databases` first to see available databases.
     pub database_name: String,
-    /// Opaque pagination cursor. Omit (or pass `null`) for the first page.
-    /// On subsequent calls, pass the `nextCursor` returned by the previous
-    /// response verbatim. Cursors are opaque — do not parse, modify, or persist.
-    /// Ignored for non-`SELECT` statement kinds admitted by the backend
-    /// dialect (such as `SHOW` or `EXPLAIN`); those always return a single
-    /// page.
+    /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
 }

@@ -179,11 +179,11 @@ A subcommand is required — running `database-mcp` with no subcommand prints us
 
 ### list_databases
 
-Lists accessible databases, paginated. Parameters: `cursor` (optional opaque token from a prior response's `nextCursor`). Returns up to 100 databases per call; when more remain, the response includes a `nextCursor` string — pass it back on the next call to fetch the next page. Iterate until `nextCursor` is absent. Not available for SQLite.
+Lists accessible databases, paginated via `cursor` / `nextCursor`. See [Cursor Pagination](https://database.haymon.ai/docs/features#cursor-pagination) for iteration details. Not available for SQLite.
 
 ### list_tables
 
-Lists tables in a database, paginated. Parameters: `database_name`, `cursor` (optional opaque token from a prior response's `nextCursor`). Returns up to 100 tables per call; when more remain, the response includes a `nextCursor` string — pass it back on the next call to fetch the next page. Iterate until `nextCursor` is absent.
+Lists tables in a database, paginated via `cursor` / `nextCursor`. Requires `database_name`. See [Cursor Pagination](https://database.haymon.ai/docs/features#cursor-pagination) for iteration details.
 
 ### get_table_schema
 
@@ -191,7 +191,7 @@ Returns column definitions (type, nullable, key, default, extra) and foreign key
 
 ### read_query
 
-Executes a read-only SQL query (SELECT, SHOW, DESCRIBE, USE, EXPLAIN). Always enforces SQL validation as defence-in-depth. Parameters: `query`, `database_name`, `cursor` (optional opaque token from a prior response's `nextCursor`). `SELECT` results paginate — up to 100 rows per call, with a `nextCursor` when more remain; iterate until `nextCursor` is absent. `SHOW`, `DESCRIBE`, `USE`, and `EXPLAIN` always return a single page and ignore `cursor`.
+Executes a read-only SQL query (SELECT, SHOW, DESCRIBE, USE, EXPLAIN). Always enforces SQL validation as defence-in-depth. Parameters: `query`, `database_name`, `cursor`. `SELECT` results paginate via `cursor` / `nextCursor`; `SHOW`, `DESCRIBE`, `USE`, and `EXPLAIN` return a single page and ignore `cursor`. See [Cursor Pagination](https://database.haymon.ai/docs/features#cursor-pagination) for iteration details.
 
 ### write_query
 

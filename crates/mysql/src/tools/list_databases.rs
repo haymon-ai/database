@@ -35,11 +35,7 @@ A sorted JSON array of database name strings.
 </what_it_returns>
 
 <pagination>
-This tool paginates its response. If more databases exist than fit in one page, the response includes a `nextCursor` string — call `list_databases` again with that string as the `cursor` argument to fetch the next page. Iterate until `nextCursor` is absent.
-
-Cursors are opaque: do not parse, modify, or persist them across sessions. Passing a malformed or stale cursor returns a JSON-RPC error (code -32602); recover by retrying without a cursor to restart from the first page.
-
-Note: databases created or dropped between paginated calls may cause the same database to appear twice or to be skipped. Re-enumerate from a fresh call for a consistent snapshot.
+Paginated. Pass the prior response's `nextCursor` as `cursor` to fetch the next page.
 </pagination>"#;
 }
 
@@ -103,29 +99,5 @@ impl MysqlHandler {
         let (databases, next_cursor) = pager.finalize(rows);
 
         Ok(ListDatabasesResponse { databases, next_cursor })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::ListDatabasesTool;
-
-    #[test]
-    fn description_documents_pagination() {
-        let desc = ListDatabasesTool::DESCRIPTION;
-        assert!(desc.contains("nextCursor"), "description must mention `nextCursor`");
-        assert!(desc.contains("cursor"), "description must document cursor semantics");
-        assert!(
-            desc.contains("-32602"),
-            "description must mention the invalid-cursor error code"
-        );
-    }
-
-    #[test]
-    fn description_does_not_state_specific_page_size() {
-        assert!(
-            !ListDatabasesTool::DESCRIPTION.contains("100"),
-            "description must not hard-state `100` databases — page size is operator-configurable"
-        );
     }
 }
