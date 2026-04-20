@@ -919,7 +919,7 @@ async fn test_read_query_pagination_off_the_end_cursor_returns_empty() {
 async fn test_read_query_pagination_survives_trailing_line_comment() {
     // A trailing `-- comment` in the caller's SQL must not swallow the
     // subquery-wrap's closing paren + LIMIT/OFFSET. Regression guard for
-    // the newline-before-`)` fix in Pager::wrap_select.
+    // the newline-before-`)` fix in database_mcp_sql::pagination::with_limit_offset.
     let handler = handler_with_page_size(2);
     let response = handler
         .read_query(ReadQueryRequest {

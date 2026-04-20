@@ -7,6 +7,7 @@ use database_mcp_server::types::{ReadQueryRequest, ReadQueryResponse};
 use database_mcp_sql::Connection as _;
 use database_mcp_sql::SqlError;
 use database_mcp_sql::StatementKind;
+use database_mcp_sql::pagination::with_limit_offset;
 use database_mcp_sql::sanitize::validate_ident;
 use database_mcp_sql::validation::validate_read_only;
 use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
@@ -125,7 +126,7 @@ impl PostgresHandler {
         match kind {
             StatementKind::Select => {
                 let pager = Pager::new(cursor, self.config.page_size);
-                let wrapped = pager.wrap_select(&query);
+                let wrapped = with_limit_offset(&query, pager.limit(), pager.offset());
                 let rows = self.connection.fetch_json(wrapped.as_str(), db).await?;
                 let (rows, next_cursor) = pager.finalize(rows);
                 Ok(ReadQueryResponse { rows, next_cursor })

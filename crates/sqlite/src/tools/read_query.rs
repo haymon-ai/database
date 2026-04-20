@@ -8,6 +8,7 @@ use database_mcp_server::types::ReadQueryResponse;
 use database_mcp_sql::Connection as _;
 use database_mcp_sql::SqlError;
 use database_mcp_sql::StatementKind;
+use database_mcp_sql::pagination::with_limit_offset;
 use database_mcp_sql::validation::validate_read_only;
 use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
 use rmcp::model::{ErrorData, ToolAnnotations};
@@ -117,7 +118,7 @@ impl SqliteHandler {
         match kind {
             StatementKind::Select => {
                 let pager = Pager::new(cursor, self.config.page_size);
-                let wrapped = pager.wrap_select(&query);
+                let wrapped = with_limit_offset(&query, pager.limit(), pager.offset());
                 let rows = self.connection.fetch_json(wrapped.as_str(), None).await?;
                 let (rows, next_cursor) = pager.finalize(rows);
                 Ok(ReadQueryResponse { rows, next_cursor })
