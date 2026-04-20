@@ -27,7 +27,7 @@ Use when:
 </usecase>
 
 <examples>
-✓ "Create a database called analytics" → createDatabase(databaseName="analytics")
+✓ "Create a database called analytics" → createDatabase(database="analytics")
 ✗ "Create a table" → use writeQuery with CREATE TABLE
 </examples>
 
@@ -83,39 +83,39 @@ impl MysqlHandler {
     /// Returns [`SqlError`] if read-only or the query fails.
     pub async fn create_database(
         &self,
-        CreateDatabaseRequest { database_name }: CreateDatabaseRequest,
+        CreateDatabaseRequest { database }: CreateDatabaseRequest,
     ) -> Result<MessageResponse, SqlError> {
         if self.config.read_only {
             return Err(SqlError::ReadOnlyViolation);
         }
 
-        validate_ident(&database_name)?;
+        validate_ident(&database)?;
 
         let check_sql = format!(
             r"
             SELECT CAST(SCHEMA_NAME AS CHAR)
             FROM information_schema.SCHEMATA
             WHERE SCHEMA_NAME = {}",
-            quote_literal(&database_name),
+            quote_literal(&database),
         );
 
         let exists: Option<String> = self.connection.fetch_optional(check_sql.as_str(), None).await?;
 
         if exists.is_some() {
             return Ok(MessageResponse {
-                message: format!("Database '{database_name}' already exists."),
+                message: format!("Database '{database}' already exists."),
             });
         }
 
         let create_sql = format!(
             "CREATE DATABASE IF NOT EXISTS {}",
-            quote_ident(&database_name, &MySqlDialect {})
+            quote_ident(&database, &MySqlDialect {})
         );
 
         self.connection.execute(create_sql.as_str(), None).await?;
 
         Ok(MessageResponse {
-            message: format!("Database '{database_name}' created successfully."),
+            message: format!("Database '{database}' created successfully."),
         })
     }
 }

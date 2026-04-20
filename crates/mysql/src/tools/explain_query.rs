@@ -98,7 +98,7 @@ impl MysqlHandler {
     pub async fn explain_query(
         &self,
         ExplainQueryRequest {
-            database_name,
+            database,
             query,
             analyze,
         }: ExplainQueryRequest,
@@ -107,7 +107,7 @@ impl MysqlHandler {
             let _ = validate_read_only(&query, &sqlparser::dialect::MySqlDialect {})?;
         }
 
-        let db = Some(database_name.trim()).filter(|s| !s.is_empty());
+        let db = Some(database.trim()).filter(|s| !s.is_empty());
         if let Some(name) = &db {
             validate_ident(name)?;
         }

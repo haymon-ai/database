@@ -183,35 +183,35 @@ Lists accessible databases, paginated via `cursor` / `nextCursor`. See [Cursor P
 
 ### listTables
 
-Lists tables in a database, paginated via `cursor` / `nextCursor`. Requires `databaseName`. See [Cursor Pagination](https://database.haymon.ai/docs/features#cursor-pagination) for iteration details.
+Lists tables in a database, paginated via `cursor` / `nextCursor`. Requires `database`. See [Cursor Pagination](https://database.haymon.ai/docs/features#cursor-pagination) for iteration details.
 
 ### getTableSchema
 
-Returns column definitions (type, nullable, key, default, extra) and foreign key relationships (constraint name, referenced table/column, on update/delete rules) for a table. Parameters: `databaseName`, `tableName`.
+Returns column definitions (type, nullable, key, default, extra) and foreign key relationships (constraint name, referenced table/column, on update/delete rules) for a table. Parameters: `database`, `table`.
 
 ### readQuery
 
-Executes a read-only SQL query (SELECT, SHOW, DESCRIBE, USE, EXPLAIN). Always enforces SQL validation as defence-in-depth. Parameters: `query`, `databaseName`, `cursor`. `SELECT` results paginate via `cursor` / `nextCursor`; `SHOW`, `DESCRIBE`, `USE`, and `EXPLAIN` return a single page and ignore `cursor`. See [Cursor Pagination](https://database.haymon.ai/docs/features#cursor-pagination) for iteration details.
+Executes a read-only SQL query (SELECT, SHOW, DESCRIBE, USE, EXPLAIN). Always enforces SQL validation as defence-in-depth. Parameters: `query`, `database`, `cursor`. `SELECT` results paginate via `cursor` / `nextCursor`; `SHOW`, `DESCRIBE`, `USE`, and `EXPLAIN` return a single page and ignore `cursor`. See [Cursor Pagination](https://database.haymon.ai/docs/features#cursor-pagination) for iteration details.
 
 ### writeQuery
 
-Executes a write SQL query (INSERT, UPDATE, DELETE, CREATE, ALTER, DROP). Only available when read-only mode is disabled. Parameters: `query`, `databaseName`.
+Executes a write SQL query (INSERT, UPDATE, DELETE, CREATE, ALTER, DROP). Only available when read-only mode is disabled. Parameters: `query`, `database`.
 
 ### createDatabase
 
-Creates a database if it doesn't exist. Only available when read-only mode is disabled. Not available for SQLite. Parameters: `databaseName`.
+Creates a database if it doesn't exist. Only available when read-only mode is disabled. Not available for SQLite. Parameters: `database`.
 
 ### dropDatabase
 
-Drops an existing database. Refuses to drop the currently connected database. Only available when read-only mode is disabled. Not available for SQLite. Parameters: `databaseName`.
+Drops an existing database. Refuses to drop the currently connected database. Only available when read-only mode is disabled. Not available for SQLite. Parameters: `database`.
 
 ### dropTable
 
-Drops a table from a database. If the table has foreign key dependents, the database error is surfaced to the user. On PostgreSQL, a `cascade` parameter is available to force the drop with `CASCADE`. Only available when read-only mode is disabled. Parameters: `databaseName`, `tableName`, `cascade` (PostgreSQL only).
+Drops a table from a database. If the table has foreign key dependents, the database error is surfaced to the user. On PostgreSQL, a `cascade` parameter is available to force the drop with `CASCADE`. Only available when read-only mode is disabled. Parameters: `database`, `table`, `cascade` (PostgreSQL only).
 
 ### explainQuery
 
-Returns the execution plan for a SQL query. Supports an optional `analyze` parameter for actual execution statistics (PostgreSQL and MySQL/MariaDB). In read-only mode, EXPLAIN ANALYZE is only allowed for read-only statements since it actually executes the query. SQLite uses EXPLAIN QUERY PLAN (no ANALYZE support). Always available regardless of read-only mode. Parameters: `query`, `databaseName`, `analyze` (PostgreSQL/MySQL only).
+Returns the execution plan for a SQL query. Supports an optional `analyze` parameter for actual execution statistics (PostgreSQL and MySQL/MariaDB). In read-only mode, EXPLAIN ANALYZE is only allowed for read-only statements since it actually executes the query. SQLite uses EXPLAIN QUERY PLAN (no ANALYZE support). Always available regardless of read-only mode. Parameters: `query`, `database`, `analyze` (PostgreSQL/MySQL only).
 
 ## Security
 

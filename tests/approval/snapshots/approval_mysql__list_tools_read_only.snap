@@ -17,7 +17,7 @@ expression: tools
           "description": "If true, use EXPLAIN ANALYZE for actual execution statistics. In read-only mode, only allowed for read-only statements. Defaults to false.",
           "type": "boolean"
         },
-        "databaseName": {
+        "database": {
           "description": "The database to explain against. Required. Use `listDatabases` first to see available databases.",
           "type": "string"
         },
@@ -27,7 +27,7 @@ expression: tools
         }
       },
       "required": [
-        "databaseName",
+        "database",
         "query"
       ],
       "title": "ExplainQueryRequest",
@@ -59,23 +59,23 @@ expression: tools
   {
     "name": "getTableSchema",
     "title": "Get Table Schema",
-    "description": "Get column definitions and foreign key relationships for a table. Requires `databaseName` and `tableName` — call `listDatabases` and `listTables` first.\n\n<usecase>\nALWAYS call this before writing queries to understand:\n- Column names and data types\n- Which columns are nullable, primary keys, or have defaults\n- Foreign key relationships for writing JOINs\n</usecase>\n\n<examples>\n✓ \"What columns does the orders table have?\" → getTableSchema(databaseName=\"mydb\", tableName=\"orders\")\n✓ Before writing a SELECT → getTableSchema first to confirm column names\n✓ \"How are users and orders related?\" → check foreign keys in both tables\n</examples>\n\n<what_it_returns>\nA JSON object with tableName and columns keyed by column name, each containing type, nullable, key, default, and foreignKey info.\n</what_it_returns>",
+    "description": "Get column definitions and foreign key relationships for a table. Requires `database` and `table` — call `listDatabases` and `listTables` first.\n\n<usecase>\nALWAYS call this before writing queries to understand:\n- Column names and data types\n- Which columns are nullable, primary keys, or have defaults\n- Foreign key relationships for writing JOINs\n</usecase>\n\n<examples>\n✓ \"What columns does the orders table have?\" → getTableSchema(database=\"mydb\", table=\"orders\")\n✓ Before writing a SELECT → getTableSchema first to confirm column names\n✓ \"How are users and orders related?\" → check foreign keys in both tables\n</examples>\n\n<what_it_returns>\nA JSON object with table and columns keyed by column name, each containing type, nullable, key, default, and foreignKey info.\n</what_it_returns>",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "Request for the `getTableSchema` tool.",
       "properties": {
-        "databaseName": {
+        "database": {
           "description": "The database name containing the table. Required. Use `listDatabases` first to see available databases.",
           "type": "string"
         },
-        "tableName": {
+        "table": {
           "description": "The table name to inspect. Use `listTables` first to see available tables in the database.",
           "type": "string"
         }
       },
       "required": [
-        "databaseName",
-        "tableName"
+        "database",
+        "table"
       ],
       "title": "GetTableSchemaRequest",
       "type": "object"
@@ -87,13 +87,13 @@ expression: tools
         "columns": {
           "description": "Column definitions keyed by column name."
         },
-        "tableName": {
+        "table": {
           "description": "Name of the inspected table.",
           "type": "string"
         }
       },
       "required": [
-        "tableName",
+        "table",
         "columns"
       ],
       "title": "TableSchemaResponse",
@@ -161,7 +161,7 @@ expression: tools
   {
     "name": "listTables",
     "title": "List Tables",
-    "description": "List all tables in a specific database. Requires `databaseName` — call `listDatabases` first to discover available databases.\n\n<usecase>\nUse when:\n- Exploring a database to find relevant tables\n- Verifying a table exists before querying or inspecting it\n- The user asks what tables are in a database\n</usecase>\n\n<examples>\n✓ \"What tables are in the mydb database?\" → listTables(databaseName=\"mydb\")\n✓ \"Does a users table exist?\" → listTables to check\n✗ \"Show me the columns of users\" → use getTableSchema instead\n</examples>\n\n<what_it_returns>\nA sorted JSON array of table name strings.\n</what_it_returns>\n\n<pagination>\nPaginated. Pass the prior response's `nextCursor` as `cursor` to fetch the next page.\n</pagination>",
+    "description": "List all tables in a specific database. Requires `database` — call `listDatabases` first to discover available databases.\n\n<usecase>\nUse when:\n- Exploring a database to find relevant tables\n- Verifying a table exists before querying or inspecting it\n- The user asks what tables are in a database\n</usecase>\n\n<examples>\n✓ \"What tables are in the mydb database?\" → listTables(database=\"mydb\")\n✓ \"Does a users table exist?\" → listTables to check\n✗ \"Show me the columns of users\" → use getTableSchema instead\n</examples>\n\n<what_it_returns>\nA sorted JSON array of table name strings.\n</what_it_returns>\n\n<pagination>\nPaginated. Pass the prior response's `nextCursor` as `cursor` to fetch the next page.\n</pagination>",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "Request for the `listTables` tool.",
@@ -174,13 +174,13 @@ expression: tools
             "null"
           ]
         },
-        "databaseName": {
+        "database": {
           "description": "The database name to list tables from. Required. Use `listDatabases` first to see available databases.",
           "type": "string"
         }
       },
       "required": [
-        "databaseName"
+        "database"
       ],
       "title": "ListTablesRequest",
       "type": "object"
@@ -233,7 +233,7 @@ expression: tools
             "null"
           ]
         },
-        "databaseName": {
+        "database": {
           "description": "The database to run the query against. Required. Use `listDatabases` first to see available databases.",
           "type": "string"
         },
@@ -244,7 +244,7 @@ expression: tools
       },
       "required": [
         "query",
-        "databaseName"
+        "database"
       ],
       "title": "ReadQueryRequest",
       "type": "object"

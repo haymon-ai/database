@@ -49,18 +49,18 @@ expression: tools
   {
     "name": "getTableSchema",
     "title": "Get Table Schema",
-    "description": "Get column definitions and foreign key relationships for a table. Requires `tableName` — call `listTables` first.\n\n<usecase>\nALWAYS call this before writing queries to understand:\n- Column names and data types\n- Which columns are nullable, primary keys, or have defaults\n- Foreign key relationships for writing JOINs\n</usecase>\n\n<examples>\n✓ \"What columns does the orders table have?\" → getTableSchema(tableName=\"orders\")\n✓ Before writing a SELECT → getTableSchema first to confirm column names\n✓ \"How are users and orders related?\" → check foreign keys in both tables\n</examples>\n\n<what_it_returns>\nA JSON object with tableName and columns keyed by column name, each containing type, nullable, key, default, and foreignKey info.\n</what_it_returns>",
+    "description": "Get column definitions and foreign key relationships for a table. Requires `table` — call `listTables` first.\n\n<usecase>\nALWAYS call this before writing queries to understand:\n- Column names and data types\n- Which columns are nullable, primary keys, or have defaults\n- Foreign key relationships for writing JOINs\n</usecase>\n\n<examples>\n✓ \"What columns does the orders table have?\" → getTableSchema(table=\"orders\")\n✓ Before writing a SELECT → getTableSchema first to confirm column names\n✓ \"How are users and orders related?\" → check foreign keys in both tables\n</examples>\n\n<what_it_returns>\nA JSON object with table and columns keyed by column name, each containing type, nullable, key, default, and foreignKey info.\n</what_it_returns>",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "Request for the `getTableSchema` tool.",
       "properties": {
-        "tableName": {
+        "table": {
           "description": "The table name to inspect. Use `listTables` first to see available tables.",
           "type": "string"
         }
       },
       "required": [
-        "tableName"
+        "table"
       ],
       "title": "GetTableSchemaRequest",
       "type": "object"
@@ -72,13 +72,13 @@ expression: tools
         "columns": {
           "description": "Column definitions keyed by column name."
         },
-        "tableName": {
+        "table": {
           "description": "Name of the inspected table.",
           "type": "string"
         }
       },
       "required": [
-        "tableName",
+        "table",
         "columns"
       ],
       "title": "TableSchemaResponse",

@@ -12,9 +12,9 @@ use serde::Deserialize;
 #[serde(rename_all = "camelCase")]
 pub struct DropTableRequest {
     /// The database containing the table. Required. Use `listDatabases` first to see available databases.
-    pub database_name: String,
+    pub database: String,
     /// Name of the table to drop. Must contain only alphanumeric characters and underscores.
-    pub table_name: String,
+    pub table: String,
     /// If true, use CASCADE to also drop dependent foreign key constraints. Defaults to false.
     #[serde(default)]
     pub cascade: bool,

@@ -17,7 +17,7 @@ pub(crate) struct ListTablesTool;
 impl ListTablesTool {
     const NAME: &'static str = "listTables";
     const TITLE: &'static str = "List Tables";
-    const DESCRIPTION: &'static str = r#"List all tables in a specific database. Requires `databaseName` — call `listDatabases` first to discover available databases.
+    const DESCRIPTION: &'static str = r#"List all tables in a specific database. Requires `database` — call `listDatabases` first to discover available databases.
 
 <usecase>
 Use when:
@@ -27,7 +27,7 @@ Use when:
 </usecase>
 
 <examples>
-✓ "What tables are in the mydb database?" → listTables(databaseName="mydb")
+✓ "What tables are in the mydb database?" → listTables(database="mydb")
 ✓ "Does a users table exist?" → listTables to check
 ✗ "Show me the columns of users" → use getTableSchema instead
 </examples>
@@ -81,13 +81,13 @@ impl PostgresHandler {
     /// # Errors
     ///
     /// Returns [`ErrorData`] with code `-32602` if `cursor` is malformed,
-    /// or an internal-error [`ErrorData`] if `databaseName` is invalid
+    /// or an internal-error [`ErrorData`] if `database` is invalid
     /// or the underlying query fails.
     pub async fn list_tables(
         &self,
-        ListTablesRequest { database_name, cursor }: ListTablesRequest,
+        ListTablesRequest { database, cursor }: ListTablesRequest,
     ) -> Result<ListTablesResponse, ErrorData> {
-        let db = Some(database_name.trim()).filter(|s| !s.is_empty());
+        let db = Some(database.trim()).filter(|s| !s.is_empty());
         if let Some(name) = db {
             validate_ident(name)?;
         }

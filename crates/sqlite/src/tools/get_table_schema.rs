@@ -22,7 +22,7 @@ pub(crate) struct GetTableSchemaTool;
 impl GetTableSchemaTool {
     const NAME: &'static str = "getTableSchema";
     const TITLE: &'static str = "Get Table Schema";
-    const DESCRIPTION: &'static str = r#"Get column definitions and foreign key relationships for a table. Requires `tableName` — call `listTables` first.
+    const DESCRIPTION: &'static str = r#"Get column definitions and foreign key relationships for a table. Requires `table` — call `listTables` first.
 
 <usecase>
 ALWAYS call this before writing queries to understand:
@@ -32,13 +32,13 @@ ALWAYS call this before writing queries to understand:
 </usecase>
 
 <examples>
-✓ "What columns does the orders table have?" → getTableSchema(tableName="orders")
+✓ "What columns does the orders table have?" → getTableSchema(table="orders")
 ✓ Before writing a SELECT → getTableSchema first to confirm column names
 ✓ "How are users and orders related?" → check foreign keys in both tables
 </examples>
 
 <what_it_returns>
-A JSON object with tableName and columns keyed by column name, each containing type, nullable, key, default, and foreignKey info.
+A JSON object with table and columns keyed by column name, each containing type, nullable, key, default, and foreignKey info.
 </what_it_returns>"#;
 }
 
@@ -84,16 +84,16 @@ impl SqliteHandler {
     /// Returns [`SqlError`] if validation fails or the query errors.
     pub async fn get_table_schema(
         &self,
-        GetTableSchemaRequest { table_name }: GetTableSchemaRequest,
+        GetTableSchemaRequest { table }: GetTableSchemaRequest,
     ) -> Result<TableSchemaResponse, SqlError> {
-        validate_ident(&table_name)?;
+        validate_ident(&table)?;
 
         // 1. Get basic schema
-        let pragma_sql = format!("PRAGMA table_info({})", quote_ident(&table_name, &SQLiteDialect {}));
+        let pragma_sql = format!("PRAGMA table_info({})", quote_ident(&table, &SQLiteDialect {}));
         let rows = self.connection.fetch_json(pragma_sql.as_str(), None).await?;
 
         if rows.is_empty() {
-            return Err(SqlError::TableNotFound(table_name));
+            return Err(SqlError::TableNotFound(table));
         }
 
         let mut columns: HashMap<String, Value> = HashMap::new();
@@ -117,10 +117,7 @@ impl SqliteHandler {
         }
 
         // 2. Get FK info via PRAGMA
-        let fk_pragma_sql = format!(
-            "PRAGMA foreign_key_list({})",
-            quote_ident(&table_name, &SQLiteDialect {})
-        );
+        let fk_pragma_sql = format!("PRAGMA foreign_key_list({})", quote_ident(&table, &SQLiteDialect {}));
         let fk_rows = self.connection.fetch_json(fk_pragma_sql.as_str(), None).await?;
 
         for fk_row in &fk_rows {
@@ -162,7 +159,7 @@ impl SqliteHandler {
         }
 
         Ok(TableSchemaResponse {
-            table_name,
+            table,
             columns: json!(columns),
         })
     }

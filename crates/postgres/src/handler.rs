@@ -28,8 +28,8 @@ const DESCRIPTION: &str = "Database MCP Server for PostgreSQL";
 const INSTRUCTIONS: &str = r"## Workflow
 
 1. Call `listDatabases` to discover available databases.
-2. Call `listTables` with a `databaseName` to see its tables.
-3. Call `getTableSchema` with `databaseName` and `tableName` to inspect columns, types, and foreign keys before writing queries.
+2. Call `listTables` with a `database` to see its tables.
+3. Call `getTableSchema` with `database` and `table` to inspect columns, types, and foreign keys before writing queries.
 4. Use `readQuery` for read-only SQL (SELECT, SHOW, EXPLAIN).
 5. Use `writeQuery` for data changes (INSERT, UPDATE, DELETE, CREATE, ALTER, DROP).
 6. Use `explainQuery` to analyze query execution plans and diagnose slow queries.
@@ -37,7 +37,7 @@ const INSTRUCTIONS: &str = r"## Workflow
 8. Use `dropDatabase` to drop an existing database.
 9. Use `dropTable` to remove a table from a database (supports `cascade` for foreign key dependencies).
 
-Tools accept an optional `databaseName` parameter to query across databases without reconnecting.
+Tools accept an optional `database` parameter to query across databases without reconnecting.
 
 ## Constraints
 

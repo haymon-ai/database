@@ -20,7 +20,7 @@ pub(crate) struct GetTableSchemaTool;
 impl GetTableSchemaTool {
     const NAME: &'static str = "getTableSchema";
     const TITLE: &'static str = "Get Table Schema";
-    const DESCRIPTION: &'static str = r#"Get column definitions and foreign key relationships for a table. Requires `databaseName` and `tableName` — call `listDatabases` and `listTables` first.
+    const DESCRIPTION: &'static str = r#"Get column definitions and foreign key relationships for a table. Requires `database` and `table` — call `listDatabases` and `listTables` first.
 
 <usecase>
 ALWAYS call this before writing queries to understand:
@@ -30,13 +30,13 @@ ALWAYS call this before writing queries to understand:
 </usecase>
 
 <examples>
-✓ "What columns does the orders table have?" → getTableSchema(databaseName="mydb", tableName="orders")
+✓ "What columns does the orders table have?" → getTableSchema(database="mydb", table="orders")
 ✓ Before writing a SELECT → getTableSchema first to confirm column names
 ✓ "How are users and orders related?" → check foreign keys in both tables
 </examples>
 
 <what_it_returns>
-A JSON object with tableName and columns keyed by column name, each containing type, nullable, key, default, and foreignKey info.
+A JSON object with table and columns keyed by column name, each containing type, nullable, key, default, and foreignKey info.
 </what_it_returns>"#;
 }
 
@@ -82,24 +82,21 @@ impl MysqlHandler {
     /// Returns [`SqlError`] if validation fails or the query errors.
     pub async fn get_table_schema(
         &self,
-        GetTableSchemaRequest {
-            database_name,
-            table_name,
-        }: GetTableSchemaRequest,
+        GetTableSchemaRequest { database, table }: GetTableSchemaRequest,
     ) -> Result<TableSchemaResponse, SqlError> {
-        validate_ident(&database_name)?;
-        validate_ident(&table_name)?;
+        validate_ident(&database)?;
+        validate_ident(&table)?;
 
         // 1. Get basic schema
         let describe_sql = format!(
             "DESCRIBE {}.{}",
-            quote_ident(&database_name, &MySqlDialect {}),
-            quote_ident(&table_name, &MySqlDialect {}),
+            quote_ident(&database, &MySqlDialect {}),
+            quote_ident(&table, &MySqlDialect {}),
         );
         let schema_rows = self.connection.fetch_json(describe_sql.as_str(), None).await?;
 
         if schema_rows.is_empty() {
-            return Err(SqlError::TableNotFound(format!("{database_name}.{table_name}")));
+            return Err(SqlError::TableNotFound(format!("{database}.{table}")));
         }
 
         let mut columns: HashMap<String, Value> = HashMap::new();
@@ -137,8 +134,8 @@ impl MysqlHandler {
               AND kcu.TABLE_NAME = {}
               AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
             ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION",
-            quote_literal(&database_name),
-            quote_literal(&table_name),
+            quote_literal(&database),
+            quote_literal(&table),
         );
 
         let fk_rows = self.connection.fetch_json(fk_sql.as_str(), None).await?;
@@ -162,7 +159,7 @@ impl MysqlHandler {
         }
 
         Ok(TableSchemaResponse {
-            table_name,
+            table,
             columns: json!(columns),
         })
     }

@@ -26,7 +26,7 @@ const DESCRIPTION: &str = "Database MCP Server for SQLite";
 const INSTRUCTIONS: &str = r"## Workflow
 
 1. Call `listTables` to discover tables in the connected database.
-2. Call `getTableSchema` with a `tableName` to inspect columns, types, and foreign keys before writing queries.
+2. Call `getTableSchema` with a `table` to inspect columns, types, and foreign keys before writing queries.
 3. Use `readQuery` for read-only SQL (SELECT).
 4. Use `writeQuery` for data changes (INSERT, UPDATE, DELETE, CREATE, ALTER, DROP).
 5. Use `explainQuery` to analyze query execution plans and diagnose slow queries.

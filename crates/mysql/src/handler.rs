@@ -27,8 +27,8 @@ const DESCRIPTION: &str = "Database MCP Server for MySQL and MariaDB";
 const INSTRUCTIONS: &str = r"## Workflow
 
 1. Call `listDatabases` to discover available databases.
-2. Call `listTables` with a `databaseName` to see its tables.
-3. Call `getTableSchema` with `databaseName` and `tableName` to inspect columns, types, and foreign keys before writing queries.
+2. Call `listTables` with a `database` to see its tables.
+3. Call `getTableSchema` with `database` and `table` to inspect columns, types, and foreign keys before writing queries.
 4. Use `readQuery` for read-only SQL (SELECT, SHOW, DESCRIBE, USE, EXPLAIN).
 5. Use `writeQuery` for data changes (INSERT, UPDATE, DELETE, CREATE, ALTER, DROP).
 6. Use `explainQuery` to analyze query execution plans and diagnose slow queries.

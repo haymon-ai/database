@@ -21,7 +21,7 @@ pub(crate) struct ReadQueryTool;
 impl ReadQueryTool {
     const NAME: &'static str = "readQuery";
     const TITLE: &'static str = "Read Query";
-    const DESCRIPTION: &'static str = r#"Execute a read-only SQL query. Allowed statements: SELECT, SHOW, EXPLAIN. Accepts an optional `databaseName` to query across databases without reconnecting.
+    const DESCRIPTION: &'static str = r#"Execute a read-only SQL query. Allowed statements: SELECT, SHOW, EXPLAIN. Accepts an optional `database` to query across databases without reconnecting.
 
 <usecase>
 Use when:
@@ -105,12 +105,12 @@ impl PostgresHandler {
         &self,
         ReadQueryRequest {
             query,
-            database_name,
+            database,
             cursor,
         }: ReadQueryRequest,
     ) -> Result<ReadQueryResponse, SqlError> {
         let kind = validate_read_only(&query, &sqlparser::dialect::PostgreSqlDialect {})?;
-        let db = Some(database_name.trim()).filter(|s| !s.is_empty());
+        let db = Some(database.trim()).filter(|s| !s.is_empty());
         if let Some(name) = db {
             validate_ident(name)?;
         }

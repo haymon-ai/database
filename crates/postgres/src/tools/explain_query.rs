@@ -18,7 +18,7 @@ pub(crate) struct ExplainQueryTool;
 impl ExplainQueryTool {
     const NAME: &'static str = "explainQuery";
     const TITLE: &'static str = "Explain Query";
-    const DESCRIPTION: &'static str = r#"Return the execution plan for a SQL query to diagnose performance. Use this tool instead of running EXPLAIN directly through readQuery — it provides structured JSON output. Accepts an optional `databaseName` to explain queries against a different database.
+    const DESCRIPTION: &'static str = r#"Return the execution plan for a SQL query to diagnose performance. Use this tool instead of running EXPLAIN directly through readQuery — it provides structured JSON output. Accepts an optional `database` to explain queries against a different database.
 
 <usecase>
 Use when:
@@ -98,7 +98,7 @@ impl PostgresHandler {
     pub async fn explain_query(
         &self,
         ExplainQueryRequest {
-            database_name,
+            database,
             query,
             analyze,
         }: ExplainQueryRequest,
@@ -107,7 +107,7 @@ impl PostgresHandler {
             let _ = validate_read_only(&query, &sqlparser::dialect::PostgreSqlDialect {})?;
         }
 
-        let db = Some(database_name.trim()).filter(|s| !s.is_empty());
+        let db = Some(database.trim()).filter(|s| !s.is_empty());
         if let Some(name) = &db {
             validate_ident(name)?;
         }

@@ -1,7 +1,7 @@
 //! SQLite-specific MCP tool request types.
 //!
 //! Unlike `MySQL` and `PostgreSQL`, `SQLite` operates on a single file and
-//! has no database selection. These types omit the `databaseName`
+//! has no database selection. These types omit the `database`
 //! field present in the shared server types.
 
 use database_mcp_server::pagination::Cursor;
@@ -14,7 +14,7 @@ use serde::Deserialize;
 #[serde(rename_all = "camelCase")]
 pub struct GetTableSchemaRequest {
     /// The table name to inspect. Use `listTables` first to see available tables.
-    pub table_name: String,
+    pub table: String,
 }
 
 /// Request for the `dropTable` tool.
@@ -22,7 +22,7 @@ pub struct GetTableSchemaRequest {
 #[serde(rename_all = "camelCase")]
 pub struct DropTableRequest {
     /// Name of the table to drop. Must contain only alphanumeric characters and underscores.
-    pub table_name: String,
+    pub table: String,
 }
 
 /// Request for the `listTables` tool.

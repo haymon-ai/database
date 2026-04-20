@@ -42,7 +42,7 @@ pub struct ListDatabasesResponse {
 #[serde(rename_all = "camelCase")]
 pub struct CreateDatabaseRequest {
     /// Name of the database to create. Must contain only alphanumeric characters and underscores.
-    pub database_name: String,
+    pub database: String,
 }
 
 /// Request for the `dropDatabase` tool.
@@ -50,7 +50,7 @@ pub struct CreateDatabaseRequest {
 #[serde(rename_all = "camelCase")]
 pub struct DropDatabaseRequest {
     /// Name of the database to drop. Must contain only alphanumeric characters and underscores.
-    pub database_name: String,
+    pub database: String,
 }
 
 /// Request for the `listTables` tool.
@@ -58,7 +58,7 @@ pub struct DropDatabaseRequest {
 #[serde(rename_all = "camelCase")]
 pub struct ListTablesRequest {
     /// The database name to list tables from. Required. Use `listDatabases` first to see available databases.
-    pub database_name: String,
+    pub database: String,
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
@@ -80,9 +80,9 @@ pub struct ListTablesResponse {
 #[serde(rename_all = "camelCase")]
 pub struct GetTableSchemaRequest {
     /// The database name containing the table. Required. Use `listDatabases` first to see available databases.
-    pub database_name: String,
+    pub database: String,
     /// The table name to inspect. Use `listTables` first to see available tables in the database.
-    pub table_name: String,
+    pub table: String,
 }
 
 /// Response for the `getTableSchema` tool.
@@ -90,7 +90,7 @@ pub struct GetTableSchemaRequest {
 #[serde(rename_all = "camelCase")]
 pub struct TableSchemaResponse {
     /// Name of the inspected table.
-    pub table_name: String,
+    pub table: String,
     /// Column definitions keyed by column name.
     pub columns: Value,
 }
@@ -102,7 +102,7 @@ pub struct QueryRequest {
     /// The SQL query to execute.
     pub query: String,
     /// The database to run the query against. Required. Use `listDatabases` first to see available databases.
-    pub database_name: String,
+    pub database: String,
 }
 
 /// Request for the `readQuery` tool.
@@ -112,7 +112,7 @@ pub struct ReadQueryRequest {
     /// The SQL query to execute.
     pub query: String,
     /// The database to run the query against. Required. Use `listDatabases` first to see available databases.
-    pub database_name: String,
+    pub database: String,
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
@@ -144,7 +144,7 @@ pub struct ReadQueryResponse {
 #[serde(rename_all = "camelCase")]
 pub struct ExplainQueryRequest {
     /// The database to explain against. Required. Use `listDatabases` first to see available databases.
-    pub database_name: String,
+    pub database: String,
     /// The SQL query to explain.
     pub query: String,
     /// If true, use EXPLAIN ANALYZE for actual execution statistics. In read-only mode, only allowed for read-only statements. Defaults to false.

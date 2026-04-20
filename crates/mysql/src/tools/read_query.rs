@@ -107,13 +107,13 @@ impl MysqlHandler {
         &self,
         ReadQueryRequest {
             query,
-            database_name,
+            database,
             cursor,
         }: ReadQueryRequest,
     ) -> Result<ReadQueryResponse, SqlError> {
         let kind = validate_read_only(&query, &sqlparser::dialect::MySqlDialect {})?;
 
-        let db = Some(database_name.trim()).filter(|s| !s.is_empty());
+        let db = Some(database.trim()).filter(|s| !s.is_empty());
         if let Some(name) = db {
             validate_ident(name)?;
         }
