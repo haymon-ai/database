@@ -90,7 +90,7 @@ impl ToolBase for ReadQueryTool {
 
 impl AsyncTool<PostgresHandler> for ReadQueryTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        Ok(handler.read_query(&params).await?)
+        Ok(handler.read_query(params).await?)
     }
 }
 
@@ -108,23 +108,30 @@ impl PostgresHandler {
     ///
     /// Returns [`SqlError::ReadOnlyViolation`] if the query is not
     /// read-only, or [`SqlError::Query`] if the backend reports an error.
-    pub async fn read_query(&self, request: &ReadQueryRequest) -> Result<ReadQueryResponse, SqlError> {
-        let kind = validate_read_only(&request.query, &sqlparser::dialect::PostgreSqlDialect {})?;
-        let db = Some(request.database_name.trim()).filter(|s| !s.is_empty());
+    pub async fn read_query(
+        &self,
+        ReadQueryRequest {
+            query,
+            database_name,
+            cursor,
+        }: ReadQueryRequest,
+    ) -> Result<ReadQueryResponse, SqlError> {
+        let kind = validate_read_only(&query, &sqlparser::dialect::PostgreSqlDialect {})?;
+        let db = Some(database_name.trim()).filter(|s| !s.is_empty());
         if let Some(name) = db {
             validate_ident(name)?;
         }
 
         match kind {
             StatementKind::Select => {
-                let pager = Pager::new(request.cursor, self.config.page_size);
-                let wrapped = pager.wrap_select(&request.query);
+                let pager = Pager::new(cursor, self.config.page_size);
+                let wrapped = pager.wrap_select(&query);
                 let rows = self.connection.fetch_json(wrapped.as_str(), db).await?;
                 let (rows, next_cursor) = pager.finalize(rows);
                 Ok(ReadQueryResponse { rows, next_cursor })
             }
             StatementKind::NonSelect => {
-                let rows = self.connection.fetch_json(request.query.as_str(), db).await?;
+                let rows = self.connection.fetch_json(query.as_str(), db).await?;
                 Ok(ReadQueryResponse {
                     rows,
                     next_cursor: None,

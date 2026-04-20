@@ -75,7 +75,7 @@ impl ToolBase for ListTablesTool {
 
 impl AsyncTool<PostgresHandler> for ListTablesTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        handler.list_tables(&params).await
+        handler.list_tables(params).await
     }
 }
 
@@ -84,16 +84,19 @@ impl PostgresHandler {
     ///
     /// # Errors
     ///
-    /// Returns [`ErrorData`] with code `-32602` if `request.cursor` is
-    /// malformed, or an internal-error [`ErrorData`] if `database_name`
-    /// is invalid or the underlying query fails.
-    pub async fn list_tables(&self, request: &ListTablesRequest) -> Result<ListTablesResponse, ErrorData> {
-        let db = Some(request.database_name.trim()).filter(|s| !s.is_empty());
+    /// Returns [`ErrorData`] with code `-32602` if `cursor` is malformed,
+    /// or an internal-error [`ErrorData`] if `database_name` is invalid
+    /// or the underlying query fails.
+    pub async fn list_tables(
+        &self,
+        ListTablesRequest { database_name, cursor }: ListTablesRequest,
+    ) -> Result<ListTablesResponse, ErrorData> {
+        let db = Some(database_name.trim()).filter(|s| !s.is_empty());
         if let Some(name) = db {
             validate_ident(name)?;
         }
 
-        let pager = Pager::new(request.cursor, self.config.page_size);
+        let pager = Pager::new(cursor, self.config.page_size);
         let query = format!(
             r"
             SELECT tablename

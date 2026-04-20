@@ -81,7 +81,7 @@ impl ToolBase for ListTablesTool {
 
 impl AsyncTool<SqliteHandler> for ListTablesTool {
     async fn invoke(handler: &SqliteHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        handler.list_tables(&params).await
+        handler.list_tables(params).await
     }
 }
 
@@ -90,11 +90,13 @@ impl SqliteHandler {
     ///
     /// # Errors
     ///
-    /// Returns [`ErrorData`] with code `-32602` if `request.cursor` is
-    /// malformed, or an internal-error [`ErrorData`] if the underlying
-    /// query fails.
-    pub async fn list_tables(&self, request: &ListTablesRequest) -> Result<ListTablesResponse, ErrorData> {
-        let pager = Pager::new(request.cursor, self.config.page_size);
+    /// Returns [`ErrorData`] with code `-32602` if `cursor` is malformed,
+    /// or an internal-error [`ErrorData`] if the underlying query fails.
+    pub async fn list_tables(
+        &self,
+        ListTablesRequest { cursor }: ListTablesRequest,
+    ) -> Result<ListTablesResponse, ErrorData> {
+        let pager = Pager::new(cursor, self.config.page_size);
         let query = format!(
             r"
             SELECT name

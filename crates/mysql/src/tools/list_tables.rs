@@ -75,7 +75,7 @@ impl ToolBase for ListTablesTool {
 
 impl AsyncTool<MysqlHandler> for ListTablesTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        handler.list_tables(&params).await
+        handler.list_tables(params).await
     }
 }
 
@@ -84,13 +84,16 @@ impl MysqlHandler {
     ///
     /// # Errors
     ///
-    /// Returns [`ErrorData`] with code `-32602` if `request.cursor` is
-    /// malformed, or an internal-error [`ErrorData`] if `database_name`
-    /// is invalid or the underlying query fails.
-    pub async fn list_tables(&self, request: &ListTablesRequest) -> Result<ListTablesResponse, ErrorData> {
-        validate_ident(&request.database_name)?;
+    /// Returns [`ErrorData`] with code `-32602` if `cursor` is malformed,
+    /// or an internal-error [`ErrorData`] if `database_name` is invalid
+    /// or the underlying query fails.
+    pub async fn list_tables(
+        &self,
+        ListTablesRequest { database_name, cursor }: ListTablesRequest,
+    ) -> Result<ListTablesResponse, ErrorData> {
+        validate_ident(&database_name)?;
 
-        let pager = Pager::new(request.cursor, self.config.page_size);
+        let pager = Pager::new(cursor, self.config.page_size);
         let query = format!(
             r"
             SELECT CAST(TABLE_NAME AS CHAR)
@@ -98,7 +101,7 @@ impl MysqlHandler {
             WHERE TABLE_SCHEMA = {}
             ORDER BY TABLE_NAME
             LIMIT {} OFFSET {}",
-            quote_literal(&request.database_name),
+            quote_literal(&database_name),
             pager.limit(),
             pager.offset(),
         );

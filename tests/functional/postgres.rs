@@ -53,7 +53,7 @@ async fn test_write_query_insert_and_verify() {
         query: "INSERT INTO users (name, email) VALUES ('WriteTest', 'write@test.com')".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&insert).await.unwrap();
+    handler.write_query(insert).await.unwrap();
 
     // Verify the row was inserted
     let select = ReadQueryRequest {
@@ -61,7 +61,7 @@ async fn test_write_query_insert_and_verify() {
         database_name: "app".into(),
         cursor: None,
     };
-    let rows = handler.read_query(&select).await.unwrap();
+    let rows = handler.read_query(select).await.unwrap();
     let arr = &rows.rows;
     assert_eq!(arr.len(), 1);
     assert_eq!(arr[0]["name"], "WriteTest");
@@ -71,7 +71,7 @@ async fn test_write_query_insert_and_verify() {
         query: "DELETE FROM users WHERE email = 'write@test.com'".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&delete).await.unwrap();
+    handler.write_query(delete).await.unwrap();
 }
 
 #[tokio::test]
@@ -82,20 +82,20 @@ async fn test_write_query_update() {
         query: "INSERT INTO users (name, email) VALUES ('Before', 'update@test.com')".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&insert).await.unwrap();
+    handler.write_query(insert).await.unwrap();
 
     let update = QueryRequest {
         query: "UPDATE users SET name = 'After' WHERE email = 'update@test.com'".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&update).await.unwrap();
+    handler.write_query(update).await.unwrap();
 
     let select = ReadQueryRequest {
         query: "SELECT name FROM users WHERE email = 'update@test.com'".into(),
         database_name: "app".into(),
         cursor: None,
     };
-    let rows = handler.read_query(&select).await.unwrap();
+    let rows = handler.read_query(select).await.unwrap();
     let arr = &rows.rows;
     assert_eq!(arr[0]["name"], "After");
 
@@ -104,7 +104,7 @@ async fn test_write_query_update() {
         query: "DELETE FROM users WHERE email = 'update@test.com'".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&delete).await.unwrap();
+    handler.write_query(delete).await.unwrap();
 }
 
 #[tokio::test]
@@ -115,20 +115,20 @@ async fn test_write_query_delete() {
         query: "INSERT INTO users (name, email) VALUES ('Deletable', 'delete@test.com')".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&insert).await.unwrap();
+    handler.write_query(insert).await.unwrap();
 
     let delete = QueryRequest {
         query: "DELETE FROM users WHERE email = 'delete@test.com'".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&delete).await.unwrap();
+    handler.write_query(delete).await.unwrap();
 
     let select = ReadQueryRequest {
         query: "SELECT * FROM users WHERE email = 'delete@test.com'".into(),
         database_name: "app".into(),
         cursor: None,
     };
-    let rows = handler.read_query(&select).await.unwrap();
+    let rows = handler.read_query(select).await.unwrap();
     let arr = &rows.rows;
     assert!(arr.is_empty(), "Row should be deleted");
 }
@@ -137,7 +137,7 @@ async fn test_write_query_delete() {
 async fn test_lists_databases() {
     let handler = handler(false);
 
-    let response = handler.list_databases(&ListDatabasesRequest::default()).await.unwrap();
+    let response = handler.list_databases(ListDatabasesRequest::default()).await.unwrap();
     let dbs = response.databases;
 
     assert!(dbs.iter().any(|db| db == "app"), "Expected 'app' in: {dbs:?}");
@@ -151,7 +151,7 @@ async fn test_lists_tables() {
         ..Default::default()
     };
 
-    let response = handler.list_tables(&request).await.unwrap();
+    let response = handler.list_tables(request).await.unwrap();
     let tables = response.tables;
 
     for expected in ["users", "posts", "tags", "post_tags"] {
@@ -170,7 +170,7 @@ async fn test_gets_table_schema() {
         table_name: "users".into(),
     };
 
-    let schema = handler.get_table_schema(&request).await.unwrap();
+    let schema = handler.get_table_schema(request).await.unwrap();
 
     assert_eq!(schema.table_name, "users");
     let columns = schema.columns.as_object().expect("columns object");
@@ -187,7 +187,7 @@ async fn test_gets_table_schema_with_relations() {
         table_name: "posts".into(),
     };
 
-    let schema = handler.get_table_schema(&request).await.unwrap();
+    let schema = handler.get_table_schema(request).await.unwrap();
 
     let columns = schema.columns.as_object().expect("columns object");
     assert!(columns.contains_key("user_id"), "Missing 'user_id' column");
@@ -211,7 +211,7 @@ async fn test_executes_sql() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     assert_eq!(response.rows.len(), 3, "Expected 3 users, got {}", response.rows.len());
 }
 
@@ -224,7 +224,7 @@ async fn test_blocks_writes_in_read_only_mode() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
 
     assert!(response.is_err(), "Expected error for write in read-only mode");
 }
@@ -236,10 +236,10 @@ async fn test_creates_database() {
         database_name: "app_new".into(),
     };
 
-    let response = handler.create_database(&request).await.unwrap();
+    let response = handler.create_database(request).await.unwrap();
     assert!(response.message.contains("created successfully"));
 
-    let response = handler.list_databases(&ListDatabasesRequest::default()).await.unwrap();
+    let response = handler.list_databases(ListDatabasesRequest::default()).await.unwrap();
     let dbs = response.databases;
 
     assert!(dbs.iter().any(|db| db == "app_new"), "New db not in list");
@@ -250,7 +250,7 @@ async fn test_drops_database() {
     let handler = handler(false);
 
     // Verify seeded database exists
-    let response = handler.list_databases(&ListDatabasesRequest::default()).await.unwrap();
+    let response = handler.list_databases(ListDatabasesRequest::default()).await.unwrap();
     let dbs = response.databases;
     assert!(dbs.iter().any(|db| db == "canary"), "canary should exist before drop");
 
@@ -258,11 +258,11 @@ async fn test_drops_database() {
     let drop_request = DropDatabaseRequest {
         database_name: "canary".into(),
     };
-    let response = handler.drop_database(&drop_request).await.unwrap();
+    let response = handler.drop_database(drop_request).await.unwrap();
     assert!(response.message.contains("dropped successfully"));
 
     // Verify it's gone
-    let response = handler.list_databases(&ListDatabasesRequest::default()).await.unwrap();
+    let response = handler.list_databases(ListDatabasesRequest::default()).await.unwrap();
     let dbs = response.databases;
     assert!(
         !dbs.iter().any(|db| db == "canary"),
@@ -277,7 +277,7 @@ async fn test_drop_active_database_blocked() {
         database_name: "app".into(),
     };
 
-    let response = handler.drop_database(&request).await;
+    let response = handler.drop_database(request).await;
 
     let err_msg = format!(
         "{:?}",
@@ -296,7 +296,7 @@ async fn test_drop_nonexistent_database() {
         database_name: "nonexistent_db_xyz".into(),
     };
 
-    let response = handler.drop_database(&request).await;
+    let response = handler.drop_database(request).await;
 
     assert!(response.is_err(), "Expected error for nonexistent database");
 }
@@ -308,7 +308,7 @@ async fn test_drop_database_invalid_identifier() {
         database_name: String::new(),
     };
 
-    let response = handler.drop_database(&request).await;
+    let response = handler.drop_database(request).await;
 
     assert!(response.is_err(), "Expected error for empty database name");
 }
@@ -321,7 +321,7 @@ async fn test_lists_tables_cross_database() {
         ..Default::default()
     };
 
-    let response = handler.list_tables(&request).await.unwrap();
+    let response = handler.list_tables(request).await.unwrap();
     let tables = response.tables;
 
     assert!(
@@ -343,7 +343,7 @@ async fn test_executes_sql_cross_database() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     assert_eq!(response.rows.len(), 2, "Expected 2 events, got {}", response.rows.len());
 }
 
@@ -355,7 +355,7 @@ async fn test_gets_table_schema_cross_database() {
         table_name: "events".into(),
     };
 
-    let response = handler.get_table_schema(&request).await.unwrap();
+    let response = handler.get_table_schema(request).await.unwrap();
 
     assert_eq!(response.table_name, "events");
     let columns = response.columns.as_object().expect("columns object");
@@ -371,7 +371,7 @@ async fn test_gets_table_schema_cross_database() {
 async fn test_lists_databases_includes_cross_db() {
     let handler = handler(false);
 
-    let response = handler.list_databases(&ListDatabasesRequest::default()).await.unwrap();
+    let response = handler.list_databases(ListDatabasesRequest::default()).await.unwrap();
     let dbs = response.databases;
 
     assert!(
@@ -389,7 +389,7 @@ async fn test_blocks_writes_cross_database_in_read_only_mode() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
 
     assert!(
         response.is_err(),
@@ -405,7 +405,7 @@ async fn test_returns_error_for_nonexistent_database() {
         ..Default::default()
     };
 
-    let response = handler.list_tables(&request).await;
+    let response = handler.list_tables(request).await;
 
     assert!(response.is_err(), "Expected error for nonexistent database");
 }
@@ -418,7 +418,7 @@ async fn test_uses_default_pool_for_matching_database() {
         ..Default::default()
     };
 
-    let response = handler.list_tables(&request).await.unwrap();
+    let response = handler.list_tables(request).await.unwrap();
     let tables = response.tables;
 
     assert!(
@@ -441,7 +441,7 @@ async fn test_query_timeout_cancels_slow_query() {
     };
 
     let start = std::time::Instant::now();
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
     let elapsed = start.elapsed();
 
     assert!(response.is_err(), "Expected timeout error");
@@ -470,7 +470,7 @@ async fn test_query_timeout_disabled_with_none() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
     assert!(response.is_ok(), "Fast query should succeed without timeout");
 }
 
@@ -483,7 +483,7 @@ async fn test_drop_table_success() {
         query: "CREATE TABLE drop_test_simple (id SERIAL PRIMARY KEY)".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&create).await.unwrap();
+    handler.write_query(create).await.unwrap();
 
     // Drop it
     let drop_request = DropTableRequest {
@@ -491,7 +491,7 @@ async fn test_drop_table_success() {
         table_name: "drop_test_simple".into(),
         cascade: false,
     };
-    let response = handler.drop_table(&drop_request).await.unwrap();
+    let response = handler.drop_table(drop_request).await.unwrap();
     assert!(response.message.contains("dropped successfully"));
 
     // Verify it's gone
@@ -499,7 +499,7 @@ async fn test_drop_table_success() {
         database_name: "app".into(),
         ..Default::default()
     };
-    let response = handler.list_tables(&tables_request).await.unwrap();
+    let response = handler.list_tables(tables_request).await.unwrap();
     let tables = response.tables;
     assert!(
         !tables.iter().any(|t| t == "drop_test_simple"),
@@ -516,14 +516,14 @@ async fn test_drop_table_fk_error() {
         query: "CREATE TABLE drop_test_parent (id SERIAL PRIMARY KEY)".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&create_parent).await.unwrap();
+    handler.write_query(create_parent).await.unwrap();
 
     let create_child = QueryRequest {
         query: "CREATE TABLE drop_test_child (id SERIAL PRIMARY KEY, parent_id INT REFERENCES drop_test_parent(id))"
             .into(),
         database_name: "app".into(),
     };
-    handler.write_query(&create_child).await.unwrap();
+    handler.write_query(create_child).await.unwrap();
 
     // Attempt to drop parent without cascade — should fail
     let drop_request = DropTableRequest {
@@ -531,7 +531,7 @@ async fn test_drop_table_fk_error() {
         table_name: "drop_test_parent".into(),
         cascade: false,
     };
-    let response = handler.drop_table(&drop_request).await;
+    let response = handler.drop_table(drop_request).await;
     assert!(response.is_err(), "Expected FK constraint error");
 
     // Clean up
@@ -539,13 +539,13 @@ async fn test_drop_table_fk_error() {
         query: "DROP TABLE drop_test_child".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&cleanup_child).await.unwrap();
+    handler.write_query(cleanup_child).await.unwrap();
 
     let cleanup_parent = QueryRequest {
         query: "DROP TABLE drop_test_parent".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&cleanup_parent).await.unwrap();
+    handler.write_query(cleanup_parent).await.unwrap();
 }
 
 #[tokio::test]
@@ -557,13 +557,13 @@ async fn test_drop_table_cascade() {
         query: "CREATE TABLE drop_test_cascade_parent (id SERIAL PRIMARY KEY)".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&create_parent).await.unwrap();
+    handler.write_query(create_parent).await.unwrap();
 
     let create_child = QueryRequest {
         query: "CREATE TABLE drop_test_cascade_child (id SERIAL PRIMARY KEY, parent_id INT REFERENCES drop_test_cascade_parent(id))".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&create_child).await.unwrap();
+    handler.write_query(create_child).await.unwrap();
 
     // Drop parent with cascade — should succeed
     let drop_request = DropTableRequest {
@@ -571,7 +571,7 @@ async fn test_drop_table_cascade() {
         table_name: "drop_test_cascade_parent".into(),
         cascade: true,
     };
-    let response = handler.drop_table(&drop_request).await.unwrap();
+    let response = handler.drop_table(drop_request).await.unwrap();
     assert!(response.message.contains("dropped successfully"));
 
     // Clean up child table (still exists, just lost FK constraint)
@@ -579,7 +579,7 @@ async fn test_drop_table_cascade() {
         query: "DROP TABLE IF EXISTS drop_test_cascade_child".into(),
         database_name: "app".into(),
     };
-    handler.write_query(&cleanup).await.unwrap();
+    handler.write_query(cleanup).await.unwrap();
 }
 
 #[tokio::test]
@@ -591,7 +591,7 @@ async fn test_drop_table_nonexistent() {
         cascade: false,
     };
 
-    let response = handler.drop_table(&drop_request).await;
+    let response = handler.drop_table(drop_request).await;
     assert!(response.is_err(), "Expected error for nonexistent table");
 }
 
@@ -604,7 +604,7 @@ async fn test_drop_table_invalid_identifier() {
         cascade: false,
     };
 
-    let response = handler.drop_table(&drop_request).await;
+    let response = handler.drop_table(drop_request).await;
     assert!(response.is_err(), "Expected error for empty table name");
 }
 
@@ -617,7 +617,7 @@ async fn test_explain_query_select() {
         analyze: false,
     };
 
-    let response = handler.explain_query(&request).await.unwrap();
+    let response = handler.explain_query(request).await.unwrap();
     let plan = &response.rows;
     assert!(!plan.is_empty(), "Expected non-empty execution plan");
 }
@@ -631,7 +631,7 @@ async fn test_explain_query_analyze() {
         analyze: true,
     };
 
-    let response = handler.explain_query(&request).await.unwrap();
+    let response = handler.explain_query(request).await.unwrap();
     let plan = &response.rows;
     assert!(!plan.is_empty(), "Expected non-empty execution plan with analyze");
 }
@@ -645,7 +645,7 @@ async fn test_explain_query_analyze_write_blocked_read_only() {
         analyze: true,
     };
 
-    let response = handler.explain_query(&request).await;
+    let response = handler.explain_query(request).await;
     assert!(
         response.is_err(),
         "Expected error for EXPLAIN ANALYZE on write statement in read-only mode"
@@ -661,7 +661,7 @@ async fn test_explain_query_plain_write_allowed() {
         analyze: false,
     };
 
-    let response = handler.explain_query(&request).await.unwrap();
+    let response = handler.explain_query(request).await.unwrap();
     let plan = &response.rows;
     assert!(
         !plan.is_empty(),
@@ -678,7 +678,7 @@ async fn test_explain_query_invalid_query() {
         analyze: false,
     };
 
-    let response = handler.explain_query(&request).await;
+    let response = handler.explain_query(request).await;
     assert!(response.is_err(), "Expected error for invalid SQL");
 }
 
@@ -690,7 +690,7 @@ async fn test_get_table_schema_nonexistent_table() {
         table_name: "nonexistent_table_xyz".into(),
     };
 
-    let response = handler.get_table_schema(&request).await;
+    let response = handler.get_table_schema(request).await;
     assert!(response.is_err(), "Expected error for nonexistent table");
 }
 
@@ -702,7 +702,7 @@ async fn test_get_table_schema_invalid_table_name() {
         table_name: String::new(),
     };
 
-    let response = handler.get_table_schema(&request).await;
+    let response = handler.get_table_schema(request).await;
     assert!(response.is_err(), "Expected error for empty table name");
 }
 
@@ -713,7 +713,7 @@ async fn test_create_database_already_exists() {
         database_name: "app".into(),
     };
 
-    let response = handler.create_database(&request).await;
+    let response = handler.create_database(request).await;
     // PostgreSQL returns an error that contains "already exists"
     let err_msg = format!(
         "{:?}",
@@ -732,7 +732,7 @@ async fn test_create_database_invalid_identifier() {
         database_name: String::new(),
     };
 
-    let response = handler.create_database(&request).await;
+    let response = handler.create_database(request).await;
     assert!(response.is_err(), "Expected error for empty database name");
 }
 
@@ -745,7 +745,7 @@ async fn test_list_tables_invalid_database_name() {
     };
 
     // Empty database_name is treated as None (uses default pool)
-    let response = handler.list_tables(&request).await.unwrap();
+    let response = handler.list_tables(request).await.unwrap();
     let tables = response.tables;
     assert!(
         tables.iter().any(|t| t == "users"),
@@ -762,7 +762,7 @@ async fn test_read_query_empty_query() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
     assert!(response.is_err(), "Expected error for empty query");
 }
 
@@ -775,7 +775,7 @@ async fn test_read_query_whitespace_only_query() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
     assert!(response.is_err(), "Expected error for whitespace-only query");
 }
 
@@ -788,7 +788,7 @@ async fn test_read_query_multi_statement_blocked() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
     assert!(response.is_err(), "Expected error for multi-statement query");
 }
 
@@ -801,7 +801,7 @@ async fn test_read_query_into_outfile_blocked() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
     assert!(response.is_err(), "Expected error for INTO OUTFILE");
 }
 
@@ -814,7 +814,7 @@ async fn test_drop_table_cross_database() {
         query: "CREATE TABLE drop_cross_test (id SERIAL PRIMARY KEY)".into(),
         database_name: "analytics".into(),
     };
-    handler.write_query(&create).await.unwrap();
+    handler.write_query(create).await.unwrap();
 
     // Drop it from the analytics database
     let drop_request = DropTableRequest {
@@ -822,7 +822,7 @@ async fn test_drop_table_cross_database() {
         table_name: "drop_cross_test".into(),
         cascade: false,
     };
-    let response = handler.drop_table(&drop_request).await.unwrap();
+    let response = handler.drop_table(drop_request).await.unwrap();
     assert!(response.message.contains("dropped successfully"));
 }
 
@@ -834,14 +834,14 @@ async fn test_write_query_cross_database() {
         query: "INSERT INTO events (name, payload) VALUES ('cross_test', '{\"test\":true}')".into(),
         database_name: "analytics".into(),
     };
-    handler.write_query(&insert).await.unwrap();
+    handler.write_query(insert).await.unwrap();
 
     let select = ReadQueryRequest {
         query: "SELECT name FROM events WHERE name = 'cross_test'".into(),
         database_name: "analytics".into(),
         cursor: None,
     };
-    let rows = handler.read_query(&select).await.unwrap();
+    let rows = handler.read_query(select).await.unwrap();
     let arr = &rows.rows;
     assert!(!arr.is_empty(), "Cross-database write should persist");
 
@@ -850,7 +850,7 @@ async fn test_write_query_cross_database() {
         query: "DELETE FROM events WHERE name = 'cross_test'".into(),
         database_name: "analytics".into(),
     };
-    handler.write_query(&delete).await.unwrap();
+    handler.write_query(delete).await.unwrap();
 }
 
 #[tokio::test]
@@ -861,7 +861,7 @@ async fn test_get_table_schema_junction_table() {
         table_name: "post_tags".into(),
     };
 
-    let schema = handler.get_table_schema(&request).await.unwrap();
+    let schema = handler.get_table_schema(request).await.unwrap();
     assert_eq!(schema.table_name, "post_tags");
 
     let columns = schema.columns.as_object().expect("columns object");
@@ -891,7 +891,7 @@ async fn test_read_query_empty_result_set() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert!(rows.is_empty(), "Expected empty result set");
 }
@@ -905,7 +905,7 @@ async fn test_read_query_aggregate() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["total"], 3);
@@ -920,7 +920,7 @@ async fn test_read_query_group_by() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert!(rows.len() >= 2, "Expected at least 2 groups");
 }
@@ -934,7 +934,7 @@ async fn test_explain_query_cross_database() {
         analyze: false,
     };
 
-    let response = handler.explain_query(&request).await.unwrap();
+    let response = handler.explain_query(request).await.unwrap();
     let plan = &response.rows;
     assert!(!plan.is_empty(), "EXPLAIN should work cross-database");
 }
@@ -948,7 +948,7 @@ async fn test_read_query_with_comments() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert_eq!(rows.len(), 3, "Comment-prefixed SELECT should work");
 }
@@ -962,7 +962,7 @@ async fn test_read_query_subquery() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert!(!rows.is_empty(), "Subquery should return results");
 }
@@ -976,7 +976,7 @@ async fn test_read_query_with_join() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert_eq!(rows.len(), 5, "Should return all 5 posts with user names");
     assert!(rows[0].get("title").is_some());
@@ -992,7 +992,7 @@ async fn test_explain_query_analyze_select_allowed_in_read_only() {
         analyze: true,
     };
 
-    let response = handler.explain_query(&request).await.unwrap();
+    let response = handler.explain_query(request).await.unwrap();
     let plan = &response.rows;
     assert!(
         !plan.is_empty(),
@@ -1008,7 +1008,7 @@ async fn test_write_query_invalid_sql() {
         database_name: "app".into(),
     };
 
-    let response = handler.write_query(&request).await;
+    let response = handler.write_query(request).await;
     assert!(response.is_err(), "Expected error for invalid SQL in write_query");
 }
 
@@ -1020,7 +1020,7 @@ async fn test_get_table_schema_column_details() {
         table_name: "users".into(),
     };
 
-    let schema = handler.get_table_schema(&request).await.unwrap();
+    let schema = handler.get_table_schema(request).await.unwrap();
     let columns = schema.columns.as_object().expect("columns object");
 
     // Verify email column type
@@ -1045,7 +1045,7 @@ async fn test_read_query_with_limit() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert_eq!(rows.len(), 2, "LIMIT 2 should return exactly 2 rows");
 }
@@ -1059,7 +1059,7 @@ async fn test_drop_table_invalid_database_name() {
         cascade: false,
     };
 
-    let response = handler.drop_table(&drop_request).await;
+    let response = handler.drop_table(drop_request).await;
     assert!(response.is_err(), "Expected error for empty database name");
 }
 
@@ -1072,7 +1072,7 @@ async fn test_read_query_with_line_comment() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert_eq!(rows.len(), 3, "Line-comment prefixed SELECT should work");
 }
@@ -1085,7 +1085,7 @@ async fn test_get_table_schema_no_foreign_keys() {
         table_name: "tags".into(),
     };
 
-    let schema = handler.get_table_schema(&request).await.unwrap();
+    let schema = handler.get_table_schema(request).await.unwrap();
     assert_eq!(schema.table_name, "tags");
     let columns = schema.columns.as_object().expect("columns object");
     assert!(columns.contains_key("id"));
@@ -1099,7 +1099,7 @@ async fn test_create_database_blocked_in_read_only() {
         database_name: "should_not_create".into(),
     };
 
-    let response = handler.create_database(&request).await;
+    let response = handler.create_database(request).await;
     assert!(response.is_err(), "create_database should be blocked in read-only mode");
 }
 
@@ -1110,7 +1110,7 @@ async fn test_drop_database_blocked_in_read_only() {
         database_name: "app".into(),
     };
 
-    let response = handler.drop_database(&request).await;
+    let response = handler.drop_database(request).await;
     assert!(response.is_err(), "drop_database should be blocked in read-only mode");
 }
 
@@ -1123,7 +1123,7 @@ async fn test_drop_table_blocked_in_read_only() {
         cascade: false,
     };
 
-    let response = handler.drop_table(&drop_request).await;
+    let response = handler.drop_table(drop_request).await;
     assert!(response.is_err(), "drop_table should be blocked in read-only mode");
 }
 
@@ -1137,7 +1137,7 @@ async fn test_read_query_control_char_database_name_rejected() {
         database_name: "test\x01db".into(),
         cursor: None,
     };
-    let result = handler.read_query(&request).await;
+    let result = handler.read_query(request).await;
     assert!(result.is_err(), "control char in database name should be rejected");
 }
 
@@ -1148,7 +1148,7 @@ async fn test_list_tables_control_char_database_rejected() {
         database_name: "test\x00db".into(),
         ..Default::default()
     };
-    let result = handler.list_tables(&request).await;
+    let result = handler.list_tables(request).await;
     assert!(result.is_err(), "control char in database name should be rejected");
 }
 
@@ -1162,14 +1162,14 @@ async fn test_create_drop_database_with_backtick() {
     let create = CreateDatabaseRequest {
         database_name: db_name.clone(),
     };
-    let result = handler.create_database(&create).await;
+    let result = handler.create_database(create).await;
     assert!(
         result.is_ok(),
         "create database with backtick should succeed: {result:?}"
     );
 
     let drop = DropDatabaseRequest { database_name: db_name };
-    let result = handler.drop_database(&drop).await;
+    let result = handler.drop_database(drop).await;
     assert!(result.is_ok(), "drop database with backtick should succeed: {result:?}");
 }
 
@@ -1185,7 +1185,7 @@ async fn collect_all_paged(handler: &PostgresHandler) -> Vec<String> {
             database_name: PG_DB.into(),
             cursor,
         };
-        let response = handler.list_tables(&request).await.expect("list page");
+        let response = handler.list_tables(request).await.expect("list page");
         all.extend(response.tables);
         match response.next_cursor {
             Some(c) => cursor = Some(c),
@@ -1203,7 +1203,7 @@ async fn test_list_tables_pagination_traverses_pages() {
     let collected = collect_all_paged(&handler_paged).await;
 
     let single_page = handler_full
-        .list_tables(&ListTablesRequest {
+        .list_tables(ListTablesRequest {
             database_name: PG_DB.into(),
             ..Default::default()
         })
@@ -1222,7 +1222,7 @@ async fn test_list_tables_pagination_traverses_pages() {
 async fn test_list_tables_pagination_small_table_set_no_next_cursor() {
     let handler = handler(true);
     let response = handler
-        .list_tables(&ListTablesRequest {
+        .list_tables(ListTablesRequest {
             database_name: PG_DB.into(),
             ..Default::default()
         })
@@ -1238,7 +1238,7 @@ async fn test_list_tables_pagination_small_table_set_no_next_cursor() {
 async fn test_list_tables_pagination_boundary_page_size_equals_total() {
     let handler_full = handler(true);
     let total = handler_full
-        .list_tables(&ListTablesRequest {
+        .list_tables(ListTablesRequest {
             database_name: PG_DB.into(),
             ..Default::default()
         })
@@ -1250,7 +1250,7 @@ async fn test_list_tables_pagination_boundary_page_size_equals_total() {
 
     let handler_boundary = handler_with_page_size(page_size);
     let response = handler_boundary
-        .list_tables(&ListTablesRequest {
+        .list_tables(ListTablesRequest {
             database_name: PG_DB.into(),
             ..Default::default()
         })
@@ -1276,7 +1276,7 @@ async fn test_list_tables_pagination_off_the_end_cursor_returns_empty_page() {
         database_name: PG_DB.into(),
         cursor: Some(Cursor { offset: 10_000 }),
     };
-    let response = handler.list_tables(&request).await.unwrap();
+    let response = handler.list_tables(request).await.unwrap();
 
     assert!(
         response.tables.is_empty(),
@@ -1290,7 +1290,7 @@ async fn test_list_tables_pagination_off_the_end_cursor_returns_empty_page() {
 async fn test_list_tables_respects_configured_page_size() {
     let handler = handler_with_page_size(2);
     let first = handler
-        .list_tables(&ListTablesRequest {
+        .list_tables(ListTablesRequest {
             database_name: PG_DB.into(),
             ..Default::default()
         })
@@ -1307,7 +1307,7 @@ async fn test_list_tables_respects_configured_page_size() {
 async fn test_list_tables_respects_configured_page_size_minimum() {
     let handler = handler_with_page_size(1);
     let first = handler
-        .list_tables(&ListTablesRequest {
+        .list_tables(ListTablesRequest {
             database_name: PG_DB.into(),
             ..Default::default()
         })
@@ -1322,7 +1322,7 @@ async fn collect_all_paged_databases(handler: &PostgresHandler) -> Vec<String> {
     let mut cursor: Option<database_mcp_server::pagination::Cursor> = None;
     loop {
         let request = ListDatabasesRequest { cursor };
-        let response = handler.list_databases(&request).await.expect("list page");
+        let response = handler.list_databases(request).await.expect("list page");
         all.extend(response.databases);
         match response.next_cursor {
             Some(c) => cursor = Some(c),
@@ -1340,7 +1340,7 @@ async fn test_list_databases_pagination_traverses_pages() {
     let collected = collect_all_paged_databases(&handler_paged).await;
 
     let single_page = handler_full
-        .list_databases(&ListDatabasesRequest::default())
+        .list_databases(ListDatabasesRequest::default())
         .await
         .expect("single page");
 
@@ -1355,7 +1355,7 @@ async fn test_list_databases_pagination_traverses_pages() {
 #[tokio::test]
 async fn test_list_databases_pagination_small_set_no_next_cursor() {
     let handler = handler(true);
-    let response = handler.list_databases(&ListDatabasesRequest::default()).await.unwrap();
+    let response = handler.list_databases(ListDatabasesRequest::default()).await.unwrap();
     assert!(
         response.next_cursor.is_none(),
         "seeded fixture below default page_size must not emit nextCursor"
@@ -1366,7 +1366,7 @@ async fn test_list_databases_pagination_small_set_no_next_cursor() {
 async fn test_list_databases_pagination_boundary_page_size_equals_total() {
     let handler_full = handler(true);
     let total = handler_full
-        .list_databases(&ListDatabasesRequest::default())
+        .list_databases(ListDatabasesRequest::default())
         .await
         .expect("discover total")
         .databases
@@ -1375,7 +1375,7 @@ async fn test_list_databases_pagination_boundary_page_size_equals_total() {
 
     let handler_boundary = handler_with_page_size(page_size);
     let response = handler_boundary
-        .list_databases(&ListDatabasesRequest::default())
+        .list_databases(ListDatabasesRequest::default())
         .await
         .unwrap();
     assert_eq!(
@@ -1397,7 +1397,7 @@ async fn test_list_databases_pagination_off_the_end_cursor_returns_empty_page() 
     let request = ListDatabasesRequest {
         cursor: Some(Cursor { offset: 10_000 }),
     };
-    let response = handler.list_databases(&request).await.unwrap();
+    let response = handler.list_databases(request).await.unwrap();
 
     assert!(
         response.databases.is_empty(),
@@ -1411,7 +1411,7 @@ async fn test_list_databases_pagination_off_the_end_cursor_returns_empty_page() 
 async fn test_list_databases_respects_configured_page_size() {
     let handler = handler_with_page_size(1);
     let first = handler
-        .list_databases(&ListDatabasesRequest::default())
+        .list_databases(ListDatabasesRequest::default())
         .await
         .expect("first page");
     assert_eq!(
@@ -1436,7 +1436,7 @@ async fn collect_all_paged_read_query(handler: &PostgresHandler, query: &str) ->
             database_name: "app".into(),
             cursor,
         };
-        let response = handler.read_query(&request).await.expect("read_query page");
+        let response = handler.read_query(request).await.expect("read_query page");
         all.extend(response.rows);
         match response.next_cursor {
             Some(c) => cursor = Some(c),
@@ -1455,7 +1455,7 @@ async fn test_read_query_pagination_traverses_pages() {
     let collected = collect_all_paged_read_query(&handler_paged, query).await;
 
     let single = handler_full
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: query.into(),
             database_name: "app".into(),
             cursor: None,
@@ -1477,7 +1477,7 @@ async fn test_read_query_pagination_traverses_pages() {
 async fn test_read_query_pagination_small_result_no_next_cursor() {
     let handler = handler_with_page_size(2);
     let response = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "SELECT id FROM users WHERE id = 1".into(),
             database_name: "app".into(),
             cursor: None,
@@ -1495,7 +1495,7 @@ async fn test_read_query_pagination_small_result_no_next_cursor() {
 async fn test_read_query_pagination_empty_result_no_next_cursor() {
     let handler = handler_with_page_size(2);
     let response = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "SELECT id FROM users WHERE id = -1".into(),
             database_name: "app".into(),
             cursor: None,
@@ -1510,7 +1510,7 @@ async fn test_read_query_pagination_empty_result_no_next_cursor() {
 async fn test_read_query_pagination_preserves_inner_limit() {
     let handler = handler_with_page_size(2);
     let response = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "SELECT id FROM users ORDER BY id LIMIT 1 OFFSET 1".into(),
             database_name: "app".into(),
             cursor: None,
@@ -1532,7 +1532,7 @@ async fn test_read_query_pagination_off_the_end_cursor_returns_empty() {
     use database_mcp_server::pagination::Cursor;
     let handler = handler_with_page_size(2);
     let response = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "SELECT id FROM users ORDER BY id".into(),
             database_name: "app".into(),
             cursor: Some(Cursor { offset: 10_000 }),
@@ -1571,7 +1571,7 @@ async fn test_read_query_non_select_show_server_version_single_page() {
     let handler = handler_with_page_size(2);
 
     let without_cursor = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "SHOW server_version".into(),
             database_name: "app".into(),
             cursor: None,
@@ -1580,7 +1580,7 @@ async fn test_read_query_non_select_show_server_version_single_page() {
         .expect("SHOW server_version should succeed");
 
     let with_cursor = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "SHOW server_version".into(),
             database_name: "app".into(),
             cursor: Some(Cursor { offset: 100 }),
@@ -1602,7 +1602,7 @@ async fn test_read_query_non_select_explain_single_page() {
     let handler = handler_with_page_size(2);
 
     let response = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "EXPLAIN SELECT 1".into(),
             database_name: "app".into(),
             cursor: None,

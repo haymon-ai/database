@@ -73,7 +73,7 @@ impl ToolBase for ListDatabasesTool {
 
 impl AsyncTool<PostgresHandler> for ListDatabasesTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        handler.list_databases(&params).await
+        handler.list_databases(params).await
     }
 }
 
@@ -86,11 +86,13 @@ impl PostgresHandler {
     ///
     /// # Errors
     ///
-    /// Returns [`ErrorData`] with code `-32602` if `request.cursor` is
-    /// malformed, or an internal-error [`ErrorData`] if the underlying
-    /// query fails.
-    pub async fn list_databases(&self, request: &ListDatabasesRequest) -> Result<ListDatabasesResponse, ErrorData> {
-        let pager = Pager::new(request.cursor, self.config.page_size);
+    /// Returns [`ErrorData`] with code `-32602` if `cursor` is malformed,
+    /// or an internal-error [`ErrorData`] if the underlying query fails.
+    pub async fn list_databases(
+        &self,
+        ListDatabasesRequest { cursor }: ListDatabasesRequest,
+    ) -> Result<ListDatabasesResponse, ErrorData> {
+        let pager = Pager::new(cursor, self.config.page_size);
         let query = format!(
             r"
             SELECT datname

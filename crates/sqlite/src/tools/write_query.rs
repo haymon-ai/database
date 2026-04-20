@@ -74,7 +74,7 @@ impl ToolBase for WriteQueryTool {
 
 impl AsyncTool<SqliteHandler> for WriteQueryTool {
     async fn invoke(handler: &SqliteHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        Ok(handler.write_query(&params).await?)
+        Ok(handler.write_query(params).await?)
     }
 }
 
@@ -84,9 +84,7 @@ impl SqliteHandler {
     /// # Errors
     ///
     /// Returns [`SqlError`] if the query fails.
-    pub async fn write_query(&self, request: &QueryRequest) -> Result<QueryResponse, SqlError> {
-        let QueryRequest { query } = request;
-
+    pub async fn write_query(&self, QueryRequest { query }: QueryRequest) -> Result<QueryResponse, SqlError> {
         let rows = self.connection.fetch_json(query.as_str(), None).await?;
         Ok(QueryResponse { rows })
     }

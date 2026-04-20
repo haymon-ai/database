@@ -74,7 +74,7 @@ impl ToolBase for WriteQueryTool {
 
 impl AsyncTool<PostgresHandler> for WriteQueryTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        Ok(handler.write_query(&params).await?)
+        Ok(handler.write_query(params).await?)
     }
 }
 
@@ -84,9 +84,10 @@ impl PostgresHandler {
     /// # Errors
     ///
     /// Returns [`SqlError`] if the query fails.
-    pub async fn write_query(&self, request: &QueryRequest) -> Result<QueryResponse, SqlError> {
-        let QueryRequest { query, database_name } = request;
-
+    pub async fn write_query(
+        &self,
+        QueryRequest { query, database_name }: QueryRequest,
+    ) -> Result<QueryResponse, SqlError> {
         let db = Some(database_name.trim()).filter(|s| !s.is_empty());
         if let Some(name) = &db {
             validate_ident(name)?;

@@ -45,14 +45,14 @@ async fn test_write_query_insert_and_verify() {
     let insert = QueryRequest {
         query: "INSERT INTO users (name, email) VALUES ('WriteTest', 'write@test.com')".into(),
     };
-    handler.write_query(&insert).await.unwrap();
+    handler.write_query(insert).await.unwrap();
 
     // Verify
     let select = ReadQueryRequest {
         query: "SELECT name FROM users WHERE email = 'write@test.com'".into(),
         cursor: None,
     };
-    let rows = handler.read_query(&select).await.unwrap();
+    let rows = handler.read_query(select).await.unwrap();
     let arr = &rows.rows;
     assert_eq!(arr.len(), 1);
     assert_eq!(arr[0]["name"], "WriteTest");
@@ -61,7 +61,7 @@ async fn test_write_query_insert_and_verify() {
     let delete = QueryRequest {
         query: "DELETE FROM users WHERE email = 'write@test.com'".into(),
     };
-    handler.write_query(&delete).await.unwrap();
+    handler.write_query(delete).await.unwrap();
 }
 
 #[tokio::test]
@@ -71,18 +71,18 @@ async fn test_write_query_update() {
     let insert = QueryRequest {
         query: "INSERT INTO users (name, email) VALUES ('Before', 'update@test.com')".into(),
     };
-    handler.write_query(&insert).await.unwrap();
+    handler.write_query(insert).await.unwrap();
 
     let update = QueryRequest {
         query: "UPDATE users SET name = 'After' WHERE email = 'update@test.com'".into(),
     };
-    handler.write_query(&update).await.unwrap();
+    handler.write_query(update).await.unwrap();
 
     let select = ReadQueryRequest {
         query: "SELECT name FROM users WHERE email = 'update@test.com'".into(),
         cursor: None,
     };
-    let rows = handler.read_query(&select).await.unwrap();
+    let rows = handler.read_query(select).await.unwrap();
     let arr = &rows.rows;
     assert_eq!(arr[0]["name"], "After");
 
@@ -90,7 +90,7 @@ async fn test_write_query_update() {
     let delete = QueryRequest {
         query: "DELETE FROM users WHERE email = 'update@test.com'".into(),
     };
-    handler.write_query(&delete).await.unwrap();
+    handler.write_query(delete).await.unwrap();
 }
 
 #[tokio::test]
@@ -100,18 +100,18 @@ async fn test_write_query_delete() {
     let insert = QueryRequest {
         query: "INSERT INTO users (name, email) VALUES ('Deletable', 'delete@test.com')".into(),
     };
-    handler.write_query(&insert).await.unwrap();
+    handler.write_query(insert).await.unwrap();
 
     let delete = QueryRequest {
         query: "DELETE FROM users WHERE email = 'delete@test.com'".into(),
     };
-    handler.write_query(&delete).await.unwrap();
+    handler.write_query(delete).await.unwrap();
 
     let select = ReadQueryRequest {
         query: "SELECT * FROM users WHERE email = 'delete@test.com'".into(),
         cursor: None,
     };
-    let rows = handler.read_query(&select).await.unwrap();
+    let rows = handler.read_query(select).await.unwrap();
     let arr = &rows.rows;
     assert!(arr.is_empty(), "Row should be deleted");
 }
@@ -120,7 +120,7 @@ async fn test_write_query_delete() {
 async fn test_lists_tables() {
     let handler = handler(false);
 
-    let response = handler.list_tables(&ListTablesRequest::default()).await.unwrap();
+    let response = handler.list_tables(ListTablesRequest::default()).await.unwrap();
     let tables = response.tables;
 
     for expected in ["users", "posts", "tags", "post_tags"] {
@@ -138,7 +138,7 @@ async fn test_gets_table_schema() {
         table_name: "users".into(),
     };
 
-    let schema = handler.get_table_schema(&request).await.unwrap();
+    let schema = handler.get_table_schema(request).await.unwrap();
 
     assert_eq!(schema.table_name, "users");
     let columns = schema.columns.as_object().expect("columns object");
@@ -154,7 +154,7 @@ async fn test_gets_table_schema_with_relations() {
         table_name: "posts".into(),
     };
 
-    let schema = handler.get_table_schema(&request).await.unwrap();
+    let schema = handler.get_table_schema(request).await.unwrap();
 
     let columns = schema.columns.as_object().expect("columns object");
     assert!(columns.contains_key("user_id"), "Missing 'user_id' column");
@@ -177,7 +177,7 @@ async fn test_executes_sql() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     assert_eq!(response.rows.len(), 3, "Expected 3 users, got {}", response.rows.len());
 }
 
@@ -189,7 +189,7 @@ async fn test_blocks_writes_in_read_only_mode() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
 
     assert!(response.is_err(), "Expected error for write in read-only mode");
 }
@@ -206,7 +206,7 @@ async fn test_query_timeout_fast_query_succeeds() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
     assert!(response.is_ok(), "Fast query should succeed within timeout");
 }
 
@@ -222,7 +222,7 @@ async fn test_query_timeout_disabled_with_none() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
     assert!(response.is_ok(), "Query should succeed without timeout");
 }
 
@@ -234,17 +234,17 @@ async fn test_drop_table_success() {
     let create = QueryRequest {
         query: "CREATE TABLE drop_test_simple (id INTEGER PRIMARY KEY)".into(),
     };
-    handler.write_query(&create).await.unwrap();
+    handler.write_query(create).await.unwrap();
 
     // Drop it
     let drop_request = DropTableRequest {
         table_name: "drop_test_simple".into(),
     };
-    let response = handler.drop_table(&drop_request).await.unwrap();
+    let response = handler.drop_table(drop_request).await.unwrap();
     assert!(response.message.contains("dropped successfully"));
 
     // Verify it's gone
-    let response = handler.list_tables(&ListTablesRequest::default()).await.unwrap();
+    let response = handler.list_tables(ListTablesRequest::default()).await.unwrap();
     let tables = response.tables;
     assert!(
         !tables.iter().any(|t| t == "drop_test_simple"),
@@ -259,7 +259,7 @@ async fn test_drop_table_nonexistent() {
         table_name: "nonexistent_table_xyz".into(),
     };
 
-    let response = handler.drop_table(&drop_request).await;
+    let response = handler.drop_table(drop_request).await;
     assert!(response.is_err(), "Expected error for nonexistent table");
 }
 
@@ -270,7 +270,7 @@ async fn test_explain_query_select() {
         query: "SELECT * FROM users".into(),
     };
 
-    let response = handler.explain_query(&request).await.unwrap();
+    let response = handler.explain_query(request).await.unwrap();
     let plan = &response.rows;
     assert!(!plan.is_empty(), "Expected non-empty execution plan");
 }
@@ -282,7 +282,7 @@ async fn test_explain_query_with_join() {
         query: "SELECT p.title, u.name FROM posts p JOIN users u ON p.user_id = u.id".into(),
     };
 
-    let response = handler.explain_query(&request).await.unwrap();
+    let response = handler.explain_query(request).await.unwrap();
     let plan = &response.rows;
     assert!(!plan.is_empty(), "EXPLAIN QUERY PLAN should return plan for JOIN query");
 }
@@ -294,7 +294,7 @@ async fn test_explain_query_invalid_sql() {
         query: "NOT VALID SQL AT ALL".into(),
     };
 
-    let response = handler.explain_query(&request).await;
+    let response = handler.explain_query(request).await;
     assert!(response.is_err(), "Expected error for invalid SQL");
 }
 
@@ -305,7 +305,7 @@ async fn test_get_table_schema_nonexistent_table() {
         table_name: "nonexistent_table_xyz".into(),
     };
 
-    let response = handler.get_table_schema(&request).await;
+    let response = handler.get_table_schema(request).await;
     assert!(response.is_err(), "Expected error for nonexistent table");
 }
 
@@ -316,7 +316,7 @@ async fn test_get_table_schema_invalid_table_name() {
         table_name: String::new(),
     };
 
-    let response = handler.get_table_schema(&request).await;
+    let response = handler.get_table_schema(request).await;
     assert!(response.is_err(), "Expected error for empty table name");
 }
 
@@ -327,7 +327,7 @@ async fn test_drop_table_invalid_identifier() {
         table_name: String::new(),
     };
 
-    let response = handler.drop_table(&drop_request).await;
+    let response = handler.drop_table(drop_request).await;
     assert!(response.is_err(), "Expected error for empty table name");
 }
 
@@ -339,7 +339,7 @@ async fn test_read_query_empty_query() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
     assert!(response.is_err(), "Expected error for empty query");
 }
 
@@ -351,7 +351,7 @@ async fn test_read_query_whitespace_only_query() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
     assert!(response.is_err(), "Expected error for whitespace-only query");
 }
 
@@ -363,7 +363,7 @@ async fn test_read_query_multi_statement_blocked() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
     assert!(response.is_err(), "Expected error for multi-statement query");
 }
 
@@ -375,7 +375,7 @@ async fn test_read_query_into_outfile_blocked() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await;
+    let response = handler.read_query(request).await;
     assert!(response.is_err(), "Expected error for INTO OUTFILE");
 }
 
@@ -387,7 +387,7 @@ async fn test_read_query_with_join() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert!(!rows.is_empty(), "JOIN query should return results");
     assert!(rows[0].get("title").is_some(), "Should have title column");
@@ -401,10 +401,10 @@ async fn test_write_query_create_table() {
     let create = QueryRequest {
         query: "CREATE TABLE write_test_create (id INTEGER PRIMARY KEY, value TEXT)".into(),
     };
-    handler.write_query(&create).await.unwrap();
+    handler.write_query(create).await.unwrap();
 
     // Verify it appears in list_tables
-    let tables = handler.list_tables(&ListTablesRequest::default()).await.unwrap();
+    let tables = handler.list_tables(ListTablesRequest::default()).await.unwrap();
     assert!(
         tables.tables.iter().any(|t| t == "write_test_create"),
         "Created table should appear in list"
@@ -414,7 +414,7 @@ async fn test_write_query_create_table() {
     let drop = DropTableRequest {
         table_name: "write_test_create".into(),
     };
-    handler.drop_table(&drop).await.unwrap();
+    handler.drop_table(drop).await.unwrap();
 }
 
 #[tokio::test]
@@ -424,7 +424,7 @@ async fn test_get_table_schema_junction_table() {
         table_name: "post_tags".into(),
     };
 
-    let schema = handler.get_table_schema(&request).await.unwrap();
+    let schema = handler.get_table_schema(request).await.unwrap();
     assert_eq!(schema.table_name, "post_tags");
 
     let columns = schema.columns.as_object().expect("columns object");
@@ -453,7 +453,7 @@ async fn test_read_query_empty_result_set() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert!(rows.is_empty(), "Expected empty result set");
 }
@@ -466,7 +466,7 @@ async fn test_read_query_aggregate() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["total"], 3);
@@ -480,7 +480,7 @@ async fn test_read_query_group_by() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert!(rows.len() >= 2, "Expected at least 2 groups");
 }
@@ -493,7 +493,7 @@ async fn test_read_query_with_comments() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert_eq!(rows.len(), 3, "Comment-prefixed SELECT should work");
 }
@@ -506,7 +506,7 @@ async fn test_read_query_subquery() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert!(!rows.is_empty(), "Subquery should return results");
 }
@@ -518,7 +518,7 @@ async fn test_get_table_schema_no_foreign_keys() {
         table_name: "tags".into(),
     };
 
-    let schema = handler.get_table_schema(&request).await.unwrap();
+    let schema = handler.get_table_schema(request).await.unwrap();
     assert_eq!(schema.table_name, "tags");
 
     let columns = schema.columns.as_object().expect("columns object");
@@ -538,7 +538,7 @@ async fn test_write_query_invalid_sql() {
         query: "NOT VALID SQL AT ALL".into(),
     };
 
-    let response = handler.write_query(&request).await;
+    let response = handler.write_query(request).await;
     assert!(response.is_err(), "Expected error for invalid SQL in write_query");
 }
 
@@ -549,7 +549,7 @@ async fn test_get_table_schema_column_details() {
         table_name: "users".into(),
     };
 
-    let schema = handler.get_table_schema(&request).await.unwrap();
+    let schema = handler.get_table_schema(request).await.unwrap();
     let columns = schema.columns.as_object().expect("columns object");
 
     // Verify id column has key info (PRIMARY KEY)
@@ -574,7 +574,7 @@ async fn test_read_query_with_limit() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert_eq!(rows.len(), 2, "LIMIT 2 should return exactly 2 rows");
 }
@@ -587,7 +587,7 @@ async fn test_read_query_with_line_comment() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert_eq!(rows.len(), 3, "Line-comment prefixed SELECT should work");
 }
@@ -600,7 +600,7 @@ async fn test_read_query_null_values() {
         cursor: None,
     };
 
-    let response = handler.read_query(&request).await.unwrap();
+    let response = handler.read_query(request).await.unwrap();
     let rows = &response.rows;
     assert_eq!(rows.len(), 1);
     assert!(rows[0].get("body").is_some(), "body column should be present");
@@ -613,7 +613,7 @@ async fn test_drop_table_blocked_in_read_only() {
         table_name: "users".into(),
     };
 
-    let response = handler.drop_table(&drop_request).await;
+    let response = handler.drop_table(drop_request).await;
     assert!(response.is_err(), "drop_table should be blocked in read-only mode");
 }
 
@@ -626,7 +626,7 @@ async fn test_list_tables_returns_empty_for_no_match() {
         query: "SELECT name FROM sqlite_master WHERE type='table' AND name='nonexistent_xyz'".into(),
         cursor: None,
     };
-    let result = handler.read_query(&request).await.unwrap();
+    let result = handler.read_query(request).await.unwrap();
     let rows = &result.rows;
     assert!(rows.is_empty(), "query for nonexistent table should return empty array");
 }
@@ -640,12 +640,12 @@ async fn test_create_drop_table_with_spaces() {
     let create = QueryRequest {
         query: "CREATE TABLE \"table with spaces\" (id INTEGER PRIMARY KEY, name TEXT)".into(),
     };
-    handler.write_query(&create).await.unwrap();
+    handler.write_query(create).await.unwrap();
 
     let schema = GetTableSchemaRequest {
         table_name: "table with spaces".into(),
     };
-    let result = handler.get_table_schema(&schema).await;
+    let result = handler.get_table_schema(schema).await;
     assert!(
         result.is_ok(),
         "get_table_schema with spaced name should succeed: {result:?}"
@@ -654,7 +654,7 @@ async fn test_create_drop_table_with_spaces() {
     let drop = DropTableRequest {
         table_name: "table with spaces".into(),
     };
-    handler.drop_table(&drop).await.unwrap();
+    handler.drop_table(drop).await.unwrap();
 }
 
 // === Pagination ===
@@ -664,7 +664,7 @@ async fn collect_all_paged(handler: &SqliteHandler) -> Vec<String> {
     let mut cursor: Option<database_mcp_server::pagination::Cursor> = None;
     loop {
         let request = ListTablesRequest { cursor };
-        let response = handler.list_tables(&request).await.expect("list page");
+        let response = handler.list_tables(request).await.expect("list page");
         all.extend(response.tables);
         match response.next_cursor {
             Some(c) => cursor = Some(c),
@@ -682,7 +682,7 @@ async fn test_list_tables_pagination_traverses_pages() {
     let collected = collect_all_paged(&handler_paged).await;
 
     let single_page = handler_full
-        .list_tables(&ListTablesRequest::default())
+        .list_tables(ListTablesRequest::default())
         .await
         .expect("single page");
 
@@ -697,7 +697,7 @@ async fn test_list_tables_pagination_traverses_pages() {
 #[tokio::test]
 async fn test_list_tables_pagination_small_table_set_no_next_cursor() {
     let handler = handler(true);
-    let response = handler.list_tables(&ListTablesRequest::default()).await.unwrap();
+    let response = handler.list_tables(ListTablesRequest::default()).await.unwrap();
     assert!(
         response.next_cursor.is_none(),
         "seeded fixture below default page_size must not emit nextCursor"
@@ -708,7 +708,7 @@ async fn test_list_tables_pagination_small_table_set_no_next_cursor() {
 async fn test_list_tables_pagination_boundary_page_size_equals_total() {
     let handler_full = handler(true);
     let total = handler_full
-        .list_tables(&ListTablesRequest::default())
+        .list_tables(ListTablesRequest::default())
         .await
         .expect("discover total")
         .tables
@@ -717,7 +717,7 @@ async fn test_list_tables_pagination_boundary_page_size_equals_total() {
 
     let handler_boundary = handler_with_page_size(page_size);
     let response = handler_boundary
-        .list_tables(&ListTablesRequest::default())
+        .list_tables(ListTablesRequest::default())
         .await
         .unwrap();
     assert_eq!(
@@ -739,7 +739,7 @@ async fn test_list_tables_pagination_off_the_end_cursor_returns_empty_page() {
     let request = ListTablesRequest {
         cursor: Some(Cursor { offset: 10_000 }),
     };
-    let response = handler.list_tables(&request).await.unwrap();
+    let response = handler.list_tables(request).await.unwrap();
 
     assert!(
         response.tables.is_empty(),
@@ -753,7 +753,7 @@ async fn test_list_tables_pagination_off_the_end_cursor_returns_empty_page() {
 async fn test_list_tables_respects_configured_page_size() {
     let handler = handler_with_page_size(2);
     let first = handler
-        .list_tables(&ListTablesRequest::default())
+        .list_tables(ListTablesRequest::default())
         .await
         .expect("first page");
     assert_eq!(first.tables.len(), 2, "configured page_size=2 must cap page 1");
@@ -767,7 +767,7 @@ async fn test_list_tables_respects_configured_page_size() {
 async fn test_list_tables_respects_configured_page_size_minimum() {
     let handler = handler_with_page_size(1);
     let first = handler
-        .list_tables(&ListTablesRequest::default())
+        .list_tables(ListTablesRequest::default())
         .await
         .expect("first page");
     assert_eq!(first.tables.len(), 1, "page_size=1 must return one table per page");
@@ -812,7 +812,7 @@ async fn collect_all_paged_read_query(handler: &SqliteHandler, query: &str) -> V
             query: query.into(),
             cursor,
         };
-        let response = handler.read_query(&request).await.expect("read_query page");
+        let response = handler.read_query(request).await.expect("read_query page");
         all.extend(response.rows);
         match response.next_cursor {
             Some(c) => cursor = Some(c),
@@ -831,7 +831,7 @@ async fn test_read_query_pagination_traverses_pages() {
     let collected = collect_all_paged_read_query(&handler_paged, query).await;
 
     let single = handler_full
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: query.into(),
             cursor: None,
         })
@@ -852,7 +852,7 @@ async fn test_read_query_pagination_traverses_pages() {
 async fn test_read_query_pagination_small_result_no_next_cursor() {
     let handler = handler_with_page_size(2);
     let response = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "SELECT id FROM users WHERE id = 1".into(),
             cursor: None,
         })
@@ -869,7 +869,7 @@ async fn test_read_query_pagination_small_result_no_next_cursor() {
 async fn test_read_query_pagination_empty_result_no_next_cursor() {
     let handler = handler_with_page_size(2);
     let response = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "SELECT id FROM users WHERE id = -1".into(),
             cursor: None,
         })
@@ -884,7 +884,7 @@ async fn test_read_query_pagination_preserves_inner_limit() {
     // Caller's inner LIMIT/OFFSET stays inside the subquery wrap.
     let handler = handler_with_page_size(2);
     let response = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "SELECT id FROM users ORDER BY id LIMIT 1 OFFSET 1".into(),
             cursor: None,
         })
@@ -905,7 +905,7 @@ async fn test_read_query_pagination_off_the_end_cursor_returns_empty() {
     use database_mcp_server::pagination::Cursor;
     let handler = handler_with_page_size(2);
     let response = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "SELECT id FROM users ORDER BY id".into(),
             cursor: Some(Cursor { offset: 10_000 }),
         })
@@ -922,7 +922,7 @@ async fn test_read_query_pagination_survives_trailing_line_comment() {
     // the newline-before-`)` fix in Pager::wrap_select.
     let handler = handler_with_page_size(2);
     let response = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "SELECT id FROM users ORDER BY id -- fetch users".into(),
             cursor: None,
         })
@@ -941,7 +941,7 @@ async fn test_read_query_pagination_survives_trailing_line_comment() {
 async fn test_read_query_pagination_strips_trailing_semicolon() {
     let handler = handler_with_page_size(2);
     let response = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "SELECT id FROM users WHERE id = 1;".into(),
             cursor: None,
         })
@@ -977,7 +977,7 @@ async fn test_read_query_cursor_does_not_bypass_read_only() {
     use database_mcp_server::pagination::Cursor;
     let handler = handler_with_page_size(2);
     let result = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "DELETE FROM users WHERE id = 1".into(),
             cursor: Some(Cursor { offset: 0 }),
         })
@@ -996,7 +996,7 @@ async fn test_read_query_non_select_single_page_with_cursor_ignored() {
     let handler = handler_with_page_size(2);
 
     let without_cursor = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "EXPLAIN SELECT 1".into(),
             cursor: None,
         })
@@ -1004,7 +1004,7 @@ async fn test_read_query_non_select_single_page_with_cursor_ignored() {
         .expect("EXPLAIN without cursor should succeed");
 
     let with_cursor = handler
-        .read_query(&ReadQueryRequest {
+        .read_query(ReadQueryRequest {
             query: "EXPLAIN SELECT 1".into(),
             cursor: Some(Cursor { offset: 100 }),
         })
