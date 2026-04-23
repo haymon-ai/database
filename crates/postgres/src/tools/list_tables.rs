@@ -272,7 +272,7 @@ impl PostgresHandler {
         if detailed {
             return self.list_tables_detailed(database, pattern, pager).await;
         }
-        
+
         self.list_tables_brief(database, pattern, pager).await
     }
 
@@ -286,16 +286,17 @@ impl PostgresHandler {
         let rows = self
             .connection
             .fetch_json(
-                sqlx::query(DETAILED_SQL).bind(pattern).bind(pager.limit()).bind(pager.offset()),
+                sqlx::query(DETAILED_SQL)
+                    .bind(pattern)
+                    .bind(pager.limit())
+                    .bind(pager.offset()),
                 database,
             )
             .await?;
-        // The CTE wraps each row as a JSON object under column `entry`;
-        // when the row is flattened to JSON by `RowExt::to_json`, the
-        // column name becomes the key. Unwrap to the inner object.
+        // Each row is `{"entry": {...}}` — lift the inner object out.
         let entries: Vec<_> = rows
             .into_iter()
-            .filter_map(|mut v| v.as_object_mut().and_then(|obj| obj.remove("entry")).or(Some(v)))
+            .map(|mut v| v.as_object_mut().and_then(|o| o.remove("entry")).unwrap_or(v))
             .collect();
         let (entries, next_cursor) = pager.finalize(entries);
         Ok(ListTablesResponse {
@@ -314,7 +315,10 @@ impl PostgresHandler {
         let rows: Vec<String> = self
             .connection
             .fetch_scalar(
-                sqlx::query(BRIEF_SQL).bind(pattern).bind(pager.limit()).bind(pager.offset()),
+                sqlx::query(BRIEF_SQL)
+                    .bind(pattern)
+                    .bind(pager.limit())
+                    .bind(pager.offset()),
                 database,
             )
             .await?;

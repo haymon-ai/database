@@ -57,7 +57,7 @@ where
     /// See trait-level documentation.
     async fn execute<'q, E>(&self, query: E, database: Option<&str>) -> Result<u64, SqlError>
     where
-        E: 'q + Execute<'q, Self::DB> + Send,
+        E: 'q + Execute<'q, Self::DB>,
     {
         let sql = query.sql().to_owned();
         let pool = self.pool(database).await?;
@@ -74,7 +74,7 @@ where
     /// See trait-level documentation.
     async fn fetch_json<'q, E>(&self, query: E, database: Option<&str>) -> Result<Vec<Value>, SqlError>
     where
-        E: 'q + Execute<'q, Self::DB> + Send,
+        E: 'q + Execute<'q, Self::DB>,
     {
         let sql = query.sql().to_owned();
         let pool = self.pool(database).await?;
@@ -94,7 +94,7 @@ where
     /// See trait-level documentation.
     async fn fetch_optional<'q, E, T>(&self, query: E, database: Option<&str>) -> Result<Option<T>, SqlError>
     where
-        E: 'q + Execute<'q, Self::DB> + Send,
+        E: 'q + Execute<'q, Self::DB>,
         T: for<'r> Decode<'r, Self::DB> + Type<Self::DB> + Send + Unpin,
     {
         let sql = query.sql().to_owned();
@@ -112,7 +112,7 @@ where
     /// See trait-level documentation.
     async fn fetch_scalar<'q, E, T>(&self, query: E, database: Option<&str>) -> Result<Vec<T>, SqlError>
     where
-        E: 'q + Execute<'q, Self::DB> + Send,
+        E: 'q + Execute<'q, Self::DB>,
         T: for<'r> Decode<'r, Self::DB> + Type<Self::DB> + Send + Unpin,
     {
         let sql = query.sql().to_owned();
