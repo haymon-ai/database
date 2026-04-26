@@ -9,7 +9,7 @@ use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
 use rmcp::model::{ErrorData, ToolAnnotations};
 
 use crate::MysqlHandler;
-use crate::types::{ListTablesRequest, ListTablesResponse};
+use crate::types::{ListTablesRequest, ListTablesResponse, TableEntries};
 
 /// Brief-mode SQL: `information_schema.TABLES` filtered to `BASE TABLE` rows.
 ///
@@ -409,7 +409,11 @@ impl MysqlHandler {
                 None,
             )
             .await?;
-        Ok(ListTablesResponse::brief(rows, pager))
+        let (tables, next_cursor) = pager.finalize(rows);
+        Ok(ListTablesResponse {
+            tables: TableEntries::Brief(tables),
+            next_cursor,
+        })
     }
 
     /// Detailed-mode page: name-keyed metadata map.
@@ -436,7 +440,10 @@ impl MysqlHandler {
                 None,
             )
             .await?;
-        let pairs = rows.into_iter().map(|(name, json)| (name, json.0)).collect();
-        Ok(ListTablesResponse::detailed(pairs, pager))
+        let (rows, next_cursor) = pager.finalize(rows);
+        Ok(ListTablesResponse {
+            tables: TableEntries::Detailed(rows.into_iter().map(|(name, json)| (name, json.0)).collect()),
+            next_cursor,
+        })
     }
 }

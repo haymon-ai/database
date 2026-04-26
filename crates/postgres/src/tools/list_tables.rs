@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use dbmcp_server::pagination::Pager;
 use dbmcp_sql::Connection;
 
-use crate::types::{ListTablesRequest, ListTablesResponse};
+use crate::types::{ListTablesRequest, ListTablesResponse, TableEntries};
 use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
 use rmcp::model::{ErrorData, ToolAnnotations};
 
@@ -271,7 +271,7 @@ impl PostgresHandler {
         self.list_tables_brief(database, pattern, pager).await
     }
 
-    /// Detailed-mode page: returns name-keyed metadata via [`ListTablesResponse::detailed`].
+    /// Detailed-mode page: name-keyed metadata wrapped as [`TableEntries::Detailed`].
     async fn list_tables_detailed(
         &self,
         database: Option<&str>,
@@ -288,11 +288,14 @@ impl PostgresHandler {
                 database,
             )
             .await?;
-        let pairs = rows.into_iter().map(|(name, json)| (name, json.0)).collect();
-        Ok(ListTablesResponse::detailed(pairs, pager))
+        let (rows, next_cursor) = pager.finalize(rows);
+        Ok(ListTablesResponse {
+            tables: TableEntries::Detailed(rows.into_iter().map(|(name, json)| (name, json.0)).collect()),
+            next_cursor,
+        })
     }
 
-    /// Brief-mode page: returns sorted table-name strings via [`ListTablesResponse::brief`].
+    /// Brief-mode page: sorted table-name strings wrapped as [`TableEntries::Brief`].
     async fn list_tables_brief(
         &self,
         database: Option<&str>,
@@ -309,6 +312,10 @@ impl PostgresHandler {
                 database,
             )
             .await?;
-        Ok(ListTablesResponse::brief(rows, pager))
+        let (tables, next_cursor) = pager.finalize(rows);
+        Ok(ListTablesResponse {
+            tables: TableEntries::Brief(tables),
+            next_cursor,
+        })
     }
 }

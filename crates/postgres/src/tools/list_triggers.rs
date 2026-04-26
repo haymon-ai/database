@@ -8,7 +8,7 @@ use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
 use rmcp::model::{ErrorData, ToolAnnotations};
 
 use crate::PostgresHandler;
-use crate::types::{ListTriggersRequest, ListTriggersResponse};
+use crate::types::{ListTriggersRequest, ListTriggersResponse, TriggerEntries};
 
 /// Marker type for the `listTriggers` MCP tool.
 pub(crate) struct ListTriggersTool;
@@ -182,7 +182,7 @@ impl PostgresHandler {
         self.list_triggers_brief(database, pattern, pager).await
     }
 
-    /// Brief-mode page: returns sorted trigger-name strings via [`ListTriggersResponse::brief`].
+    /// Brief-mode page: sorted trigger-name strings wrapped as [`TriggerEntries::Brief`].
     async fn list_triggers_brief(
         &self,
         database: Option<&str>,
@@ -199,10 +199,14 @@ impl PostgresHandler {
                 database,
             )
             .await?;
-        Ok(ListTriggersResponse::brief(rows, pager))
+        let (triggers, next_cursor) = pager.finalize(rows);
+        Ok(ListTriggersResponse {
+            triggers: TriggerEntries::Brief(triggers),
+            next_cursor,
+        })
     }
 
-    /// Detailed-mode page: returns name-keyed metadata via [`ListTriggersResponse::detailed`].
+    /// Detailed-mode page: name-keyed metadata wrapped as [`TriggerEntries::Detailed`].
     async fn list_triggers_detailed(
         &self,
         database: Option<&str>,
@@ -219,7 +223,10 @@ impl PostgresHandler {
                 database,
             )
             .await?;
-        let pairs = rows.into_iter().map(|(name, json)| (name, json.0)).collect();
-        Ok(ListTriggersResponse::detailed(pairs, pager))
+        let (rows, next_cursor) = pager.finalize(rows);
+        Ok(ListTriggersResponse {
+            triggers: TriggerEntries::Detailed(rows.into_iter().map(|(name, json)| (name, json.0)).collect()),
+            next_cursor,
+        })
     }
 }

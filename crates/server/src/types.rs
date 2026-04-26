@@ -7,7 +7,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::pagination::{Cursor, Pager};
+use crate::pagination::Cursor;
 
 /// Two-shape table listing payload: bare names in brief mode, name-keyed map in detailed mode.
 ///
@@ -67,31 +67,6 @@ pub struct ListTablesResponse {
     /// Opaque cursor pointing to the next page. Absent when this is the final page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
-}
-
-impl ListTablesResponse {
-    /// Builds a brief-mode response: trims the over-fetch and wraps the names.
-    #[must_use]
-    pub fn brief(rows: Vec<String>, pager: Pager) -> Self {
-        let (tables, next_cursor) = pager.finalize(rows);
-        Self {
-            tables: TableEntries::Brief(tables),
-            next_cursor,
-        }
-    }
-
-    /// Builds a detailed-mode response from typed `(name, entry)` pairs.
-    ///
-    /// Backends decode `entry` via [`sqlx::types::Json<Value>`] at the row-read
-    /// site, so this constructor only paginates and wraps; no JSON reparsing.
-    #[must_use]
-    pub fn detailed(pairs: Vec<(String, Value)>, pager: Pager) -> Self {
-        let (pairs, next_cursor) = pager.finalize(pairs);
-        Self {
-            tables: TableEntries::Detailed(pairs.into_iter().collect()),
-            next_cursor,
-        }
-    }
 }
 
 /// Response for tools with no structured return data.
@@ -231,31 +206,6 @@ pub struct ListTriggersResponse {
     /// Opaque cursor pointing to the next page. Absent when this is the final page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
-}
-
-impl ListTriggersResponse {
-    /// Builds a brief-mode response: trims the over-fetch and wraps the names.
-    #[must_use]
-    pub fn brief(rows: Vec<String>, pager: Pager) -> Self {
-        let (triggers, next_cursor) = pager.finalize(rows);
-        Self {
-            triggers: TriggerEntries::Brief(triggers),
-            next_cursor,
-        }
-    }
-
-    /// Builds a detailed-mode response from typed `(name, entry)` pairs.
-    ///
-    /// Backends decode `entry` via [`sqlx::types::Json<Value>`] at the row-read
-    /// site, so this constructor only paginates and wraps; no JSON reparsing.
-    #[must_use]
-    pub fn detailed(pairs: Vec<(String, Value)>, pager: Pager) -> Self {
-        let (pairs, next_cursor) = pager.finalize(pairs);
-        Self {
-            triggers: TriggerEntries::Detailed(pairs.into_iter().collect()),
-            next_cursor,
-        }
-    }
 }
 
 /// Request for the `listFunctions` tool.

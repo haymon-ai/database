@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use dbmcp_server::pagination::Pager;
-use dbmcp_server::types::{ListTriggersRequest, ListTriggersResponse};
+use dbmcp_server::types::{ListTriggersRequest, ListTriggersResponse, TriggerEntries};
 use dbmcp_sql::Connection as _;
 use dbmcp_sql::sanitize::{quote_literal, validate_ident};
 use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
@@ -109,6 +109,10 @@ impl MysqlHandler {
         );
 
         let rows: Vec<String> = self.connection.fetch_scalar(query.as_str(), None).await?;
-        Ok(ListTriggersResponse::brief(rows, pager))
+        let (triggers, next_cursor) = pager.finalize(rows);
+        Ok(ListTriggersResponse {
+            triggers: TriggerEntries::Brief(triggers),
+            next_cursor,
+        })
     }
 }
