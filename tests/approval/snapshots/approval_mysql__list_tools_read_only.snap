@@ -349,6 +349,25 @@ expression: tools
       "type": "object"
     },
     "outputSchema": {
+      "$defs": {
+        "TriggerEntries": {
+          "anyOf": [
+            {
+              "description": "Brief mode: sorted array of bare trigger-name strings.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "additionalProperties": true,
+              "description": "Detailed mode: name-keyed map; insertion order matches the SQL `ORDER BY` sort.",
+              "type": "object"
+            }
+          ],
+          "description": "Two-shape trigger listing payload: bare names in brief mode, name-keyed map in detailed mode.\n\nChosen by the handler based on the request's `detailed` flag. Serialises untagged: brief\nmode becomes a JSON array of strings, detailed mode becomes a JSON object whose keys are\ntrigger names and whose values are the per-trigger metadata."
+        }
+      },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "Response for the `listTriggers` tool.",
       "properties": {
@@ -360,11 +379,8 @@ expression: tools
           ]
         },
         "triggers": {
-          "description": "Sorted list of trigger names for this page.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "$ref": "#/$defs/TriggerEntries",
+          "description": "Page of matching triggers. Shape depends on the request's `detailed` flag."
         }
       },
       "required": [

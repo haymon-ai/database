@@ -105,8 +105,6 @@ impl SqliteHandler {
         );
 
         let rows: Vec<String> = self.connection.fetch_scalar(query.as_str(), None).await?;
-        let (triggers, next_cursor) = pager.finalize(rows);
-
-        Ok(ListTriggersResponse { triggers, next_cursor })
+        Ok(ListTriggersResponse::brief(rows, pager))
     }
 }

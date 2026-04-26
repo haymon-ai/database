@@ -1790,15 +1790,14 @@ async fn test_list_triggers_returns_seeded_triggers() {
         .await
         .expect("list_triggers");
 
+    let names = response.triggers.as_brief().expect("brief mode");
     assert!(
-        response.triggers.contains(&"users_before_insert".to_string()),
-        "expected seeded users_before_insert trigger, got {:?}",
-        response.triggers
+        names.contains(&"users_before_insert".to_string()),
+        "expected seeded users_before_insert trigger, got {names:?}"
     );
     assert!(
-        response.triggers.contains(&"posts_before_update".to_string()),
-        "expected seeded posts_before_update trigger, got {:?}",
-        response.triggers
+        names.contains(&"posts_before_update".to_string()),
+        "expected seeded posts_before_update trigger, got {names:?}"
     );
 }
 
@@ -1813,11 +1812,8 @@ async fn test_list_triggers_empty_for_trigger_less_database() {
         .await
         .expect("list_triggers");
 
-    assert!(
-        response.triggers.is_empty(),
-        "analytics has no triggers, got {:?}",
-        response.triggers
-    );
+    let names = response.triggers.as_brief().expect("brief mode");
+    assert!(names.is_empty(), "analytics has no triggers, got {names:?}");
 }
 
 #[tokio::test]

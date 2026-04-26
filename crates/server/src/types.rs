@@ -173,15 +173,89 @@ pub struct ListTriggersRequest {
     pub cursor: Option<Cursor>,
 }
 
+/// Two-shape trigger listing payload: bare names in brief mode, name-keyed map in detailed mode.
+///
+/// Chosen by the handler based on the request's `detailed` flag. Serialises untagged: brief
+/// mode becomes a JSON array of strings, detailed mode becomes a JSON object whose keys are
+/// trigger names and whose values are the per-trigger metadata.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(untagged)]
+pub enum TriggerEntries {
+    /// Brief mode: sorted array of bare trigger-name strings.
+    Brief(Vec<String>),
+    /// Detailed mode: name-keyed map; insertion order matches the SQL `ORDER BY` sort.
+    Detailed(IndexMap<String, Value>),
+}
+
+impl TriggerEntries {
+    /// Number of entries in the page, regardless of variant.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Brief(v) => v.len(),
+            Self::Detailed(m) => m.len(),
+        }
+    }
+
+    /// Whether the page contains no entries.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Returns the brief-mode names as a slice, or `None` in detailed mode.
+    #[must_use]
+    pub fn as_brief(&self) -> Option<&[String]> {
+        if let Self::Brief(v) = self { Some(v) } else { None }
+    }
+
+    /// Returns the detailed-mode map of name → metadata, or `None` in brief mode.
+    #[must_use]
+    pub fn as_detailed(&self) -> Option<&IndexMap<String, Value>> {
+        if let Self::Detailed(m) = self { Some(m) } else { None }
+    }
+
+    /// Consumes the payload and returns the brief-mode names, or `None` in detailed mode.
+    #[must_use]
+    pub fn into_brief(self) -> Option<Vec<String>> {
+        if let Self::Brief(v) = self { Some(v) } else { None }
+    }
+}
+
 /// Response for the `listTriggers` tool.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ListTriggersResponse {
-    /// Sorted list of trigger names for this page.
-    pub triggers: Vec<String>,
+    /// Page of matching triggers. Shape depends on the request's `detailed` flag.
+    pub triggers: TriggerEntries,
     /// Opaque cursor pointing to the next page. Absent when this is the final page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
+}
+
+impl ListTriggersResponse {
+    /// Builds a brief-mode response: trims the over-fetch and wraps the names.
+    #[must_use]
+    pub fn brief(rows: Vec<String>, pager: Pager) -> Self {
+        let (triggers, next_cursor) = pager.finalize(rows);
+        Self {
+            triggers: TriggerEntries::Brief(triggers),
+            next_cursor,
+        }
+    }
+
+    /// Builds a detailed-mode response from typed `(name, entry)` pairs.
+    ///
+    /// Backends decode `entry` via [`sqlx::types::Json<Value>`] at the row-read
+    /// site, so this constructor only paginates and wraps; no JSON reparsing.
+    #[must_use]
+    pub fn detailed(pairs: Vec<(String, Value)>, pager: Pager) -> Self {
+        let (pairs, next_cursor) = pager.finalize(pairs);
+        Self {
+            triggers: TriggerEntries::Detailed(pairs.into_iter().collect()),
+            next_cursor,
+        }
+    }
 }
 
 /// Request for the `listFunctions` tool.
@@ -315,7 +389,7 @@ pub struct ExplainQueryRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::{IndexMap, ListTablesResponse, TableEntries};
+    use super::{IndexMap, ListTablesResponse, ListTriggersResponse, TableEntries, TriggerEntries};
     use serde_json::{Value, json};
 
     #[test]
@@ -408,6 +482,62 @@ mod tests {
         let new_len = serde_json::to_vec(&TableEntries::Detailed(new_map)).unwrap().len();
         let old_len = serde_json::to_vec(&old).unwrap().len();
         assert!(new_len < old_len, "payload not smaller: new={new_len} old={old_len}");
+    }
+
+    #[test]
+    fn trigger_brief_serializes_as_bare_string_array() {
+        let entries = TriggerEntries::Brief(vec!["audit_after_insert".into(), "audit_after_update".into()]);
+        assert_eq!(
+            serde_json::to_value(&entries).unwrap(),
+            json!(["audit_after_insert", "audit_after_update"])
+        );
+    }
+
+    #[test]
+    fn trigger_detailed_serializes_as_keyed_object() {
+        let entries = TriggerEntries::Detailed(IndexMap::from([(
+            "audit_after_insert".into(),
+            json!({"timing": "AFTER", "events": ["INSERT"]}),
+        )]));
+        assert_eq!(
+            serde_json::to_value(&entries).unwrap(),
+            json!({"audit_after_insert": {"timing": "AFTER", "events": ["INSERT"]}})
+        );
+    }
+
+    #[test]
+    fn trigger_brief_empty_serializes_as_empty_array() {
+        assert_eq!(
+            serde_json::to_value(TriggerEntries::Brief(Vec::new())).unwrap(),
+            json!([])
+        );
+    }
+
+    #[test]
+    fn trigger_response_brief_matches_legacy_wire_shape() {
+        let response = ListTriggersResponse {
+            triggers: TriggerEntries::Brief(vec!["t1".into()]),
+            next_cursor: None,
+        };
+        assert_eq!(serde_json::to_value(&response).unwrap(), json!({"triggers": ["t1"]}));
+    }
+
+    #[test]
+    fn trigger_helpers_unwrap_correct_variant() {
+        let brief = TriggerEntries::Brief(vec!["a".into()]);
+        assert_eq!(brief.len(), 1);
+        assert!(!brief.is_empty());
+        assert!(brief.as_brief().is_some());
+        assert!(brief.as_detailed().is_none());
+
+        let det = TriggerEntries::Detailed(IndexMap::from([("x".into(), json!(1))]));
+        assert_eq!(det.len(), 1);
+        assert!(det.as_brief().is_none());
+        assert!(det.as_detailed().is_some());
+        assert_eq!(
+            TriggerEntries::Brief(vec!["a".into()]).into_brief(),
+            Some(vec!["a".into()])
+        );
     }
 
     #[test]
