@@ -111,17 +111,22 @@ const BRIEF_SQL: &str = r"
 /// `pg_get_function_result`) and `obj_description` only run for the page's
 /// rows — never the full schema.
 ///
+/// A `CROSS JOIN LATERAL` materialises `pg_get_function_arguments(p.oid)`
+/// into `args.text` so it is computed once per row and reused both in the
+/// keyed signature `name(args)` and in the JSON `arguments` field — no
+/// double-call, no Rust-side json lookup.
+///
 /// `provolatile`, `proisstrict`, `prosecdef`, `proparallel` are stable
 /// `pg_proc` columns. `provolatile` is `'i'`/`'s'`/`'v'`; `proparallel` is
 /// `'s'`/`'r'`/`'u'`; `prosecdef` is a boolean.
 const DETAILED_SQL: &str = r"
     SELECT
-        p.proname AS name,
+        p.proname || '(' || args.text || ')' AS name,
         json_build_object(
             'schema',         'public',
             'name',           p.proname,
             'language',       l.lanname,
-            'arguments',      pg_get_function_arguments(p.oid),
+            'arguments',      args.text,
             'returnType',     pg_get_function_result(p.oid),
             'volatility',     CASE p.provolatile
                                   WHEN 'i' THEN 'IMMUTABLE'
@@ -143,6 +148,7 @@ const DETAILED_SQL: &str = r"
     JOIN pg_namespace n ON n.oid = p.pronamespace
     JOIN pg_language  l ON l.oid = p.prolang
     JOIN pg_roles     r ON r.oid = p.proowner
+    CROSS JOIN LATERAL (SELECT pg_get_function_arguments(p.oid) AS text) args
     WHERE n.nspname = 'public'
       AND p.prokind = 'f'
       AND ($1::text IS NULL OR p.proname ILIKE '%' || $1 || '%')
@@ -182,14 +188,10 @@ impl PostgresHandler {
                 )
                 .await?;
             let (rows, next_cursor) = pager.paginate(rows);
-            let map = rows
-                .into_iter()
-                .map(|(name, json)| {
-                    let arguments = json.0.get("arguments").and_then(|v| v.as_str()).unwrap_or_default();
-                    (format!("{name}({arguments})"), json.0)
-                })
-                .collect();
-            return Ok(ListFunctionsResponse::detailed(map, next_cursor));
+            return Ok(ListFunctionsResponse::detailed(
+                rows.into_iter().map(|(key, json)| (key, json.0)).collect(),
+                next_cursor,
+            ));
         }
 
         let rows: Vec<String> = self

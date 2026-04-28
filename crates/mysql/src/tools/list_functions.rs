@@ -115,13 +115,12 @@ const BRIEF_SQL: &str = r"
 /// user is everything before it (`LEFT(..., LENGTH - host_len - 1)`), with
 /// embedded backticks doubled in both components. Parameter names in the
 /// argument list are backtick-quoted with embedded backticks doubled.
-/// `SQL_DATA_ACCESS`'s underscore form (e.g. `READS_SQL_DATA`) is converted
-/// to the keyword phrase (`READS SQL DATA`) for the embedded DDL while the
-/// structured `sqlDataAccess` field keeps the underscore form for
-/// programmatic comparison. `QUOTE(...)` on `ROUTINE_COMMENT` produces a
-/// properly escaped single-quoted SQL string literal (handles embedded `'`
-/// and `\`). The `''` → `null` coercion on `description` mirrors the
-/// Postgres detailed-payload contract.
+/// `SQL_DATA_ACCESS` is stored with spaces (`'READS SQL DATA'` etc.); the
+/// embedded DDL emits the column directly while the structured
+/// `sqlDataAccess` field substitutes underscores for programmatic
+/// comparison. `QUOTE(...)` on `ROUTINE_COMMENT` produces a properly escaped
+/// single-quoted SQL string literal (handles embedded `'` and `\`). The
+/// `''` → `null` coercion on `description` mirrors the Postgres detailed-payload contract.
 ///
 /// `LIMIT` pushes down before the JSON projection and the correlated
 /// subqueries, so per-page work scales with `page_size + 1` rows regardless
@@ -175,7 +174,7 @@ const DETAILED_SQL: &str = r"
                 ') RETURNS ',
                 CAST(r.DTD_IDENTIFIER AS CHAR),
                 CASE WHEN r.IS_DETERMINISTIC = 'YES' THEN ' DETERMINISTIC' ELSE ' NOT DETERMINISTIC' END,
-                ' ', CAST(REPLACE(r.SQL_DATA_ACCESS, '_', ' ') AS CHAR),
+                ' ', CAST(r.SQL_DATA_ACCESS AS CHAR),
                 ' SQL SECURITY ', CAST(r.SECURITY_TYPE AS CHAR),
                 CASE WHEN r.ROUTINE_COMMENT IS NULL OR r.ROUTINE_COMMENT = '' THEN ''
                      ELSE CONCAT(' COMMENT ', QUOTE(r.ROUTINE_COMMENT)) END,
