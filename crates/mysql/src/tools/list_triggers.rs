@@ -1,7 +1,6 @@
 //! MCP tool: `listTriggers`.
 
 use std::borrow::Cow;
-use std::sync::LazyLock;
 
 use dbmcp_server::pagination::Pager;
 use dbmcp_server::types::{ListTriggersRequest, ListTriggersResponse};
@@ -11,7 +10,6 @@ use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
 use rmcp::model::{ErrorData, ToolAnnotations};
 
 use crate::MysqlHandler;
-use crate::tools::definer_sql::definer_canonical_sql;
 
 /// Marker type for the `listTriggers` MCP tool.
 pub(crate) struct ListTriggersTool;
@@ -107,17 +105,15 @@ const BRIEF_SQL: &str = r"
 /// portion can itself contain `@` (e.g. `'foo@bar'@'localhost'`), so the
 /// host is the segment after the **last** `@` and the user is everything
 /// before it (`SUBSTRING_INDEX(..., '@', -1)` for host, `LEFT(...)` for
-/// user). The reconstructed clause is rendered in canonical
-/// `SHOW CREATE TRIGGER` form with each component backtick-quoted.
-/// `events` is always a single-element
-/// array on `MySQL`/`MariaDB` (the engine fires one event per definition);
+/// user). The five comma-separated `CONCAT` chunks rebuild the canonical
+/// `SHOW CREATE TRIGGER` `DEFINER=` `` `<user>`@`<host>` `` opener inline
+/// so identifier escaping and the last-`@` split live next to the rest of
+/// the projection. `events` is always a single-element array on
+/// `MySQL`/`MariaDB` (the engine fires one event per definition);
 /// `activationLevel` is always `ROW`. `ORDER BY TRIGGER_NAME` is sufficient —
 /// `(TRIGGER_SCHEMA, TRIGGER_NAME)` is the table's primary key, and the
 /// `WHERE` clause already pins `TRIGGER_SCHEMA`.
-static DETAILED_SQL: LazyLock<String> = LazyLock::new(|| {
-    let definer = definer_canonical_sql("DEFINER");
-    format!(
-        r"
+const DETAILED_SQL: &str = r"
     SELECT
         CAST(TRIGGER_NAME AS CHAR) AS name,
         JSON_OBJECT(
@@ -127,7 +123,11 @@ static DETAILED_SQL: LazyLock<String> = LazyLock::new(|| {
             'events',              JSON_ARRAY(CAST(EVENT_MANIPULATION AS CHAR)),
             'activationLevel',     CAST(ACTION_ORIENTATION  AS CHAR),
             'definition',          CONCAT(
-                {definer},
+                'CREATE DEFINER=`',
+                REPLACE(LEFT(DEFINER, LENGTH(DEFINER) - LENGTH(SUBSTRING_INDEX(DEFINER, '@', -1)) - 1), '`', '``'),
+                '`@`',
+                REPLACE(SUBSTRING_INDEX(DEFINER, '@', -1), '`', '``'),
+                '`',
                 ' TRIGGER ',
                 '`', REPLACE(TRIGGER_NAME, '`', '``'), '`',
                 ' ', ACTION_TIMING, ' ', EVENT_MANIPULATION,
@@ -144,9 +144,7 @@ static DETAILED_SQL: LazyLock<String> = LazyLock::new(|| {
     WHERE TRIGGER_SCHEMA = ?
       AND (? IS NULL OR LOWER(TRIGGER_NAME) LIKE LOWER(CONCAT('%', ?, '%')))
     ORDER BY TRIGGER_NAME
-    LIMIT ? OFFSET ?"
-    )
-});
+    LIMIT ? OFFSET ?";
 
 impl MysqlHandler {
     /// Lists one page of user-defined triggers, optionally filtered and/or detailed.
@@ -180,7 +178,7 @@ impl MysqlHandler {
             let rows: Vec<(String, sqlx::types::Json<serde_json::Value>)> = self
                 .connection
                 .fetch(
-                    sqlx::query(DETAILED_SQL.as_str())
+                    sqlx::query(DETAILED_SQL)
                         .bind(database)
                         .bind(pattern)
                         .bind(pattern)

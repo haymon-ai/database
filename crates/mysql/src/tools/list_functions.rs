@@ -1,7 +1,6 @@
 //! MCP tool: `listFunctions`.
 
 use std::borrow::Cow;
-use std::sync::LazyLock;
 
 use dbmcp_server::pagination::Pager;
 use dbmcp_server::types::ListFunctionsResponse;
@@ -11,7 +10,6 @@ use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
 use rmcp::model::{ErrorData, ToolAnnotations};
 
 use crate::MysqlHandler;
-use crate::tools::definer_sql::definer_canonical_sql;
 use crate::types::ListFunctionsRequest;
 
 /// Marker type for the `listFunctions` MCP tool.
@@ -108,23 +106,27 @@ const BRIEF_SQL: &str = r"
 /// assembled by a correlated subquery against `information_schema.PARAMETERS`
 /// filtered to the row's `(SPECIFIC_SCHEMA, SPECIFIC_NAME)` and to
 /// `ROUTINE_TYPE='FUNCTION'`, `ORDINAL_POSITION > 0` (excluding the synthetic
-/// RETURN row at ordinal 0). The reconstructed `definition` reuses the same
-/// pattern with backtick-quoted parameter names and produces the canonical
-/// `CREATE FUNCTION` text — `SQL_DATA_ACCESS`'s underscore form (e.g.
-/// `READS_SQL_DATA`) is converted to the keyword phrase (`READS SQL DATA`)
-/// for the embedded DDL while the structured `sqlDataAccess` field keeps the
-/// underscore form for programmatic comparison. `QUOTE(...)` on
-/// `ROUTINE_COMMENT` produces a properly escaped single-quoted SQL string
-/// literal (handles embedded `'` and `\`). The `''` → `null` coercion on
-/// `description` mirrors the Postgres detailed-payload contract.
+/// RETURN row at ordinal 0). The reconstructed `definition` produces the
+/// canonical `CREATE FUNCTION` text. The five comma-separated `CONCAT`
+/// chunks at the top of the `definition` rebuild the canonical
+/// `DEFINER=` `` `<user>`@`<host>` `` opener inline; the user portion may
+/// itself contain `@` (e.g. `'foo@bar'@'localhost'`), so the host segment is
+/// taken after the **last** `@` (`SUBSTRING_INDEX(..., '@', -1)`) and the
+/// user is everything before it (`LEFT(..., LENGTH - host_len - 1)`), with
+/// embedded backticks doubled in both components. Parameter names in the
+/// argument list are backtick-quoted with embedded backticks doubled.
+/// `SQL_DATA_ACCESS`'s underscore form (e.g. `READS_SQL_DATA`) is converted
+/// to the keyword phrase (`READS SQL DATA`) for the embedded DDL while the
+/// structured `sqlDataAccess` field keeps the underscore form for
+/// programmatic comparison. `QUOTE(...)` on `ROUTINE_COMMENT` produces a
+/// properly escaped single-quoted SQL string literal (handles embedded `'`
+/// and `\`). The `''` → `null` coercion on `description` mirrors the
+/// Postgres detailed-payload contract.
 ///
 /// `LIMIT` pushes down before the JSON projection and the correlated
 /// subqueries, so per-page work scales with `page_size + 1` rows regardless
 /// of how many functions the schema holds in total.
-static DETAILED_SQL: LazyLock<String> = LazyLock::new(|| {
-    let definer = definer_canonical_sql("r.DEFINER");
-    format!(
-        r"
+const DETAILED_SQL: &str = r"
     SELECT
         CAST(r.ROUTINE_NAME AS CHAR) AS name,
         JSON_OBJECT(
@@ -150,7 +152,11 @@ static DETAILED_SQL: LazyLock<String> = LazyLock::new(|| {
             'description',         CASE WHEN r.ROUTINE_COMMENT IS NULL OR r.ROUTINE_COMMENT = ''
                                         THEN NULL ELSE CAST(r.ROUTINE_COMMENT AS CHAR) END,
             'definition',          CONCAT(
-                {definer},
+                'CREATE DEFINER=`',
+                REPLACE(LEFT(r.DEFINER, LENGTH(r.DEFINER) - LENGTH(SUBSTRING_INDEX(r.DEFINER, '@', -1)) - 1), '`', '``'),
+                '`@`',
+                REPLACE(SUBSTRING_INDEX(r.DEFINER, '@', -1), '`', '``'),
+                '`',
                 ' FUNCTION ',
                 '`', REPLACE(r.ROUTINE_NAME, '`', '``'), '`',
                 '(',
@@ -186,9 +192,7 @@ static DETAILED_SQL: LazyLock<String> = LazyLock::new(|| {
       AND r.ROUTINE_TYPE   = 'FUNCTION'
       AND (? IS NULL OR LOWER(r.ROUTINE_NAME) LIKE LOWER(CONCAT('%', ?, '%')))
     ORDER BY r.ROUTINE_NAME
-    LIMIT ? OFFSET ?"
-    )
-});
+    LIMIT ? OFFSET ?";
 
 impl MysqlHandler {
     /// Lists one page of stored functions, optionally filtered and/or detailed.
@@ -222,7 +226,7 @@ impl MysqlHandler {
             let rows: Vec<(String, sqlx::types::Json<serde_json::Value>)> = self
                 .connection
                 .fetch(
-                    sqlx::query(DETAILED_SQL.as_str())
+                    sqlx::query(DETAILED_SQL)
                         .bind(database)
                         .bind(pattern)
                         .bind(pattern)
