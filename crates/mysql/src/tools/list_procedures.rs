@@ -111,9 +111,6 @@ impl MysqlHandler {
         let rows: Vec<String> = self.connection.fetch_scalar(query.as_str(), None).await?;
         let (procedures, next_cursor) = pager.paginate(rows);
 
-        Ok(ListProceduresResponse {
-            procedures,
-            next_cursor,
-        })
+        Ok(ListProceduresResponse::brief(procedures, next_cursor))
     }
 }

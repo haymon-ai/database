@@ -2557,15 +2557,14 @@ async fn test_list_procedures_returns_seeded_procedures() {
         .await
         .expect("list_procedures");
 
+    let names = response.procedures.as_brief().expect("brief mode").to_vec();
     assert!(
-        response.procedures.contains(&"archive_user".to_string()),
-        "expected seeded archive_user procedure, got {:?}",
-        response.procedures
+        names.contains(&"archive_user".to_string()),
+        "expected seeded archive_user procedure, got {names:?}"
     );
     assert!(
-        response.procedures.contains(&"touch_post".to_string()),
-        "expected seeded touch_post procedure, got {:?}",
-        response.procedures
+        names.contains(&"touch_post".to_string()),
+        "expected seeded touch_post procedure, got {names:?}"
     );
 }
 
@@ -2580,11 +2579,11 @@ async fn test_list_procedures_excludes_functions() {
         .await
         .expect("list_procedures");
 
+    let names = response.procedures.as_brief().expect("brief mode").to_vec();
     for func_name in ["calc_total", "double_it"] {
         assert!(
-            !response.procedures.contains(&func_name.to_string()),
-            "function `{func_name}` leaked into listProcedures output: {:?}",
-            response.procedures
+            !names.contains(&func_name.to_string()),
+            "function `{func_name}` leaked into listProcedures output: {names:?}"
         );
     }
 }

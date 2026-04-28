@@ -208,7 +208,9 @@ The detailed-mode field set diverges per backend:
 
 ### `listProcedures`
 
-List user-defined stored procedures in a database. Results are paginated — see [Cursor Pagination](#cursor-pagination) for the protocol. The response is a sorted JSON array of procedure-name strings:
+List user-defined stored procedures in a database. Results are paginated — see [Cursor Pagination](#cursor-pagination) for the protocol.
+
+Brief mode (default) returns a sorted JSON array of procedure-name strings:
 
 ```json
 {
@@ -217,7 +219,14 @@ List user-defined stored procedures in a database. Results are paginated — see
 }
 ```
 
-Available on MySQL/MariaDB and PostgreSQL (`public` schema, PostgreSQL 11+). Not available for SQLite.
+PostgreSQL also supports two optional parameters (mirroring `listFunctions`):
+
+- `search` — case-insensitive `ILIKE` substring on procedure name. `%` matches any sequence; `_` matches a single character. Wildcard semantics match `listTables` / `listTriggers` / `listFunctions`. The `search` value must remain identical across paginated calls for cursor continuity.
+- `detailed` (default `false`) — when `true`, `procedures` becomes a JSON object keyed by procedure signature `name(arguments)` (overloads disambiguate; zero-arg procedures key as `name()` for shape uniformity). Each value carries `schema`, `name`, `language`, `arguments`, `security` (`INVOKER` / `DEFINER`), `owner`, `description` (or `null` when no `COMMENT ON PROCEDURE`), and `definition` (the full `pg_get_functiondef` output for `prokind='p'`). Brief and detailed pages share the same `(proname, oid)` row order, so a client can switch `detailed` mid-pagination without losing position.
+
+Detailed mode deliberately omits the `listFunctions`-only fields `returnType`, `volatility`, `strict`, and `parallelSafety` — procedures don't return a value, `pg_proc.provolatile`/`proisstrict` are not user-settable for procedures, and `proparallel` carries no procedure-level guarantee in PostgreSQL.
+
+MySQL/MariaDB `listProcedures` accepts only `database` and `cursor` (brief mode only). Not available for SQLite. Available on MySQL/MariaDB and PostgreSQL (`public` schema, PostgreSQL 11+).
 
 ### `listMaterializedViews`
 

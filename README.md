@@ -226,7 +226,16 @@ See [Cursor Pagination](https://dbmcp.haymon.ai/docs/features#cursor-pagination)
 
 ### listProcedures
 
-Lists user-defined stored procedures, paginated via `cursor` / `nextCursor`. Available on MySQL/MariaDB and PostgreSQL (`public` schema, PostgreSQL 11+). Not available for SQLite. Parameters: `database`, `cursor`. See [Cursor Pagination](https://dbmcp.haymon.ai/docs/features#cursor-pagination) for iteration details.
+Lists user-defined stored procedures, paginated via `cursor` / `nextCursor`. Available on MySQL/MariaDB and PostgreSQL (`public` schema, PostgreSQL 11+). Not available for SQLite. Parameters: `database`, `cursor`; PostgreSQL additionally accepts `search` and `detailed`.
+
+`search` (PostgreSQL only) is an optional case-insensitive `ILIKE` pattern with `%` and `_` as wildcards. The `search` value must remain identical across paginated calls for cursor continuity.
+
+`detailed` (PostgreSQL only, default `false`) switches the response shape:
+
+- **Brief** (default) — `procedures` is a sorted JSON array of bare procedure-name strings. Overloaded procedures appear once per overload (duplicate name strings are expected).
+- **Detailed** (`detailed: true`) — `procedures` is a JSON object keyed by procedure signature `name(arguments)` (overloads disambiguate; zero-arg procedures key as `name()`). Each value carries `schema`, `name`, `language`, `arguments`, `security`, `owner`, `description`, and `definition`. Detailed mode deliberately omits the `listFunctions`-only fields `returnType`, `volatility`, `strict`, and `parallelSafety` — they are not meaningful for procedures. See the [`listProcedures` reference](https://dbmcp.haymon.ai/docs/features#listprocedures) for the full field list.
+
+See [Cursor Pagination](https://dbmcp.haymon.ai/docs/features#cursor-pagination) for iteration details.
 
 ### listMaterializedViews
 
