@@ -11,11 +11,11 @@
 use dbmcp_config::{DatabaseBackend, DatabaseConfig};
 use dbmcp_mysql::MysqlHandler;
 use dbmcp_mysql::types::{
-    DropTableRequest, ListEntries, ListFunctionsRequest, ListProceduresRequest, ListTablesRequest,
+    DropTableRequest, ListEntries, ListFunctionsRequest, ListProceduresRequest, ListTablesRequest, ListViewsRequest,
 };
 use dbmcp_server::types::{
     CreateDatabaseRequest, DropDatabaseRequest, ExplainQueryRequest, ListDatabasesRequest, ListTriggersRequest,
-    ListViewsRequest, QueryRequest, ReadQueryRequest,
+    QueryRequest, ReadQueryRequest,
 };
 use serde_json::Value;
 
@@ -1578,14 +1578,16 @@ async fn test_read_query_non_select_show_tables_single_page() {
         "cursor must be silently ignored for non-SELECT statements"
     );
     // SHOW TABLES in `app` returns 7 seeded base tables (users, posts, tags,
-    // post_tags, temporal, posts_audit, events_by_year) plus 2 seeded views
-    // (active_users, published_posts); MySQL's SHOW TABLES lists both. Must
+    // post_tags, temporal, posts_audit, events_by_year) plus 9 seeded views
+    // (active_users, active_users_v2, active_orders, active_users_with_check_cascaded,
+    // active_users_with_check_local, archived_users, archived_users_invoker,
+    // user_metrics_cte, published_posts); MySQL's SHOW TABLES lists both. Must
     // not be paginated even with page_size=2.
     let rows = &without_cursor.rows;
     assert_eq!(
         rows.len(),
-        9,
-        "SHOW TABLES must not be paginated: expected all 9 seeded tables+views, got {}",
+        16,
+        "SHOW TABLES must not be paginated: expected all 16 seeded tables+views, got {}",
         rows.len()
     );
 }
@@ -1645,6 +1647,7 @@ async fn test_list_views_returns_seeded_views() {
     let request = ListViewsRequest {
         database: Some("app".into()),
         cursor: None,
+        ..Default::default()
     };
 
     let response = handler.list_views(request).await.expect("list_views");
@@ -1667,6 +1670,7 @@ async fn test_list_views_excludes_base_tables() {
         .list_views(ListViewsRequest {
             database: Some("app".into()),
             cursor: None,
+            ..Default::default()
         })
         .await
         .expect("list_views");
@@ -1689,6 +1693,7 @@ async fn test_list_views_empty_for_view_less_database() {
         .list_views(ListViewsRequest {
             database: Some("analytics".into()),
             cursor: None,
+            ..Default::default()
         })
         .await
         .expect("list_views");
@@ -1707,6 +1712,7 @@ async fn test_list_views_empty_database_falls_back_to_default() {
         .list_views(ListViewsRequest {
             database: Some(String::new()),
             cursor: None,
+            ..Default::default()
         })
         .await
         .expect("empty db should default to --db-name");
@@ -1724,6 +1730,7 @@ async fn test_list_views_omitted_database_falls_back_to_default() {
         .list_views(ListViewsRequest {
             database: None,
             cursor: None,
+            ..Default::default()
         })
         .await
         .expect("omitted db should default to --db-name");
@@ -1745,6 +1752,7 @@ async fn test_list_views_pagination_traverses_pages() {
         let request = ListViewsRequest {
             database: Some("app".into()),
             cursor,
+            ..Default::default()
         };
         let response = handler_paged.list_views(request).await.expect("paged list_views");
         all.extend(response.views.as_brief().expect("brief").iter().cloned());
@@ -1758,6 +1766,7 @@ async fn test_list_views_pagination_traverses_pages() {
         .list_views(ListViewsRequest {
             database: Some("app".into()),
             cursor: None,
+            ..Default::default()
         })
         .await
         .expect("single-page list_views");
@@ -1773,6 +1782,7 @@ async fn test_list_views_works_in_read_only_mode() {
         .list_views(ListViewsRequest {
             database: Some("app".into()),
             cursor: None,
+            ..Default::default()
         })
         .await
         .expect("list_views in read-only mode");
@@ -4116,4 +4126,335 @@ async fn test_list_procedures_detailed_definition_uses_canonical_definer_form() 
         !definition.starts_with("CREATE DEFINER='"),
         "legacy single-quoted DEFINER leaked: {definition:?}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// `listViews` — search + detailed (spec 064)
+// ---------------------------------------------------------------------------
+
+async fn brief_views(handler: &MysqlHandler, search: Option<&str>) -> Vec<String> {
+    let response = handler
+        .list_views(ListViewsRequest {
+            database: Some("app".into()),
+            search: search.map(str::to_owned),
+            ..Default::default()
+        })
+        .await
+        .expect("brief list_views");
+    response.views.into_brief().expect("brief mode")
+}
+
+async fn detailed_view_entries(handler: &MysqlHandler, search: &str) -> indexmap::IndexMap<String, Value> {
+    let response = handler
+        .list_views(ListViewsRequest {
+            database: Some("app".into()),
+            search: Some(search.into()),
+            detailed: true,
+            ..Default::default()
+        })
+        .await
+        .expect("detailed list_views");
+    response.views.as_detailed().expect("detailed mode").clone()
+}
+
+#[tokio::test]
+async fn test_list_views_search_filters_by_substring() {
+    let handler = handler(true);
+    let names = brief_views(&handler, Some("active")).await;
+    let expected = [
+        "active_orders".to_string(),
+        "active_users".to_string(),
+        "active_users_v2".to_string(),
+        "active_users_with_check_cascaded".to_string(),
+        "active_users_with_check_local".to_string(),
+    ];
+    assert_eq!(names, expected, "got {names:?}");
+}
+
+#[tokio::test]
+async fn test_list_views_search_is_case_insensitive() {
+    let handler = handler(true);
+    let lower = brief_views(&handler, Some("active")).await;
+    let upper = brief_views(&handler, Some("ActIvE")).await;
+    assert_eq!(lower, upper);
+}
+
+#[tokio::test]
+async fn test_list_views_search_keeps_like_wildcards() {
+    let handler = handler(true);
+    let pct = brief_views(&handler, Some("%users%")).await;
+    assert!(
+        pct.contains(&"active_users".to_string()),
+        "wildcard `%users%` must match `active_users`, got {pct:?}"
+    );
+    assert!(
+        pct.iter().all(|n| n.contains("users")),
+        "wildcard `%users%` must only return `*users*`, got {pct:?}"
+    );
+
+    // `_` matches a single character; `active_` followed by `%` matches every
+    // view whose name begins with `active_`.
+    let underscore = brief_views(&handler, Some("active\\_%")).await;
+    assert!(
+        !underscore.is_empty(),
+        "wildcard `active\\_%` must match seeded views, got {underscore:?}"
+    );
+    assert!(
+        underscore.iter().all(|n| n.starts_with("active_")),
+        "wildcard `active\\_%` must only return `active_*`, got {underscore:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_list_views_search_no_match_returns_empty() {
+    let handler = handler(true);
+    let names = brief_views(&handler, Some("nonexistent_view_xyz")).await;
+    assert!(names.is_empty(), "expected empty list, got {names:?}");
+}
+
+#[tokio::test]
+async fn test_list_views_brief_wire_shape_unchanged() {
+    let handler = handler(true);
+    let response = handler
+        .list_views(ListViewsRequest {
+            database: Some("app".into()),
+            ..Default::default()
+        })
+        .await
+        .expect("list_views");
+
+    let names = response.views.as_brief().expect("brief mode (Vec<String>)");
+    assert!(
+        names.iter().all(|s| !s.is_empty()),
+        "brief mode names must be non-empty strings, got {names:?}"
+    );
+    let json = serde_json::to_value(&response).expect("serialize");
+    let views = json.get("views").expect("views key");
+    assert!(
+        views.is_array(),
+        "brief mode `views` must be a JSON array, got {views:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_list_views_search_resists_sql_meta_chars() {
+    let handler = handler(true);
+    for payload in ["'", ";", "--", "`", "\\", "active'; DROP VIEW bad; --"] {
+        let result = handler
+            .list_views(ListViewsRequest {
+                database: Some("app".into()),
+                search: Some(payload.into()),
+                ..Default::default()
+            })
+            .await;
+        assert!(
+            result.is_ok(),
+            "adversarial payload {payload:?} must not error: {:?}",
+            result.err()
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_list_views_detailed_returns_keyed_object_with_all_fields() {
+    let handler = handler(true);
+    let entries = detailed_view_entries(&handler, "active_users").await;
+    let entry = entries.get("active_users").expect("active_users key present");
+
+    for key in [
+        "schema",
+        "definer",
+        "security",
+        "checkOption",
+        "updatable",
+        "characterSetClient",
+        "collationConnection",
+        "definition",
+    ] {
+        assert!(entry.get(key).is_some(), "missing field {key}: {entry:?}");
+    }
+
+    // Forbidden fields — divergence from Postgres / MySQL list_procedures.
+    for forbidden in [
+        "description",
+        "algorithm",
+        "owner",
+        "language",
+        "arguments",
+        "sqlMode",
+        "databaseCollation",
+    ] {
+        assert!(
+            entry.get(forbidden).is_none(),
+            "forbidden field {forbidden} present: {entry:?}"
+        );
+    }
+
+    assert_eq!(
+        entry.get("schema").and_then(Value::as_str),
+        Some("app"),
+        "schema must equal active database"
+    );
+}
+
+#[tokio::test]
+async fn test_list_views_detailed_check_option_none_for_plain_view() {
+    let handler = handler(true);
+    let entries = detailed_view_entries(&handler, "active_users").await;
+    let entry = entries.get("active_users").expect("active_users present");
+    assert_eq!(
+        entry.get("checkOption").and_then(Value::as_str),
+        Some("NONE"),
+        "plain view must report checkOption=NONE"
+    );
+}
+
+#[tokio::test]
+async fn test_list_views_detailed_check_option_cascaded_and_local() {
+    let handler = handler(true);
+    let cascaded_entries = detailed_view_entries(&handler, "active_users_with_check_cascaded").await;
+    let cascaded = cascaded_entries
+        .get("active_users_with_check_cascaded")
+        .expect("cascaded view present");
+    assert_eq!(cascaded.get("checkOption").and_then(Value::as_str), Some("CASCADED"));
+
+    let local_entries = detailed_view_entries(&handler, "active_users_with_check_local").await;
+    let local = local_entries
+        .get("active_users_with_check_local")
+        .expect("local view present");
+    assert_eq!(local.get("checkOption").and_then(Value::as_str), Some("LOCAL"));
+}
+
+#[tokio::test]
+async fn test_list_views_detailed_updatable_boolean() {
+    let handler = handler(true);
+    let entries = detailed_view_entries(&handler, "active").await;
+
+    assert_eq!(
+        entries
+            .get("active_users")
+            .expect("active_users present")
+            .get("updatable")
+            .and_then(Value::as_bool),
+        Some(true),
+        "single-table view must be updatable"
+    );
+
+    assert_eq!(
+        entries
+            .get("active_orders")
+            .expect("active_orders present")
+            .get("updatable")
+            .and_then(Value::as_bool),
+        Some(false),
+        "JOIN view must not be updatable"
+    );
+}
+
+#[tokio::test]
+async fn test_list_views_detailed_security_modes() {
+    let handler = handler(true);
+    let entries = detailed_view_entries(&handler, "archived").await;
+
+    let definer = entries.get("archived_users").expect("archived_users present");
+    assert_eq!(definer.get("security").and_then(Value::as_str), Some("DEFINER"));
+    let definer_string = definer.get("definer").and_then(Value::as_str).expect("definer string");
+    assert!(
+        definer_string.contains('@'),
+        "definer must be user@host form, got {definer_string:?}"
+    );
+
+    let invoker = entries
+        .get("archived_users_invoker")
+        .expect("archived_users_invoker present");
+    assert_eq!(invoker.get("security").and_then(Value::as_str), Some("INVOKER"));
+}
+
+#[tokio::test]
+async fn test_list_views_detailed_definition_is_raw_select_body() {
+    let handler = handler(true);
+    let entries = detailed_view_entries(&handler, "active_users").await;
+    let entry = entries.get("active_users").expect("active_users present");
+    let definition = entry
+        .get("definition")
+        .and_then(Value::as_str)
+        .expect("definition string");
+
+    let upper = definition.trim_start().to_uppercase();
+    assert!(
+        !upper.starts_with("CREATE"),
+        "definition must be raw SELECT body, no CREATE wrapper: {definition:?}"
+    );
+    assert!(
+        !upper.contains("WITH CASCADED CHECK OPTION") && !upper.contains("WITH LOCAL CHECK OPTION"),
+        "plain view definition must not carry a WITH CHECK OPTION suffix: {definition:?}"
+    );
+    assert!(
+        !definition.is_empty(),
+        "definition must be non-empty for a privileged role"
+    );
+}
+
+#[tokio::test]
+async fn test_list_views_detailed_combined_with_search_filters_before_metadata() {
+    let handler = handler(true);
+    let entries = detailed_view_entries(&handler, "active").await;
+    assert!(!entries.is_empty(), "search=active must match seeded views");
+    for (name, value) in &entries {
+        assert!(
+            name.to_lowercase().contains("active"),
+            "non-matching key returned: {name}"
+        );
+        // Each entry is fully detailed.
+        assert!(
+            value.get("schema").is_some() && value.get("definition").is_some(),
+            "entry must carry detailed fields, got {value:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_list_views_detailed_round_trips_body_with_subquery() {
+    let handler = handler(true);
+    let entries = detailed_view_entries(&handler, "user_metrics_cte").await;
+    let entry = entries.get("user_metrics_cte").expect("user_metrics_cte present");
+    let definition = entry
+        .get("definition")
+        .and_then(Value::as_str)
+        .expect("definition string");
+    // Engine canonicalises CTE to subquery form; assert the subquery survives
+    // round-trip without truncation or trimming.
+    assert!(
+        definition.to_lowercase().contains("select"),
+        "subquery body must round-trip, got {definition:?}"
+    );
+    assert!(
+        definition.to_lowercase().contains("post_count") || definition.to_lowercase().contains("count("),
+        "subquery body must mention post_count or count(...), got {definition:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_list_views_detailed_session_context_fields_populated() {
+    let handler = handler(true);
+    let entries = detailed_view_entries(&handler, "active").await;
+    assert!(!entries.is_empty(), "seeded views must be present");
+    for (name, value) in &entries {
+        let charset = value
+            .get("characterSetClient")
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("characterSetClient missing for {name}: {value:?}"));
+        assert!(
+            !charset.is_empty(),
+            "characterSetClient must be non-empty for {name}: {value:?}"
+        );
+        let collation = value
+            .get("collationConnection")
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("collationConnection missing for {name}: {value:?}"));
+        assert!(
+            !collation.is_empty(),
+            "collationConnection must be non-empty for {name}: {value:?}"
+        );
+    }
 }
