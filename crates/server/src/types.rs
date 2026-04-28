@@ -251,18 +251,6 @@ impl ListFunctionsResponse {
     }
 }
 
-/// Request for the `listProcedures` tool.
-#[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ListProceduresRequest {
-    /// Database to list procedures from. Defaults to the active database.
-    #[serde(default)]
-    pub database: Option<String>,
-    /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
-    #[serde(default)]
-    pub cursor: Option<Cursor>,
-}
-
 /// Response for the `listProcedures` tool.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

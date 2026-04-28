@@ -226,14 +226,14 @@ See [Cursor Pagination](https://dbmcp.haymon.ai/docs/features#cursor-pagination)
 
 ### listProcedures
 
-Lists user-defined stored procedures, paginated via `cursor` / `nextCursor`. Available on MySQL/MariaDB and PostgreSQL (`public` schema, PostgreSQL 11+). Not available for SQLite. Parameters: `database`, `cursor`; PostgreSQL additionally accepts `search` and `detailed`.
+Lists user-defined stored procedures, paginated via `cursor` / `nextCursor`. Available on MySQL/MariaDB and PostgreSQL (`public` schema, PostgreSQL 11+). Not available for SQLite. Parameters: `database` (defaults to the active database), `cursor`, `search`, `detailed`.
 
-`search` (PostgreSQL only) is an optional case-insensitive `ILIKE` pattern with `%` and `_` as wildcards. The `search` value must remain identical across paginated calls for cursor continuity.
+`search` is an optional case-insensitive `LIKE`/`ILIKE` pattern with `%` (any sequence) and `_` (single character) as wildcards. The `search` value must remain identical across paginated calls for cursor continuity.
 
-`detailed` (PostgreSQL only, default `false`) switches the response shape:
+`detailed` (default `false`) switches the response shape:
 
-- **Brief** (default) — `procedures` is a sorted JSON array of bare procedure-name strings. Overloaded procedures appear once per overload (duplicate name strings are expected).
-- **Detailed** (`detailed: true`) — `procedures` is a JSON object keyed by procedure signature `name(arguments)` (overloads disambiguate; zero-arg procedures key as `name()`). Each value carries `schema`, `name`, `language`, `arguments`, `security`, `owner`, `description`, and `definition`. Detailed mode deliberately omits the `listFunctions`-only fields `returnType`, `volatility`, `strict`, and `parallelSafety` — they are not meaningful for procedures. See the [`listProcedures` reference](https://dbmcp.haymon.ai/docs/features#listprocedures) for the full field list.
+- **Brief** (default) — `procedures` is a sorted JSON array of bare procedure-name strings. PostgreSQL overloads appear once per overload (duplicate name strings are expected).
+- **Detailed** (`detailed: true`) — `procedures` is a JSON object keyed by procedure signature; each value carries the per-backend metadata payload (language, arguments, security, definition, and backend-specific extras such as PostgreSQL `owner` or MySQL/MariaDB `deterministic`/`sqlDataAccess`/session-context fields). PostgreSQL keys are `name(arguments)` (overloads disambiguate; zero-arg procedures key as `name()`); MySQL/MariaDB keys are bare names (no overloading). See the [`listProcedures` reference](https://dbmcp.haymon.ai/docs/features#listprocedures) for the full per-backend field list.
 
 See [Cursor Pagination](https://dbmcp.haymon.ai/docs/features#cursor-pagination) for iteration details.
 
