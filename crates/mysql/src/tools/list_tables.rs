@@ -1,6 +1,7 @@
 //! MCP tool: `listTables`.
 
 use std::borrow::Cow;
+use std::sync::LazyLock;
 
 use dbmcp_server::pagination::Pager;
 use dbmcp_sql::Connection as _;
@@ -9,6 +10,7 @@ use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
 use rmcp::model::{ErrorData, ToolAnnotations};
 
 use crate::MysqlHandler;
+use crate::tools::definer_sql::definer_canonical_sql;
 use crate::types::{ListTablesRequest, ListTablesResponse};
 
 /// Brief-mode SQL: `information_schema.TABLES` filtered to `BASE TABLE` rows.
@@ -43,7 +45,10 @@ const BRIEF_SQL: &str = r"
 /// `DEFINER` column stores `user@host` unquoted and `user` may itself
 /// contain `@` (e.g. `'foo@bar'@'localhost'`), so the host is the
 /// segment after the **last** `@` and the user is everything before it.
-const DETAILED_SQL: &str = r#"
+static DETAILED_SQL: LazyLock<String> = LazyLock::new(|| {
+    let definer = definer_canonical_sql("tr.DEFINER");
+    format!(
+        r#"
 WITH table_info AS (
     SELECT
         t.TABLE_SCHEMA AS table_schema,
@@ -194,11 +199,7 @@ triggers_info AS (
         tr.EVENT_OBJECT_TABLE  AS TABLE_NAME,
         tr.TRIGGER_NAME        AS trigger_name,
         CONCAT(
-            'CREATE DEFINER=`',
-            REPLACE(LEFT(tr.DEFINER, LENGTH(tr.DEFINER) - LENGTH(SUBSTRING_INDEX(tr.DEFINER, '@', -1)) - 1), '`', '``'),
-            '`@`',
-            REPLACE(SUBSTRING_INDEX(tr.DEFINER, '@', -1), '`', '``'),
-            '`',
+            {definer},
             ' TRIGGER ', '`', REPLACE(tr.TRIGGER_NAME, '`', '``'), '`',
             ' ', tr.ACTION_TIMING, ' ', tr.EVENT_MANIPULATION,
             ' ON ',
@@ -286,7 +287,9 @@ FROM table_info ti
 LEFT JOIN partitions_info pi
   ON pi.TABLE_SCHEMA = ti.table_schema
  AND pi.TABLE_NAME   = ti.table_name
-ORDER BY ti.table_name"#;
+ORDER BY ti.table_name"#
+    )
+});
 
 /// Marker type for the `listTables` MCP tool.
 pub(crate) struct ListTablesTool;
@@ -392,7 +395,7 @@ impl MysqlHandler {
             let rows: Vec<(String, sqlx::types::Json<serde_json::Value>)> = self
                 .connection
                 .fetch(
-                    sqlx::query(DETAILED_SQL)
+                    sqlx::query(DETAILED_SQL.as_str())
                         .bind(database)
                         .bind(pattern)
                         .bind(pattern)

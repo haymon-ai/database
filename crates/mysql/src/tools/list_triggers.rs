@@ -1,6 +1,7 @@
 //! MCP tool: `listTriggers`.
 
 use std::borrow::Cow;
+use std::sync::LazyLock;
 
 use dbmcp_server::pagination::Pager;
 use dbmcp_server::types::{ListTriggersRequest, ListTriggersResponse};
@@ -10,6 +11,7 @@ use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
 use rmcp::model::{ErrorData, ToolAnnotations};
 
 use crate::MysqlHandler;
+use crate::tools::definer_sql::definer_canonical_sql;
 
 /// Marker type for the `listTriggers` MCP tool.
 pub(crate) struct ListTriggersTool;
@@ -112,7 +114,10 @@ const BRIEF_SQL: &str = r"
 /// `activationLevel` is always `ROW`. `ORDER BY TRIGGER_NAME` is sufficient —
 /// `(TRIGGER_SCHEMA, TRIGGER_NAME)` is the table's primary key, and the
 /// `WHERE` clause already pins `TRIGGER_SCHEMA`.
-const DETAILED_SQL: &str = r"
+static DETAILED_SQL: LazyLock<String> = LazyLock::new(|| {
+    let definer = definer_canonical_sql("DEFINER");
+    format!(
+        r"
     SELECT
         CAST(TRIGGER_NAME AS CHAR) AS name,
         JSON_OBJECT(
@@ -122,11 +127,7 @@ const DETAILED_SQL: &str = r"
             'events',              JSON_ARRAY(CAST(EVENT_MANIPULATION AS CHAR)),
             'activationLevel',     CAST(ACTION_ORIENTATION  AS CHAR),
             'definition',          CONCAT(
-                'CREATE DEFINER=`',
-                REPLACE(LEFT(DEFINER, LENGTH(DEFINER) - LENGTH(SUBSTRING_INDEX(DEFINER, '@', -1)) - 1), '`', '``'),
-                '`@`',
-                REPLACE(SUBSTRING_INDEX(DEFINER, '@', -1), '`', '``'),
-                '`',
+                {definer},
                 ' TRIGGER ',
                 '`', REPLACE(TRIGGER_NAME, '`', '``'), '`',
                 ' ', ACTION_TIMING, ' ', EVENT_MANIPULATION,
@@ -143,7 +144,9 @@ const DETAILED_SQL: &str = r"
     WHERE TRIGGER_SCHEMA = ?
       AND (? IS NULL OR LOWER(TRIGGER_NAME) LIKE LOWER(CONCAT('%', ?, '%')))
     ORDER BY TRIGGER_NAME
-    LIMIT ? OFFSET ?";
+    LIMIT ? OFFSET ?"
+    )
+});
 
 impl MysqlHandler {
     /// Lists one page of user-defined triggers, optionally filtered and/or detailed.
@@ -177,7 +180,7 @@ impl MysqlHandler {
             let rows: Vec<(String, sqlx::types::Json<serde_json::Value>)> = self
                 .connection
                 .fetch(
-                    sqlx::query(DETAILED_SQL)
+                    sqlx::query(DETAILED_SQL.as_str())
                         .bind(database)
                         .bind(pattern)
                         .bind(pattern)
