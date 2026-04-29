@@ -55,7 +55,7 @@ The matview name is the map key only — it is not repeated inside the value. De
 </what_it_returns>
 
 <pagination>
-Paginated. Pass the prior response's `nextCursor` as `cursor` to fetch the next page. The `search` filter must stay the same across pages for cursor continuity. Brief and detailed modes share the same `(matviewname, c.oid)` row order, so a client can switch `detailed` between pages without losing position.
+Paginated. Pass the prior response's `nextCursor` as `cursor` to fetch the next page. The `search` filter must stay the same across pages for cursor continuity. Brief and detailed modes share the same `matviewname` row order, so a client can switch `detailed` between pages without losing position.
 </pagination>"#;
 }
 
@@ -95,32 +95,30 @@ impl AsyncTool<PostgresHandler> for ListMaterializedViewsTool {
 
 /// Brief-mode SQL: `pg_matviews` scan with `ILIKE` filter on matview name.
 ///
-/// `pg_matviews` only contains rows whose `pg_class.relkind = 'm'`, and
+/// `pg_matviews` already filters to `pg_class.relkind = 'm'`, and
 /// `schemaname = 'public'` keeps system-schema matviews out. The
 /// `($1::text IS NULL OR ...)` trinary lets one statement cover both filtered
-/// and unfiltered cases. Joins to `pg_namespace` + `pg_class` give a stable
-/// `c.oid` tiebreaker for cursor continuity even though matview names are
-/// unique per schema (defence-in-depth — same shape as `listViews`).
+/// and unfiltered cases. Matview names are unique per schema (Postgres enforces
+/// this via `pg_class`'s unique index on `(relname, relnamespace)`), so
+/// `matviewname` alone is a stable sort key — no tiebreaker needed.
 const BRIEF_SQL: &str = r"
-    SELECT mv.matviewname
-    FROM pg_matviews mv
-    JOIN pg_namespace n ON n.nspname = mv.schemaname
-    JOIN pg_class     c ON c.relname = mv.matviewname AND c.relnamespace = n.oid AND c.relkind = 'm'
-    WHERE mv.schemaname = 'public'
-      AND ($1::text IS NULL OR mv.matviewname ILIKE '%' || $1 || '%')
-    ORDER BY mv.matviewname, c.oid
+    SELECT matviewname
+    FROM pg_matviews
+    WHERE schemaname = 'public'
+      AND ($1::text IS NULL OR matviewname ILIKE '%' || $1 || '%')
+    ORDER BY matviewname
     LIMIT $2 OFFSET $3";
 
 /// Detailed-mode SQL: per-matview `json_build_object` projection.
 ///
-/// `pg_matviews` excludes regular views. The `pg_namespace` + `pg_class`
-/// joins anchor the relation OID needed by `obj_description` and add the
-/// `c.relkind = 'm'` defence-in-depth filter. Postgres defers SELECT-list
-/// evaluation past `LIMIT`, so `obj_description` only runs for the page's
-/// rows — never the full schema. `pg_matviews.matviewowner` is already a
-/// role name, so no `pg_roles` join is needed. `populated` and `indexed`
-/// are projected directly from `pg_matviews.ispopulated` /
-/// `pg_matviews.hasindexes`.
+/// `pg_matviews` already filters to `relkind = 'm'`. The `pg_namespace` +
+/// `pg_class` joins anchor the relation OID needed by `obj_description`.
+/// Postgres defers SELECT-list evaluation past `LIMIT`, so `obj_description`
+/// only runs for the page's rows — never the full schema.
+/// `pg_matviews.matviewowner` is already a role name, so no `pg_roles` join is
+/// needed. `populated` and `indexed` are projected directly from
+/// `pg_matviews.ispopulated` / `pg_matviews.hasindexes`. Matview names are
+/// unique per schema, so `matviewname` alone is a stable sort key.
 const DETAILED_SQL: &str = r"
     SELECT
         mv.matviewname AS name,
@@ -134,10 +132,10 @@ const DETAILED_SQL: &str = r"
         ) AS entry
     FROM pg_matviews mv
     JOIN pg_namespace n ON n.nspname = mv.schemaname
-    JOIN pg_class     c ON c.relname = mv.matviewname AND c.relnamespace = n.oid AND c.relkind = 'm'
+    JOIN pg_class     c ON c.relname = mv.matviewname AND c.relnamespace = n.oid
     WHERE mv.schemaname = 'public'
       AND ($1::text IS NULL OR mv.matviewname ILIKE '%' || $1 || '%')
-    ORDER BY mv.matviewname, c.oid
+    ORDER BY mv.matviewname
     LIMIT $2 OFFSET $3";
 
 impl PostgresHandler {
