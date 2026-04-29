@@ -248,7 +248,11 @@ See [Cursor Pagination](https://dbmcp.haymon.ai/docs/features#cursor-pagination)
 
 ### listMaterializedViews
 
-Lists materialized views in the `public` schema, paginated via `cursor` / `nextCursor`. PostgreSQL only — not available for MySQL/MariaDB or SQLite. Parameters: `database`, `cursor`. See [Cursor Pagination](https://dbmcp.haymon.ai/docs/features#cursor-pagination) for iteration details.
+Lists materialized views in the `public` schema, paginated via `cursor` / `nextCursor`. PostgreSQL only — not available for MySQL/MariaDB or SQLite. Parameters: `database`, `cursor`, `search`, `detailed`.
+
+- **Brief** (default) — `materializedViews` is a sorted JSON array of bare matview-name strings. Wire shape unchanged from earlier releases.
+- **Search** (`search: "..."`) — case-insensitive `ILIKE` substring match on matview name. `%` and `_` carry their standard `ILIKE` wildcard meaning; backslash is not an escape character. SQL meta-characters (`'`, `;`, `--`) are bound as parameter values and never interpolated.
+- **Detailed** (`detailed: true`) — `materializedViews` is a JSON object keyed by bare matview name; each value carries `schema`, `owner`, `description` (or `null` when no `COMMENT ON MATERIALIZED VIEW`), `definition` (the SELECT body verbatim from `pg_matviews.definition`), `populated` (`false` for matviews created `WITH NO DATA` and never refreshed), and `indexed` (`true` when at least one index exists; `REFRESH MATERIALIZED VIEW CONCURRENTLY` additionally requires a unique index). Detailed mode deliberately omits column metadata, `tablespace`, storage parameters, and unique-index detection — recoverable via `definition`, `listTables(detailed=true)`, or `readQuery` against `pg_indexes`. See the [`listMaterializedViews` reference](https://dbmcp.haymon.ai/docs/features#listmaterializedviews) for source columns and operational semantics.
 
 ### readQuery
 
