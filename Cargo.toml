@@ -24,6 +24,7 @@ repository = "https://github.com/haymon-ai/dbmcp"
 # Internal workspace crates
 dbmcp-config = { path = "crates/config", version = "0.9.1" }
 dbmcp-mysql = { path = "crates/mysql", version = "0.9.1" }
+dbmcp-pii = { path = "crates/pii", version = "0.9.1" }
 dbmcp-postgres = { path = "crates/postgres", version = "0.9.1" }
 dbmcp-server = { path = "crates/server", version = "0.9.1" }
 dbmcp-sql = { path = "crates/sql", version = "0.9.1" }
@@ -34,9 +35,13 @@ sqlx-json = { path = "crates/sqlx-json", version = "0.9.1" }
 axum = "0.8"
 base64 = "0.22"
 clap = { version = "4", features = ["derive", "env"] }
+fancy-regex = "0.13"
+hmac = "0.12"
 indexmap = { version = "2", features = ["serde"] }
 mimalloc = "0.1"
 moka = { version = "0.12", features = ["future"] }
+regex = "1"
+sha2 = "0.10"
 rmcp = { version = "1.6", features = [
     "macros",
     "server",
@@ -58,6 +63,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Dev/test dependencies
 insta = { version = "1", features = ["json", "redactions"] }
+proptest = "1"
 
 [workspace.lints.rust]
 ambiguous_negative_literals = "warn"
