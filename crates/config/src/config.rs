@@ -3,6 +3,7 @@
 //! Configuration is organized into sections:
 //! - [`DatabaseConfig`] — database connection and behavior settings
 //! - [`HttpConfig`] — HTTP transport binding and security settings
+//! - [`PiiConfig`] — PII redaction enable flag and operator selection
 //!
 //! The top-level [`Config`] composes these sections. Database connection is
 //! configured via individual variables (`DB_HOST`, `DB_PORT`, `DB_USER`,
@@ -39,6 +40,15 @@ pub enum ConfigError {
         value: u16,
         /// The inclusive upper bound (`DatabaseConfig::MAX_PAGE_SIZE`).
         max: u16,
+    },
+
+    /// `PII_OPERATOR` value is not one of the accepted choices.
+    #[error("PII_OPERATOR must be one of {accepted}, got '{value}'")]
+    InvalidPiiOperator {
+        /// The offending value.
+        value: String,
+        /// Comma-separated list of accepted operator names.
+        accepted: &'static str,
     },
 }
 
@@ -133,9 +143,6 @@ pub struct DatabaseConfig {
     /// Whether the server runs in read-only mode.
     pub read_only: bool,
 
-    /// Whether the server redacts PII from query tool response payloads.
-    pub redact_pii: bool,
-
     /// Maximum database connection pool size.
     pub max_pool_size: u32,
 
@@ -171,7 +178,6 @@ impl std::fmt::Debug for DatabaseConfig {
             .field("ssl_key", &self.ssl_key)
             .field("ssl_verify_cert", &self.ssl_verify_cert)
             .field("read_only", &self.read_only)
-            .field("redact_pii", &self.redact_pii)
             .field("max_pool_size", &self.max_pool_size)
             .field("connection_timeout", &self.connection_timeout)
             .field("query_timeout", &self.query_timeout)
@@ -191,8 +197,6 @@ impl DatabaseConfig {
     pub const DEFAULT_SSL_VERIFY_CERT: bool = true;
     /// Default read-only mode.
     pub const DEFAULT_READ_ONLY: bool = true;
-    /// Default PII redaction mode (off — opt-in only).
-    pub const DEFAULT_REDACT_PII: bool = false;
     /// Default connection pool size.
     pub const DEFAULT_MAX_POOL_SIZE: u32 = 5;
     /// Default idle timeout in seconds (10 minutes).
@@ -261,7 +265,6 @@ impl Default for DatabaseConfig {
             ssl_key: None,
             ssl_verify_cert: Self::DEFAULT_SSL_VERIFY_CERT,
             read_only: Self::DEFAULT_READ_ONLY,
-            redact_pii: Self::DEFAULT_REDACT_PII,
             max_pool_size: Self::DEFAULT_MAX_POOL_SIZE,
             connection_timeout: None,
             query_timeout: None,
@@ -325,13 +328,73 @@ impl HttpConfig {
     }
 }
 
+/// Supported PII redaction operators exposed on the CLI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum PiiOperator {
+    /// Replace each detected span with an entity-aware placeholder (default).
+    Replace,
+    /// Mask each detected span with `'*'` (length-preserving).
+    Mask,
+    /// Remove each detected span (replace with empty string).
+    Redact,
+    /// Replace each detected span with a stable hex digest (SHA-256).
+    Hash,
+}
+
+impl std::fmt::Display for PiiOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Replace => write!(f, "replace"),
+            Self::Mask => write!(f, "mask"),
+            Self::Redact => write!(f, "redact"),
+            Self::Hash => write!(f, "hash"),
+        }
+    }
+}
+
+/// PII redaction settings for query tool responses.
+#[derive(Clone, Debug)]
+pub struct PiiConfig {
+    /// Whether the server redacts PII from query tool response payloads.
+    pub enabled: bool,
+    /// Which built-in operator rewrites detected spans.
+    pub operator: PiiOperator,
+}
+
+impl PiiConfig {
+    /// Default PII redaction state (off — opt-in only).
+    pub const DEFAULT_ENABLED: bool = false;
+    /// Default PII operator when no override is supplied.
+    pub const DEFAULT_OPERATOR: PiiOperator = PiiOperator::Replace;
+
+    /// Validates the PII configuration and returns all errors found.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `Vec<ConfigError>` if any validation rules fail. Day-one
+    /// implementation always returns `Ok(())`; the slot exists so future
+    /// per-operator validation can land without changing the signature.
+    pub fn validate(&self) -> Result<(), Vec<ConfigError>> {
+        Ok(())
+    }
+}
+
+impl Default for PiiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: Self::DEFAULT_ENABLED,
+            operator: Self::DEFAULT_OPERATOR,
+        }
+    }
+}
+
 /// Runtime configuration for the MCP server.
 ///
-/// Composes [`DatabaseConfig`] with an optional [`HttpConfig`].
-/// HTTP config is present only when the HTTP transport is selected
-/// (via subcommand or `MCP_TRANSPORT` env var). Logging is configured
-/// directly from CLI arguments before `Config` is constructed, so it
-/// is not part of this struct.
+/// Composes [`DatabaseConfig`] with an optional [`HttpConfig`] and a
+/// [`PiiConfig`]. HTTP config is present only when the HTTP transport
+/// is selected (via subcommand or `MCP_TRANSPORT` env var); PII config
+/// is always present. Logging is configured directly from CLI arguments
+/// before `Config` is constructed, so it is not part of this struct.
 #[derive(Clone, Debug)]
 pub struct Config {
     /// Database connection and behavior settings.
@@ -339,6 +402,9 @@ pub struct Config {
 
     /// HTTP transport settings (present only when HTTP transport is active).
     pub http: Option<HttpConfig>,
+
+    /// PII redaction settings.
+    pub pii: PiiConfig,
 }
 
 #[cfg(test)]
@@ -358,6 +424,7 @@ mod tests {
         Config {
             database: db_config(backend),
             http: None,
+            pii: PiiConfig::default(),
         }
     }
 
@@ -634,25 +701,6 @@ mod tests {
     }
 
     #[test]
-    fn redact_pii_default_is_false() {
-        let config = DatabaseConfig::default();
-        assert!(!config.redact_pii, "redact_pii must default to false");
-    }
-
-    #[test]
-    fn debug_includes_redact_pii() {
-        let config = DatabaseConfig {
-            redact_pii: true,
-            ..mysql_config().database
-        };
-        let debug = format!("{config:?}");
-        assert!(
-            debug.contains("redact_pii: true"),
-            "expected redact_pii in debug output: {debug}"
-        );
-    }
-
-    #[test]
     fn debug_includes_query_timeout() {
         let config = Config {
             database: DatabaseConfig {
@@ -666,5 +714,58 @@ mod tests {
             debug.contains("query_timeout: Some(30)"),
             "expected query_timeout in debug output: {debug}"
         );
+    }
+
+    #[test]
+    fn pii_config_default_disabled() {
+        let pii = PiiConfig::default();
+        assert!(!pii.enabled, "PiiConfig::default().enabled must be false");
+    }
+
+    #[test]
+    fn pii_config_default_operator_is_replace() {
+        let pii = PiiConfig::default();
+        assert_eq!(pii.operator, PiiOperator::Replace);
+    }
+
+    #[test]
+    fn pii_operator_display_lowercase() {
+        assert_eq!(PiiOperator::Replace.to_string(), "replace");
+        assert_eq!(PiiOperator::Mask.to_string(), "mask");
+        assert_eq!(PiiOperator::Redact.to_string(), "redact");
+        assert_eq!(PiiOperator::Hash.to_string(), "hash");
+    }
+
+    #[test]
+    fn pii_config_validate_ok_when_disabled_with_any_operator() {
+        for operator in [
+            PiiOperator::Replace,
+            PiiOperator::Mask,
+            PiiOperator::Redact,
+            PiiOperator::Hash,
+        ] {
+            let pii = PiiConfig {
+                enabled: false,
+                operator,
+            };
+            assert!(pii.validate().is_ok(), "validate must accept disabled+{operator}");
+        }
+    }
+
+    #[test]
+    fn config_debug_includes_pii_section() {
+        let config = Config {
+            pii: PiiConfig {
+                enabled: true,
+                operator: PiiOperator::Mask,
+            },
+            ..mysql_config()
+        };
+        let debug = format!("{config:?}");
+        assert!(
+            debug.contains("pii: PiiConfig { enabled: true"),
+            "expected pii section in debug output: {debug}"
+        );
+        assert!(debug.contains("operator: Mask"), "expected operator in debug: {debug}");
     }
 }

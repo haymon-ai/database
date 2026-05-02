@@ -4,11 +4,11 @@
 //! Cursor, and other MCP clients that communicate via stdio.
 
 use clap::Parser;
-use dbmcp_config::DatabaseConfig;
+use dbmcp_config::{Config, ConfigError, DatabaseConfig, PiiConfig};
 use rmcp::ServiceExt;
 use tracing::{error, info};
 
-use crate::commands::common::{self, DatabaseArguments};
+use crate::commands::common::{self, DatabaseArguments, PiiArguments};
 use crate::error::Error;
 
 /// Runs the MCP server in stdio mode.
@@ -17,6 +17,37 @@ pub(crate) struct StdioCommand {
     /// Shared database connection flags.
     #[command(flatten)]
     db_arguments: DatabaseArguments,
+
+    /// Shared PII flags.
+    #[command(flatten)]
+    pii_arguments: PiiArguments,
+}
+
+impl TryFrom<&StdioCommand> for Config {
+    type Error = Vec<ConfigError>;
+
+    fn try_from(cmd: &StdioCommand) -> Result<Self, Self::Error> {
+        let mut errors: Vec<ConfigError> = Vec::new();
+        let database = match DatabaseConfig::try_from(&cmd.db_arguments) {
+            Ok(c) => Some(c),
+            Err(e) => {
+                errors.extend(e);
+                None
+            }
+        };
+        let pii = PiiConfig::from(&cmd.pii_arguments);
+        if let Err(e) = pii.validate() {
+            errors.extend(e);
+        }
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+        Ok(Self {
+            database: database.expect("database config present when no errors collected"),
+            http: None,
+            pii,
+        })
+    }
 }
 
 impl StdioCommand {
@@ -30,8 +61,8 @@ impl StdioCommand {
     /// transport fails to initialize, or the server encounters a fatal
     /// protocol error.
     pub(crate) async fn execute(&self) -> Result<(), Error> {
-        let db_config = DatabaseConfig::try_from(&self.db_arguments)?;
-        let server = common::create_server(&db_config);
+        let config = Config::try_from(self)?;
+        let server = common::create_server(&config);
 
         info!("Starting MCP server via stdio transport...");
         let transport = rmcp::transport::io::stdio();
@@ -46,7 +77,7 @@ impl StdioCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dbmcp_config::{ConfigError, DatabaseBackend};
+    use dbmcp_config::DatabaseBackend;
 
     #[track_caller]
     fn parse(args: &[&str]) -> StdioCommand {

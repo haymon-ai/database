@@ -5,7 +5,7 @@
 //! the underlying connection pools.
 
 use clap::{Args, Parser};
-use dbmcp_config::{ConfigError, DatabaseConfig, HttpConfig};
+use dbmcp_config::{Config, ConfigError, DatabaseConfig, HttpConfig, PiiConfig};
 use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
@@ -14,7 +14,7 @@ use tokio_util::sync::CancellationToken;
 use tower_http::cors::CorsLayer;
 use tracing::info;
 
-use crate::commands::common::{self, DatabaseArguments};
+use crate::commands::common::{self, DatabaseArguments, PiiArguments};
 use crate::error::Error;
 
 /// HTTP transport flags embedded in [`HttpCommand`].
@@ -85,6 +85,10 @@ impl TryFrom<&HttpArguments> for HttpConfig {
 
 /// Runs the MCP server in HTTP mode.
 #[derive(Debug, Parser)]
+#[allow(
+    clippy::struct_field_names,
+    reason = "_arguments postfix matches the clap argument-group convention used elsewhere"
+)]
 pub(crate) struct HttpCommand {
     /// Shared database connection flags.
     #[command(flatten)]
@@ -93,6 +97,44 @@ pub(crate) struct HttpCommand {
     /// HTTP transport flags.
     #[command(flatten)]
     http_arguments: HttpArguments,
+
+    /// Shared PII flags.
+    #[command(flatten)]
+    pii_arguments: PiiArguments,
+}
+
+impl TryFrom<&HttpCommand> for Config {
+    type Error = Vec<ConfigError>;
+
+    fn try_from(cmd: &HttpCommand) -> Result<Self, Self::Error> {
+        let mut errors: Vec<ConfigError> = Vec::new();
+        let database = match DatabaseConfig::try_from(&cmd.db_arguments) {
+            Ok(c) => Some(c),
+            Err(e) => {
+                errors.extend(e);
+                None
+            }
+        };
+        let http = match HttpConfig::try_from(&cmd.http_arguments) {
+            Ok(c) => Some(c),
+            Err(e) => {
+                errors.extend(e);
+                None
+            }
+        };
+        let pii = PiiConfig::from(&cmd.pii_arguments);
+        if let Err(e) = pii.validate() {
+            errors.extend(e);
+        }
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+        Ok(Self {
+            database: database.expect("database config present when no errors collected"),
+            http: Some(http.expect("http config present when no errors collected")),
+            pii,
+        })
+    }
 }
 
 impl HttpCommand {
@@ -109,13 +151,13 @@ impl HttpCommand {
     /// fails (port in use, permission denied), or the HTTP service
     /// fails to serve.
     pub(crate) async fn execute(&self) -> Result<(), Error> {
-        let db_config = DatabaseConfig::try_from(&self.db_arguments)?;
-        let http_config = HttpConfig::try_from(&self.http_arguments)?;
+        let config = Config::try_from(self)?;
+        let http_config = config.http.as_ref().expect("http config set by TryFrom impl");
 
-        let server = common::create_server(&db_config);
+        let server = common::create_server(&config);
         let cancel_token = CancellationToken::new();
 
-        let router = build_http_router(&http_config, server, &cancel_token);
+        let router = build_http_router(http_config, server, &cancel_token);
 
         let bind_addr = format!("{}:{}", http_config.host, http_config.port);
         info!("Starting MCP server via HTTP transport on {bind_addr}...");
@@ -247,7 +289,12 @@ mod tests {
             allowed_origins: origins,
             allowed_hosts: HttpConfig::default_allowed_hosts(),
         };
-        let server = common::create_server(&sqlite_memory_db_config());
+        let config = Config {
+            database: sqlite_memory_db_config(),
+            http: Some(http_config.clone()),
+            pii: PiiConfig::default(),
+        };
+        let server = common::create_server(&config);
         let cancel = CancellationToken::new();
         build_http_router(&http_config, server, &cancel)
     }
