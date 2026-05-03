@@ -16,21 +16,18 @@ use crate::error::Error;
 pub(crate) struct StdioCommand {
     /// Shared database connection flags.
     #[command(flatten)]
-    db_arguments: DatabaseArguments,
+    database: DatabaseArguments,
 
     /// Shared PII flags.
     #[command(flatten)]
-    pii_arguments: PiiArguments,
+    pii: PiiArguments,
 }
 
 impl TryFrom<&StdioCommand> for Config {
     type Error = ConfigErrors;
 
     fn try_from(cmd: &StdioCommand) -> Result<Self, Self::Error> {
-        match (
-            DatabaseConfig::try_from(&cmd.db_arguments),
-            PiiConfig::try_from(&cmd.pii_arguments),
-        ) {
+        match (DatabaseConfig::try_from(&cmd.database), PiiConfig::try_from(&cmd.pii)) {
             (Ok(database), Ok(pii)) => Ok(Self {
                 database,
                 http: None,
@@ -87,24 +84,24 @@ mod tests {
     #[test]
     fn db_read_only_defaults_to_true() {
         let cmd = parse(&["_"]);
-        assert!(cmd.db_arguments.read_only);
+        assert!(cmd.database.read_only);
     }
 
     #[test]
     fn db_query_timeout_zero_passes_through() {
         let cmd = parse(&["_", "--db-query-timeout", "0"]);
-        let config = DatabaseConfig::try_from(&cmd.db_arguments).expect("valid db args");
+        let config = DatabaseConfig::try_from(&cmd.database).expect("valid db args");
         assert_eq!(config.query_timeout, Some(0));
     }
 
     #[test]
     fn db_args_populate_database_config() {
         let cmd = parse(&["_", "--db-backend", "postgres", "--db-user", "pg", "--db-name", "app"]);
-        assert_eq!(cmd.db_arguments.backend, DatabaseBackend::Postgres);
-        assert_eq!(cmd.db_arguments.user.as_deref(), Some("pg"));
-        assert_eq!(cmd.db_arguments.name.as_deref(), Some("app"));
+        assert_eq!(cmd.database.backend, DatabaseBackend::Postgres);
+        assert_eq!(cmd.database.user.as_deref(), Some("pg"));
+        assert_eq!(cmd.database.name.as_deref(), Some("app"));
 
-        let config = DatabaseConfig::try_from(&cmd.db_arguments).expect("valid postgres args");
+        let config = DatabaseConfig::try_from(&cmd.database).expect("valid postgres args");
         assert_eq!(config.backend, DatabaseBackend::Postgres);
         assert_eq!(config.user, "pg");
         assert_eq!(config.name.as_deref(), Some("app"));
@@ -115,8 +112,7 @@ mod tests {
         // SQLite without --db-name must fail validation inside the TryFrom impl,
         // surfacing `ConfigError::MissingSqliteDbName` to the caller.
         let cmd = parse(&["_", "--db-backend", "sqlite"]);
-        let errors =
-            DatabaseConfig::try_from(&cmd.db_arguments).expect_err("sqlite without --db-name must be rejected");
+        let errors = DatabaseConfig::try_from(&cmd.database).expect_err("sqlite without --db-name must be rejected");
         assert!(errors.iter().any(|e| matches!(e, ConfigError::MissingSqliteDbName)));
     }
 

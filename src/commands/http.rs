@@ -85,22 +85,18 @@ impl TryFrom<&HttpArguments> for HttpConfig {
 
 /// Runs the MCP server in HTTP mode.
 #[derive(Debug, Parser)]
-#[allow(
-    clippy::struct_field_names,
-    reason = "_arguments postfix matches the clap argument-group convention used elsewhere"
-)]
 pub(crate) struct HttpCommand {
     /// Shared database connection flags.
     #[command(flatten)]
-    db_arguments: DatabaseArguments,
+    database: DatabaseArguments,
 
     /// HTTP transport flags.
     #[command(flatten)]
-    http_arguments: HttpArguments,
+    http: HttpArguments,
 
     /// Shared PII flags.
     #[command(flatten)]
-    pii_arguments: PiiArguments,
+    pii: PiiArguments,
 }
 
 impl TryFrom<&HttpCommand> for Config {
@@ -108,9 +104,9 @@ impl TryFrom<&HttpCommand> for Config {
 
     fn try_from(cmd: &HttpCommand) -> Result<Self, Self::Error> {
         match (
-            DatabaseConfig::try_from(&cmd.db_arguments),
-            HttpConfig::try_from(&cmd.http_arguments),
-            PiiConfig::try_from(&cmd.pii_arguments),
+            DatabaseConfig::try_from(&cmd.database),
+            HttpConfig::try_from(&cmd.http),
+            PiiConfig::try_from(&cmd.pii),
         ) {
             (Ok(database), Ok(http), Ok(pii)) => Ok(Self {
                 database,
