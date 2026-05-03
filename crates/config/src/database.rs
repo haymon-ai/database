@@ -392,14 +392,10 @@ mod tests {
             ..DatabaseConfig::default()
         };
         let errors = config.validate().expect_err("three missing files must fail");
-        let names: Vec<&str> = errors
-            .iter()
-            .filter_map(|e| match e {
-                ConfigError::SslCertNotFound(name, _) => Some(name.as_str()),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(names, vec!["DB_SSL_CA", "DB_SSL_CERT", "DB_SSL_KEY"]);
+        assert_eq!(errors.len(), 3);
+        assert!(matches!(&errors[0], ConfigError::SslCertNotFound(name, _) if name == "DB_SSL_CA"));
+        assert!(matches!(&errors[1], ConfigError::SslCertNotFound(name, _) if name == "DB_SSL_CERT"));
+        assert!(matches!(&errors[2], ConfigError::SslCertNotFound(name, _) if name == "DB_SSL_KEY"));
     }
 
     #[test]

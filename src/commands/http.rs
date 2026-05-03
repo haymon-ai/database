@@ -337,7 +337,7 @@ mod tests {
         let cmd = HttpCommand::try_parse_from(["_", "--db-backend", "sqlite"]).expect("clap parse");
         let errors = Config::try_from(&cmd).expect_err("sqlite without name must fail");
         assert_eq!(errors.len(), 1);
-        assert!(errors.iter().any(|e| matches!(e, ConfigError::MissingSqliteDbName)));
+        assert!(matches!(errors[0], ConfigError::MissingSqliteDbName));
     }
 
     #[test]

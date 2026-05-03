@@ -20,23 +20,20 @@ pub(crate) enum Error {
     Io(#[from] std::io::Error),
 
     /// Configuration validation failed with one or more errors.
-    #[error("{}", format_config_errors(.0))]
-    Config(ConfigErrors),
+    #[error("{}", BulletList(.0))]
+    Config(#[from] ConfigErrors),
 }
 
-impl From<ConfigErrors> for Error {
-    fn from(errors: ConfigErrors) -> Self {
-        Self::Config(errors)
-    }
-}
+struct BulletList<'a>(&'a ConfigErrors);
 
-fn format_config_errors(errors: &ConfigErrors) -> String {
-    let mut s = String::from("configuration validation failed:");
-    for error in errors.iter() {
-        s.push_str("\n  - ");
-        s.push_str(&error.to_string());
+impl std::fmt::Display for BulletList<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "configuration validation failed:")?;
+        for error in self.0.iter() {
+            write!(f, "\n  - {error}")?;
+        }
+        Ok(())
     }
-    s
 }
 
 #[cfg(test)]
@@ -60,7 +57,8 @@ mod tests {
 
     #[test]
     fn config_error_from_config_errors() {
-        let error: Error = ConfigErrors::single(ConfigError::MissingSqliteDbName).into();
+        let errors: ConfigErrors = ConfigError::MissingSqliteDbName.into();
+        let error: Error = errors.into();
         assert!(matches!(error, Error::Config(_)));
     }
 }

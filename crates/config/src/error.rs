@@ -30,15 +30,18 @@ pub enum ConfigError {
     EmptyHttpHost,
 }
 
-/// Non-empty collection of configuration errors, ordered database → http → pii.
+/// Non-empty collection of [`ConfigError`]s preserving insertion order.
 ///
 /// Externally observed wrappers always carry ≥ 1 error — [`Self::from_vec`]
-/// returns `None` for an empty input. Each transport's `TryFrom<&Command>
-/// for Config` impl owns its own multi-section accumulation and returns
-/// `Ok(value)` when nothing was collected, never an empty wrapper.
+/// returns `None` for an empty input, and [`From<ConfigError>`] yields a
+/// single-element wrapper. Each transport's `TryFrom<&Command> for Config`
+/// impl owns its own multi-section accumulation (database → http → pii) and
+/// returns `Ok(value)` when nothing was collected, never an empty wrapper.
 ///
-/// `Display` renders each contained [`ConfigError`] on its own line, joined
-/// with `\n`, in the order supplied — no header, no count, no trailing newline.
+/// Derefs to `&[ConfigError]` so callers can use slice methods directly
+/// (`iter`, `len`, indexing). `Display` renders each contained error on its
+/// own line, joined with `\n`, in stored order — no header, no count, no
+/// trailing newline.
 #[derive(Debug, thiserror::Error)]
 #[error("{}", ErrorList(&self.0))]
 pub struct ConfigErrors(Vec<ConfigError>);
@@ -58,44 +61,24 @@ impl std::fmt::Display for ErrorList<'_> {
 }
 
 impl ConfigErrors {
-    /// Wraps a single [`ConfigError`].
-    #[must_use]
-    pub fn single(err: ConfigError) -> Self {
-        Self(vec![err])
-    }
-
     /// Wraps a non-empty `Vec`. Returns `None` when `errors` is empty.
     #[must_use]
     pub fn from_vec(errors: Vec<ConfigError>) -> Option<Self> {
         if errors.is_empty() { None } else { Some(Self(errors)) }
     }
+}
 
-    /// Iterates contained errors in their stored order.
-    pub fn iter(&self) -> impl Iterator<Item = &ConfigError> + '_ {
-        self.0.iter()
-    }
+impl std::ops::Deref for ConfigErrors {
+    type Target = [ConfigError];
 
-    /// Returns the number of contained errors. Always ≥ 1 by construction.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Always `false` by construction — externally observed wrappers are non-empty.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    /// Appends every error from `other`, preserving order.
-    pub fn extend(&mut self, other: Self) {
-        self.0.extend(other.0);
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
 impl From<ConfigError> for ConfigErrors {
     fn from(err: ConfigError) -> Self {
-        Self::single(err)
+        Self(vec![err])
     }
 }
 
@@ -105,15 +88,6 @@ impl IntoIterator for ConfigErrors {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a ConfigErrors {
-    type Item = &'a ConfigError;
-    type IntoIter = std::slice::Iter<'a, ConfigError>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
     }
 }
 
@@ -129,10 +103,6 @@ mod tests {
         ConfigError::SslCertNotFound("DB_SSL_CA".into(), "/nope/ca.pem".into())
     }
 
-    fn missing_cert() -> ConfigError {
-        ConfigError::SslCertNotFound("DB_SSL_CERT".into(), "/nope/cert.pem".into())
-    }
-
     #[test]
     fn from_vec_empty_is_none() {
         assert!(ConfigErrors::from_vec(Vec::new()).is_none());
@@ -142,20 +112,19 @@ mod tests {
     fn from_vec_non_empty_preserves_order() {
         let errors = ConfigErrors::from_vec(vec![missing_name(), missing_ca()]).expect("non-empty");
         assert_eq!(errors.len(), 2);
-        let collected: Vec<_> = errors.iter().collect();
-        assert!(matches!(collected[0], ConfigError::MissingSqliteDbName));
-        assert!(matches!(collected[1], ConfigError::SslCertNotFound(_, _)));
+        assert!(matches!(errors[0], ConfigError::MissingSqliteDbName));
+        assert!(matches!(errors[1], ConfigError::SslCertNotFound(_, _)));
     }
 
     #[test]
-    fn single_yields_one_error() {
-        let errors = ConfigErrors::single(missing_name());
+    fn from_config_error_yields_single() {
+        let errors: ConfigErrors = missing_name().into();
         assert_eq!(errors.len(), 1);
     }
 
     #[test]
     fn display_n1_equals_inner_verbatim() {
-        let errors = ConfigErrors::single(missing_name());
+        let errors: ConfigErrors = missing_name().into();
         assert_eq!(errors.to_string(), missing_name().to_string());
         assert!(!errors.to_string().ends_with('\n'));
     }
@@ -173,42 +142,10 @@ mod tests {
     }
 
     #[test]
-    fn extend_appends_in_order() {
-        let mut a = ConfigErrors::single(missing_name());
-        let b = ConfigErrors::from_vec(vec![missing_ca(), missing_cert()]).expect("non-empty");
-        a.extend(b);
-        assert_eq!(a.len(), 3);
-        let collected: Vec<_> = a.iter().collect();
-        assert!(matches!(collected[0], ConfigError::MissingSqliteDbName));
-        assert!(matches!(
-            collected[1],
-            ConfigError::SslCertNotFound(name, _) if name == "DB_SSL_CA"
-        ));
-        assert!(matches!(
-            collected[2],
-            ConfigError::SslCertNotFound(name, _) if name == "DB_SSL_CERT"
-        ));
-    }
-
-    #[test]
     fn into_iterator_owned_yields_in_stored_order() {
         let errors = ConfigErrors::from_vec(vec![missing_name(), missing_ca()]).expect("non-empty");
         let collected: Vec<ConfigError> = errors.into_iter().collect();
         assert!(matches!(collected[0], ConfigError::MissingSqliteDbName));
         assert!(matches!(collected[1], ConfigError::SslCertNotFound(_, _)));
-    }
-
-    #[test]
-    fn into_iterator_borrowed_yields_in_stored_order() {
-        let errors = ConfigErrors::from_vec(vec![missing_name(), missing_ca()]).expect("non-empty");
-        let collected: Vec<&ConfigError> = (&errors).into_iter().collect();
-        assert!(matches!(collected[0], ConfigError::MissingSqliteDbName));
-        assert!(matches!(collected[1], ConfigError::SslCertNotFound(_, _)));
-    }
-
-    #[test]
-    fn from_config_error_yields_single() {
-        let errors: ConfigErrors = missing_name().into();
-        assert_eq!(errors.len(), 1);
     }
 }

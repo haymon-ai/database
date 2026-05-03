@@ -134,19 +134,10 @@ mod tests {
             "/nonexistent/key.pem",
         ]);
         let errors = Config::try_from(&cmd).expect_err("multi-section misconfig must fail");
-        let collected: Vec<&ConfigError> = errors.iter().collect();
-        assert!(matches!(collected[0], ConfigError::MissingSqliteDbName));
-        assert!(matches!(
-            collected[1],
-            ConfigError::SslCertNotFound(name, _) if name == "DB_SSL_CA"
-        ));
-        assert!(matches!(
-            collected[2],
-            ConfigError::SslCertNotFound(name, _) if name == "DB_SSL_CERT"
-        ));
-        assert!(matches!(
-            collected[3],
-            ConfigError::SslCertNotFound(name, _) if name == "DB_SSL_KEY"
-        ));
+        assert_eq!(errors.len(), 4);
+        assert!(matches!(errors[0], ConfigError::MissingSqliteDbName));
+        assert!(matches!(&errors[1], ConfigError::SslCertNotFound(name, _) if name == "DB_SSL_CA"));
+        assert!(matches!(&errors[2], ConfigError::SslCertNotFound(name, _) if name == "DB_SSL_CERT"));
+        assert!(matches!(&errors[3], ConfigError::SslCertNotFound(name, _) if name == "DB_SSL_KEY"));
     }
 }
