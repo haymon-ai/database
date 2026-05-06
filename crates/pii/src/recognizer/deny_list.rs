@@ -1,10 +1,10 @@
 //! Deny-list helper that compiles literal terms into a single recognizer.
 
 use crate::error::RecognizerError;
-use crate::pattern::Pattern;
+use crate::regex::Regex;
 use crate::score::Score;
 
-use super::{EntityType, PatternRecognizer};
+use super::{EntityType, Pattern};
 
 /// Build a recognizer that matches whole-word occurrences of the supplied `terms`.
 ///
@@ -25,7 +25,7 @@ pub fn deny_list_recognizer<S: AsRef<str>>(
     entity_type: EntityType,
     terms: &[S],
     score: Score,
-) -> Result<PatternRecognizer, RecognizerError> {
+) -> Result<Pattern, RecognizerError> {
     if terms.is_empty() {
         return Err(RecognizerError::EmptyPatternList);
     }
@@ -37,6 +37,6 @@ pub fn deny_list_recognizer<S: AsRef<str>>(
         regex_src.push_str(&regex::escape(term.as_ref()));
     }
     regex_src.push_str(r")\b");
-    let pattern = Pattern::new("deny_list", regex_src, score).expect("escaped deny-list regex always compiles");
-    PatternRecognizer::new(entity_type, vec![pattern])
+    let pattern = Regex::new("deny_list", regex_src, score).expect("escaped deny-list regex always compiles");
+    Pattern::new(entity_type, vec![pattern])
 }

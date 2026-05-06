@@ -1,14 +1,14 @@
 //! CT-011 / AS US3-#1: custom recognizer registered at construction time
 //! appears in results from the very next analyze call.
 
-use dbmcp_pii::{AnalyzeOptions, Analyzer, EntityType, Pattern, PatternRecognizer, Score, entity};
+use dbmcp_pii::{AnalyzeOptions, Analyzer, EntityType, Pattern, Regex, Score, entity};
 
 #[test]
 fn employee_id_custom_recognizer() {
     let mut analyzer = Analyzer::with_defaults();
     let employee_id = EntityType::new("EMPLOYEE_ID".to_owned());
-    let pattern = Pattern::new("internal_id", r"\bE\d{6}\b", Score::new(0.8).unwrap()).unwrap();
-    let recognizer = PatternRecognizer::new(employee_id.clone(), vec![pattern]).unwrap();
+    let pattern = Regex::new("internal_id", r"\bE\d{6}\b", Score::new(0.8).unwrap()).unwrap();
+    let recognizer = Pattern::new(employee_id.clone(), vec![pattern]).unwrap();
     analyzer.register(Box::new(recognizer));
 
     let results = analyzer.analyze("see ticket from E123456 today", &AnalyzeOptions::default());
