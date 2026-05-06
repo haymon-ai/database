@@ -1,7 +1,5 @@
 //! `Hash` operator: SHA-256 / SHA-512 bare digest.
 
-use std::fmt::Write;
-
 use sha2::{Digest, Sha256, Sha512};
 
 use super::HashAlgorithm;
@@ -15,11 +13,13 @@ pub(crate) fn apply(candidate: &str, algorithm: HashAlgorithm) -> String {
 }
 
 fn to_hex(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        write!(out, "{b:02x}").expect("writing to a String is infallible");
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut out = vec![0u8; bytes.len() * 2];
+    for (i, &b) in bytes.iter().enumerate() {
+        out[i * 2] = HEX[(b >> 4) as usize];
+        out[i * 2 + 1] = HEX[(b & 0x0f) as usize];
     }
-    out
+    String::from_utf8(out).expect("hex digits are ASCII")
 }
 
 #[cfg(test)]

@@ -3,6 +3,9 @@
 use crate::recognizer::ValidationOutcome;
 
 /// PEM private-key block type validator: BEGIN-type MUST equal END-type.
+///
+/// The recognizer regex already enforces that the BEGIN/END labels end in
+/// `PRIVATE KEY`, so this validator only checks the labels match each other.
 pub(super) fn validate(candidate: &str) -> ValidationOutcome {
     let Some(begin_label) = candidate
         .split_once("-----BEGIN ")
@@ -18,5 +21,5 @@ pub(super) fn validate(candidate: &str) -> ValidationOutcome {
     else {
         return ValidationOutcome::Invalid;
     };
-    ValidationOutcome::from_bool(begin_label == end_label && begin_label.contains("PRIVATE KEY"))
+    ValidationOutcome::from_bool(begin_label == end_label)
 }

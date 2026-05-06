@@ -104,12 +104,6 @@ impl Redactor {
     /// Returns [`RedactionError::Internal`] when the analyzer pipeline
     /// panics at any depth; the request must be failed without
     /// returning any row.
-    ///
-    /// # Panics
-    ///
-    /// Does not panic in practice: the only `expect` call is on
-    /// `serde_json::to_string` of a `BTreeMap<String, u64>`, which is
-    /// infallible.
     pub fn apply(&self, rows: &mut [Value]) -> Result<RedactionStats, RedactionError> {
         let mut stats = RedactionStats::default();
         let result = catch_unwind(AssertUnwindSafe(|| {
@@ -128,7 +122,11 @@ impl Redactor {
                         }
                         for op in &anon.operations {
                             stats.total += 1;
-                            *stats.by_entity.entry(op.entity_type.as_str().to_owned()).or_default() += 1;
+                            if let Some(v) = stats.by_entity.get_mut(op.entity_type.as_str()) {
+                                *v += 1;
+                            } else {
+                                stats.by_entity.insert(op.entity_type.as_str().to_owned(), 1);
+                            }
                         }
                         *s = anon.text;
                     }
@@ -142,11 +140,10 @@ impl Redactor {
         result.map_err(|_| RedactionError::Internal("analyzer panicked".into()))?;
 
         if stats.total > 0 {
-            let by_entity = serde_json::to_string(&stats.by_entity).expect("BTreeMap of String/u64 always serialises");
             tracing::info!(
                 target: "dbmcp::pii",
                 redactions = stats.total,
-                by_entity = %by_entity,
+                by_entity = ?stats.by_entity,
                 rows = rows.len(),
                 string_leaves_scanned = stats.string_leaves_scanned,
                 "pii.redacted"
