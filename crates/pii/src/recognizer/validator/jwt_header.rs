@@ -1,6 +1,7 @@
 //! JWT header structural validator (signature NOT verified).
 
 use base64::Engine;
+use serde::Deserialize;
 
 use crate::recognizer::{ValidationOutcome, Validator};
 
@@ -12,6 +13,11 @@ use crate::recognizer::{ValidationOutcome, Validator};
 #[derive(Debug, Default, Clone, Copy)]
 pub struct JwtHeaderValidator;
 
+#[derive(Deserialize)]
+struct Header {
+    alg: Option<String>,
+}
+
 impl Validator for JwtHeaderValidator {
     fn validate(&self, candidate: &str) -> ValidationOutcome {
         let mut parts = candidate.split('.');
@@ -21,9 +27,9 @@ impl Validator for JwtHeaderValidator {
         let Ok(decoded) = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(header) else {
             return ValidationOutcome::Invalid;
         };
-        let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) else {
+        let Ok(parsed) = serde_json::from_slice::<Header>(&decoded) else {
             return ValidationOutcome::Invalid;
         };
-        ValidationOutcome::from_bool(matches!(json.get("alg"), Some(serde_json::Value::String(_))))
+        ValidationOutcome::from_bool(parsed.alg.is_some())
     }
 }

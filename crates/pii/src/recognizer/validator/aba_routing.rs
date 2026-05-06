@@ -1,6 +1,6 @@
 //! US ABA routing-number checksum validator.
 
-use super::us_ssn::collect_digits;
+use super::digits::collect_digits;
 use crate::recognizer::{ValidationOutcome, Validator};
 
 /// US ABA routing-number checksum.

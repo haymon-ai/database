@@ -24,8 +24,10 @@ const AWS_SECRET_KEYWORDS: &[&str] = &["secret", "aws_secret_access_key", "aws_s
 pub fn api_key_strong() -> Pattern {
     let s = Score::from_static(0.6);
     let patterns = vec![
-        Regex::new("AWS access", r"\bAKIA[0-9A-Z]{16}\b", s).expect("AWS access compiles"),
-        Regex::new("GitHub PAT", r"\bgh[pousr]_[A-Za-z0-9]{36,}\b", s).expect("GitHub PAT compiles"),
+        // AWS access keys are 20 chars: 4-char prefix + 16-char base32 body (A–Z, 2–7).
+        Regex::new("AWS access", r"\bAKIA[A-Z2-7]{16}\b", s).expect("AWS access compiles"),
+        // GitHub legacy tokens are exactly 36 alnum chars; an unbounded `{36,}` is a known FP source.
+        Regex::new("GitHub PAT", r"\bgh[pousr]_[A-Za-z0-9]{36}\b", s).expect("GitHub PAT compiles"),
         Regex::new("Stripe live", r"\b(?:sk|pk)_live_[A-Za-z0-9]{24,}\b", s).expect("Stripe compiles"),
         Regex::new("Google API", r"\bAIza[0-9A-Za-z_\-]{35}\b", s).expect("Google API compiles"),
         Regex::new("OpenAI", r"\bsk-[A-Za-z0-9]{48}\b", s).expect("OpenAI compiles"),
@@ -143,5 +145,19 @@ mod tests {
         let body: String = std::iter::repeat_n('C', 40).collect();
         assert!(matches_strong(&body).is_empty());
         assert!(matches_secret(&body).is_empty());
+    }
+
+    #[test]
+    fn negative_aws_access_with_non_base32_digit() {
+        // AWS access keys are base32 (A-Z, 2-7). `0`, `1`, `8`, `9` MUST NOT match.
+        assert!(matches_strong("AKIA0OSFODNN7EXAMPLE").is_empty());
+        assert!(matches_strong("AKIAIOSFODNN8EXAMPLE").is_empty());
+    }
+
+    #[test]
+    fn negative_github_pat_oversized() {
+        // Legacy GitHub tokens are exactly 36 alnum chars; 37+ MUST NOT match.
+        let body: String = std::iter::repeat_n('a', 37).collect();
+        assert!(matches_strong(&format!("GH_TOKEN=ghp_{body}")).is_empty());
     }
 }

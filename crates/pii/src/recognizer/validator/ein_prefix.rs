@@ -1,6 +1,6 @@
 //! US EIN (employer ID) prefix validator.
 
-use super::us_ssn::collect_digits;
+use super::digits::collect_digits;
 use crate::recognizer::{ValidationOutcome, Validator};
 
 /// US EIN (employer ID) prefix validator.
@@ -10,6 +10,7 @@ use crate::recognizer::{ValidationOutcome, Validator};
 #[derive(Debug, Default, Clone, Copy)]
 pub struct EinPrefixValidator;
 
+/// IRS-published valid EIN prefixes, sorted ascending for binary search.
 const EIN_VALID_PREFIXES: &[u32] = &[
     1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 15, 16, 20, 21, 22, 23, 24, 25, 26, 27, 30, 31, 32, 33, 34, 35, 36, 37, 38,
     39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68,
@@ -22,6 +23,6 @@ impl Validator for EinPrefixValidator {
             return ValidationOutcome::Invalid;
         };
         let prefix = d[0] * 10 + d[1];
-        ValidationOutcome::from_bool(EIN_VALID_PREFIXES.contains(&prefix))
+        ValidationOutcome::from_bool(EIN_VALID_PREFIXES.binary_search(&prefix).is_ok())
     }
 }

@@ -2,6 +2,7 @@
 
 mod aba_routing;
 mod and;
+mod digits;
 mod ein_prefix;
 mod iban;
 mod ip;

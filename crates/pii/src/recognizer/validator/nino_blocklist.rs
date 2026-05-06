@@ -1,41 +1,44 @@
 //! UK NINO prefix blocklist validator.
 
+use super::digits::collect_upper_alnum;
 use crate::recognizer::{ValidationOutcome, Validator};
 
 /// UK NINO blocklist validator.
 ///
-/// Rejects the closed prefix set `{BG, GB, KN, NK, NT, TN, ZZ}` plus any
-/// prefix whose second character is `O`. Suffix letter (when present) must be
-/// in `{A, B, C, D}`.
+/// Per HMRC rules: first letter MUST NOT be in `{D, F, I, Q, U, V}`; second
+/// letter MUST NOT be in `{D, F, I, O, Q, U, V}`; full prefix MUST NOT be in
+/// `{BG, GB, KN, NK, NT, TN, ZZ}`; suffix letter (when present) MUST be in
+/// `{A, B, C, D}`.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct NinoBlocklistValidator;
 
-const NINO_BLOCKED_PREFIXES: &[&str] = &["BG", "GB", "KN", "NK", "NT", "TN", "ZZ"];
+const NINO_BLOCKED_PREFIXES: &[[u8; 2]] = &[*b"BG", *b"GB", *b"KN", *b"NK", *b"NT", *b"TN", *b"ZZ"];
+
+const fn first_letter_disallowed(b: u8) -> bool {
+    matches!(b, b'D' | b'F' | b'I' | b'Q' | b'U' | b'V')
+}
+
+const fn second_letter_disallowed(b: u8) -> bool {
+    matches!(b, b'D' | b'F' | b'I' | b'O' | b'Q' | b'U' | b'V')
+}
 
 impl Validator for NinoBlocklistValidator {
     fn validate(&self, candidate: &str) -> ValidationOutcome {
-        // NINO is 8 or 9 chars after stripping `-`/` `; stack-buffer the cleaned form.
-        let mut buf = [0u8; 9];
-        let mut len = 0usize;
-        for &b in candidate.as_bytes() {
-            if !b.is_ascii_alphanumeric() {
-                continue;
-            }
-            if len == buf.len() {
-                return ValidationOutcome::Invalid;
-            }
-            buf[len] = b.to_ascii_uppercase();
-            len += 1;
-        }
+        let Some((buf, len)) = collect_upper_alnum::<9>(candidate) else {
+            return ValidationOutcome::Invalid;
+        };
         if len != 8 && len != 9 {
             return ValidationOutcome::Invalid;
         }
         let cleaned = &buf[..len];
-        if !cleaned[0].is_ascii_alphabetic() || !cleaned[1].is_ascii_alphabetic() || cleaned[1] == b'O' {
+        if !cleaned[0].is_ascii_alphabetic() || !cleaned[1].is_ascii_alphabetic() {
+            return ValidationOutcome::Invalid;
+        }
+        if first_letter_disallowed(cleaned[0]) || second_letter_disallowed(cleaned[1]) {
             return ValidationOutcome::Invalid;
         }
         let prefix = [cleaned[0], cleaned[1]];
-        if NINO_BLOCKED_PREFIXES.iter().any(|p| p.as_bytes() == prefix) {
+        if NINO_BLOCKED_PREFIXES.contains(&prefix) {
             return ValidationOutcome::Invalid;
         }
         if !cleaned[2..8].iter().all(u8::is_ascii_digit) {
@@ -45,5 +48,35 @@ impl Validator for NinoBlocklistValidator {
             return ValidationOutcome::Invalid;
         }
         ValidationOutcome::Valid
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NinoBlocklistValidator;
+    use crate::recognizer::{ValidationOutcome, Validator};
+
+    #[test]
+    fn rejects_disallowed_first_letter() {
+        for prefix in ["DA", "FA", "IA", "QA", "UA", "VA"] {
+            let candidate = format!("{prefix}123456C");
+            assert_eq!(
+                NinoBlocklistValidator.validate(&candidate),
+                ValidationOutcome::Invalid,
+                "{candidate}",
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_disallowed_second_letter() {
+        for prefix in ["AD", "AF", "AI", "AQ", "AU", "AV"] {
+            let candidate = format!("{prefix}123456C");
+            assert_eq!(
+                NinoBlocklistValidator.validate(&candidate),
+                ValidationOutcome::Invalid,
+                "{candidate}",
+            );
+        }
     }
 }

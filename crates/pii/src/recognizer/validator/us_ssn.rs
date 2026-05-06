@@ -1,5 +1,6 @@
 //! US SSN validator filtering reserved area, group, and serial values.
 
+use super::digits::collect_digits;
 use crate::recognizer::{ValidationOutcome, Validator};
 
 /// US Social Security Number validator. Rejects reserved area / group / serial values
@@ -18,24 +19,4 @@ impl Validator for UsSsnValidator {
         let valid = area != 0 && area != 666 && area < 900 && group != 0 && serial != 0;
         ValidationOutcome::from_bool(valid)
     }
-}
-
-/// Collect exactly `N` ASCII digits from `candidate`; returns `None` for any other count.
-///
-/// Iterates bytes (not chars) since every candidate that reaches a numeric
-/// validator is ASCII-only post-regex-match.
-pub(super) fn collect_digits<const N: usize>(candidate: &str) -> Option<[u32; N]> {
-    let mut out = [0u32; N];
-    let mut i = 0usize;
-    for &b in candidate.as_bytes() {
-        if !b.is_ascii_digit() {
-            continue;
-        }
-        if i == N {
-            return None;
-        }
-        out[i] = u32::from(b - b'0');
-        i += 1;
-    }
-    (i == N).then_some(out)
 }

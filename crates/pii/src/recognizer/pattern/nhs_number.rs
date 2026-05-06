@@ -45,6 +45,12 @@ mod tests {
     }
 
     #[test]
+    fn positive_remainder_ten_branch() {
+        // sum%11 == 10 → check = 1. Regression test for prior `10 => Invalid` bug.
+        assert_eq!(matches("NHS 0000000051"), vec!["0000000051"]);
+    }
+
+    #[test]
     fn negative_checksum_perturbations() {
         let bad = [
             "943 476 5910",
