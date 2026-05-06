@@ -53,7 +53,7 @@ impl ValidationOutcome {
     }
 }
 
-/// Optional checksum/parser hook attached to a [`super::Pattern`].
+/// Optional checksum/parser hook attached to a [`super::Rule`].
 pub trait Validator: Send + Sync {
     /// Validate the matched text and return the corresponding [`ValidationOutcome`].
     fn validate(&self, candidate: &str) -> ValidationOutcome;
@@ -84,7 +84,7 @@ pub trait Recognizer: Send + Sync {
     ///
     /// Default impl returns [`Category::Personal`] so external `Recognizer`
     /// impls keep compiling. Built-in recognizers override via
-    /// [`super::Pattern::with_category`].
+    /// [`super::Rule::with_category`].
     fn category(&self) -> Category {
         Category::Personal
     }

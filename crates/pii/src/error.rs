@@ -16,11 +16,11 @@ pub enum PatternError {
     },
 }
 
-/// Errors that surface when constructing a [`crate::Pattern`].
+/// Errors that surface when constructing a [`crate::Rule`].
 #[derive(Debug, Error)]
 pub enum RecognizerError {
-    /// Caller supplied no patterns.
-    #[error("recognizer requires at least one pattern")]
+    /// Caller supplied no regexes.
+    #[error("recognizer requires at least one regex")]
     EmptyPatternList,
 }
 

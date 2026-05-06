@@ -1,6 +1,6 @@
-//! Pattern-driven recognizer plus the built-in catalog shipped by default.
+//! Rule-driven recognizer plus the built-in catalog shipped by default.
 //!
-//! [`Pattern`] is the generic regex/checksum recognizer used by every built-in
+//! [`Rule`] is the generic regex/checksum recognizer used by every built-in
 //! entity type and by user-supplied custom recognizers. The submodules expose
 //! pre-configured constructors — eight v1 entries plus the catalog-expansion
 //! set — registered in deterministic order so overlap-resolution tie-breaks
@@ -68,40 +68,40 @@ pub use url::url;
 pub use us_ssn::us_ssn;
 pub use vat_number::vat_number;
 
-/// Pattern-driven recognizer used by every built-in entity type and by user-supplied custom recognizers.
-pub struct Pattern {
+/// Rule-driven recognizer used by every built-in entity type and by user-supplied custom recognizers.
+pub struct Rule {
     entity_type: EntityType,
     name: Cow<'static, str>,
-    patterns: Vec<Regex>,
+    regexes: Vec<Regex>,
     validator: Box<dyn Validator>,
     category: Category,
 }
 
-impl std::fmt::Debug for Pattern {
+impl std::fmt::Debug for Rule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Pattern")
+        f.debug_struct("Rule")
             .field("entity_type", &self.entity_type)
             .field("name", &self.name)
-            .field("patterns", &self.patterns)
+            .field("regexes", &self.regexes)
             .finish_non_exhaustive()
     }
 }
 
-impl Pattern {
+impl Rule {
     /// Build a recognizer for `entity_type`. Defaults: name `"<EntityType>Recognizer"`, no validator.
     ///
     /// # Errors
     ///
-    /// Returns [`RecognizerError::EmptyPatternList`] when `patterns` is empty.
-    pub fn new(entity_type: EntityType, patterns: Vec<Regex>) -> Result<Self, RecognizerError> {
-        if patterns.is_empty() {
+    /// Returns [`RecognizerError::EmptyPatternList`] when `regexes` is empty.
+    pub fn new(entity_type: EntityType, regexes: Vec<Regex>) -> Result<Self, RecognizerError> {
+        if regexes.is_empty() {
             return Err(RecognizerError::EmptyPatternList);
         }
         let name = Cow::Owned(format!("{}Recognizer", entity_type.as_str()));
         Ok(Self {
             entity_type,
             name,
-            patterns,
+            regexes,
             validator: Box::new(NoopValidator),
             category: Category::Personal,
         })
@@ -137,13 +137,13 @@ impl Pattern {
         self.category
     }
 
-    fn build_result(&self, pattern: &Regex, start: usize, end: usize, text: &str) -> Option<RecognizerResult> {
+    fn build_result(&self, regex: &Regex, start: usize, end: usize, text: &str) -> Option<RecognizerResult> {
         if start >= end || !text.is_char_boundary(start) || !text.is_char_boundary(end) {
             return None;
         }
         let candidate = &text[start..end];
         let validation = self.validator.validate_with_context(candidate, text, start..end);
-        let original_score = pattern.score();
+        let original_score = regex.score();
         let final_score = match validation {
             ValidationOutcome::Valid => MAX_SCORE,
             ValidationOutcome::Invalid => return None,
@@ -159,7 +159,7 @@ impl Pattern {
             score: final_score,
             explanation: AnalysisExplanation {
                 recognizer_name: self.name.clone(),
-                pattern_name: Some(pattern.name_cow()),
+                pattern_name: Some(regex.name_cow()),
                 original_score,
                 validation,
                 final_score,
@@ -168,7 +168,7 @@ impl Pattern {
     }
 }
 
-impl Recognizer for Pattern {
+impl Recognizer for Rule {
     fn name(&self) -> &str {
         &self.name
     }
@@ -178,13 +178,13 @@ impl Recognizer for Pattern {
     }
 
     fn analyze(&self, text: &str, _opts: &AnalyzeOptions) -> Vec<RecognizerResult> {
-        self.patterns
+        self.regexes
             .iter()
-            .flat_map(|pattern| {
-                pattern
+            .flat_map(|regex| {
+                regex
                     .compiled
                     .find_iter(text)
-                    .filter_map(move |m| self.build_result(pattern, m.start(), m.end(), text))
+                    .filter_map(move |m| self.build_result(regex, m.start(), m.end(), text))
             })
             .collect()
     }

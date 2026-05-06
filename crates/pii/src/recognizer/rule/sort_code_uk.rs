@@ -1,6 +1,6 @@
 //! `SORT_CODE_UK` recognizer (keyword-context required).
 
-use crate::recognizer::{Category, KeywordValidator, Pattern, entity};
+use crate::recognizer::{Category, KeywordValidator, Rule, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -12,14 +12,14 @@ const KEYWORDS: &[&str] = &["sort", "sortcode", "sort code"];
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn sort_code_uk() -> Pattern {
+pub fn sort_code_uk() -> Rule {
     let pattern = Regex::new(
         "UK sort code",
         r"\b\d{2}[- ]?\d{2}[- ]?\d{2}\b",
         Score::from_static(0.4),
     )
     .expect("static UK sort-code pattern compiles");
-    Pattern::new(entity::SORT_CODE_UK, vec![pattern])
+    Rule::new(entity::SORT_CODE_UK, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("SortCodeUkRecognizer")
         .with_validator(KeywordValidator::new(KEYWORDS))

@@ -36,7 +36,7 @@ pub use crate::anonymizer::{AnonymizedText, OperatorConfig, anonymize};
 pub use crate::error::{AnalyzerBuildError, OperatorError, PatternError, RecognizerError};
 pub use crate::operator::{ChunkCount, HashAlgorithm, Operator, OperatorKind};
 pub use crate::recognizer::{
-    AndValidator, Category, EntityType, KeywordValidator, ParseCategoryError, Pattern, Recognizer, ValidationOutcome,
+    AndValidator, Category, EntityType, KeywordValidator, ParseCategoryError, Recognizer, Rule, ValidationOutcome,
     Validator,
 };
 pub use crate::redact::{RedactionError, RedactionStats, Redactor};

@@ -1,6 +1,6 @@
 //! `VAT_NUMBER` recognizer (EU / UK / Northern Ireland VAT identifier).
 
-use crate::recognizer::{Category, Pattern, VatCountryLengthValidator, entity};
+use crate::recognizer::{Category, Rule, VatCountryLengthValidator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -10,14 +10,14 @@ use crate::score::Score;
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn vat_number() -> Pattern {
+pub fn vat_number() -> Rule {
     let pattern = Regex::new(
         "VAT (ISO2 + body)",
         r"\b[A-Z]{2}[A-Z0-9]{7,12}\b",
         Score::from_static(0.4),
     )
     .expect("static VAT pattern compiles");
-    Pattern::new(entity::VAT_NUMBER, vec![pattern])
+    Rule::new(entity::VAT_NUMBER, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("VatNumberRecognizer")
         .with_validator(VatCountryLengthValidator)

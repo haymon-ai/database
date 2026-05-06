@@ -1,6 +1,6 @@
 //! `PASSPORT_US` recognizer (keyword-context required).
 
-use crate::recognizer::{Category, KeywordValidator, Pattern, entity};
+use crate::recognizer::{Category, KeywordValidator, Rule, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -12,10 +12,10 @@ const KEYWORDS: &[&str] = &["passport", "travel document"];
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn passport_us() -> Pattern {
+pub fn passport_us() -> Rule {
     let pattern = Regex::new("US passport", r"(?i)\b[PE]\d{6,8}\b", Score::from_static(0.4))
         .expect("static US passport pattern compiles");
-    Pattern::new(entity::PASSPORT_US, vec![pattern])
+    Rule::new(entity::PASSPORT_US, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("PassportUsRecognizer")
         .with_validator(KeywordValidator::new(KEYWORDS))

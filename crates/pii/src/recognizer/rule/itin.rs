@@ -1,6 +1,6 @@
 //! `ITIN` recognizer (US Individual Taxpayer Identification Number).
 
-use crate::recognizer::{Category, ItinRangeValidator, Pattern, entity};
+use crate::recognizer::{Category, ItinRangeValidator, Rule, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -10,10 +10,10 @@ use crate::score::Score;
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn itin() -> Pattern {
+pub fn itin() -> Rule {
     let pattern = Regex::new("US ITIN", r"\b9\d{2}-?[789]\d-?\d{4}\b", Score::from_static(0.5))
         .expect("static ITIN pattern compiles");
-    Pattern::new(entity::ITIN, vec![pattern])
+    Rule::new(entity::ITIN, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("ItinRecognizer")
         .with_validator(ItinRangeValidator)

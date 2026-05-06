@@ -1,6 +1,6 @@
 //! Aggregate registry of the v1 built-in recognizers.
 
-use crate::recognizer::Pattern;
+use crate::recognizer::Rule;
 
 use super::{
     api_key_aws_secret, api_key_strong, bank_account_uk, credit_card, crypto, cvv, email, iban, ip_address, itin,
@@ -16,7 +16,7 @@ use super::{
 /// keyword-context recognizer that shares the `API_KEY` entity type but has a
 /// different validator profile).
 #[must_use]
-pub fn all() -> Vec<Pattern> {
+pub fn all() -> Vec<Rule> {
     vec![
         email(),
         credit_card(),

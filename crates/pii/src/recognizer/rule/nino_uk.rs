@@ -1,6 +1,6 @@
 //! `NINO_UK` recognizer (UK National Insurance Number with prefix blocklist).
 
-use crate::recognizer::{Category, NinoBlocklistValidator, Pattern, entity};
+use crate::recognizer::{Category, NinoBlocklistValidator, Rule, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -10,14 +10,14 @@ use crate::score::Score;
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn nino_uk() -> Pattern {
+pub fn nino_uk() -> Rule {
     let pattern = Regex::new(
         "UK NINO",
         r"(?i)\b[A-Z]{2}[ -]?\d{2}[ -]?\d{2}[ -]?\d{2}[ -]?[A-D]?\b",
         Score::from_static(0.4),
     )
     .expect("static NINO pattern compiles");
-    Pattern::new(entity::NINO_UK, vec![pattern])
+    Rule::new(entity::NINO_UK, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("NinoUkRecognizer")
         .with_validator(NinoBlocklistValidator)

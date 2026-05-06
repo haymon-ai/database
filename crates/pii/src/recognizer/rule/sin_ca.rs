@@ -1,6 +1,6 @@
 //! `SIN_CA` recognizer (Canadian Social Insurance Number, Luhn-validated).
 
-use crate::recognizer::{Category, LuhnSinValidator, Pattern, entity};
+use crate::recognizer::{Category, LuhnSinValidator, Rule, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -10,14 +10,14 @@ use crate::score::Score;
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn sin_ca() -> Pattern {
+pub fn sin_ca() -> Rule {
     let pattern = Regex::new(
         "Canadian SIN",
         r"\b\d{3}[- ]?\d{3}[- ]?\d{3}\b",
         Score::from_static(0.4),
     )
     .expect("static SIN_CA pattern compiles");
-    Pattern::new(entity::SIN_CA, vec![pattern])
+    Rule::new(entity::SIN_CA, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("SinCaRecognizer")
         .with_validator(LuhnSinValidator)

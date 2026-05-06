@@ -1,6 +1,6 @@
 //! `PRIVATE_KEY` recognizer (PEM-fenced block; BEGIN-type == END-type).
 
-use crate::recognizer::{Category, Pattern, PrivateKeyTypeValidator, entity};
+use crate::recognizer::{Category, PrivateKeyTypeValidator, Rule, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -10,14 +10,14 @@ use crate::score::Score;
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn private_key() -> Pattern {
+pub fn private_key() -> Rule {
     let pattern = Regex::new(
         "PEM private key block",
         r"(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----",
         Score::from_static(0.6),
     )
     .expect("static PEM pattern compiles");
-    Pattern::new(entity::PRIVATE_KEY, vec![pattern])
+    Rule::new(entity::PRIVATE_KEY, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("PrivateKeyRecognizer")
         .with_validator(PrivateKeyTypeValidator)

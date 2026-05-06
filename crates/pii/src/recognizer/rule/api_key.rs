@@ -5,11 +5,11 @@
 //! API, `OpenAI`. No generic high-entropy fallback. AWS secret needs a keyword
 //! context (the regex alone matches any 40-char base64 string).
 //!
-//! Two `Pattern`s ship from this module so the AWS-secret leg can
+//! Two `Rule`s ship from this module so the AWS-secret leg can
 //! attach a [`crate::KeywordValidator`] without forcing keyword
 //! requirements on the strongly-anchored providers.
 
-use crate::recognizer::{Category, KeywordValidator, Pattern, entity};
+use crate::recognizer::{Category, KeywordValidator, Rule, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -21,7 +21,7 @@ const AWS_SECRET_KEYWORDS: &[&str] = &["secret", "aws_secret_access_key", "aws_s
 ///
 /// Panics only if any bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn api_key_strong() -> Pattern {
+pub fn api_key_strong() -> Rule {
     let s = Score::from_static(0.6);
     let patterns = vec![
         // AWS access keys are 20 chars: 4-char prefix + 16-char base32 body (A–Z, 2–7).
@@ -32,7 +32,7 @@ pub fn api_key_strong() -> Pattern {
         Regex::new("Google API", r"\bAIza[0-9A-Za-z_\-]{35}\b", s).expect("Google API compiles"),
         Regex::new("OpenAI", r"\bsk-[A-Za-z0-9]{48}\b", s).expect("OpenAI compiles"),
     ];
-    Pattern::new(entity::API_KEY, patterns)
+    Rule::new(entity::API_KEY, patterns)
         .expect("non-empty pattern list")
         .with_name("ApiKeyRecognizer")
         .with_category(Category::DigitalIdentity)
@@ -48,10 +48,10 @@ pub fn api_key_strong() -> Pattern {
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn api_key_aws_secret() -> Pattern {
+pub fn api_key_aws_secret() -> Rule {
     let pattern = Regex::new("AWS secret", r"\b[A-Za-z0-9+/]{40}\b", Score::from_static(0.3))
         .expect("AWS secret pattern compiles");
-    Pattern::new(entity::API_KEY, vec![pattern])
+    Rule::new(entity::API_KEY, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("ApiKeyAwsSecretRecognizer")
         .with_validator(KeywordValidator::new(AWS_SECRET_KEYWORDS))

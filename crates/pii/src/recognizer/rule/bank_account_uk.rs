@@ -1,6 +1,6 @@
 //! `BANK_ACCOUNT_UK` recognizer (keyword-context required).
 
-use crate::recognizer::{Category, KeywordValidator, Pattern, entity};
+use crate::recognizer::{Category, KeywordValidator, Rule, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -12,14 +12,14 @@ const KEYWORDS: &[&str] = &["account", "acct", "sort", "bank", "iban"];
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn bank_account_uk() -> Pattern {
+pub fn bank_account_uk() -> Rule {
     let pattern = Regex::new(
         "UK bank account (8-10 digits)",
         r"\b\d{8,10}\b",
         Score::from_static(0.4),
     )
     .expect("static UK bank-account pattern compiles");
-    Pattern::new(entity::BANK_ACCOUNT_UK, vec![pattern])
+    Rule::new(entity::BANK_ACCOUNT_UK, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("BankAccountUkRecognizer")
         .with_validator(KeywordValidator::new(KEYWORDS))

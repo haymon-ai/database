@@ -1,6 +1,6 @@
 //! `NHS_NUMBER` recognizer (UK NHS patient identifier with mod-11 checksum).
 
-use crate::recognizer::{Category, Mod11NhsValidator, Pattern, entity};
+use crate::recognizer::{Category, Mod11NhsValidator, Rule, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -10,14 +10,14 @@ use crate::score::Score;
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn nhs_number() -> Pattern {
+pub fn nhs_number() -> Rule {
     let pattern = Regex::new(
         "UK NHS number",
         r"\b\d{3}[- ]?\d{3}[- ]?\d{4}\b",
         Score::from_static(0.4),
     )
     .expect("static NHS pattern compiles");
-    Pattern::new(entity::NHS_NUMBER, vec![pattern])
+    Rule::new(entity::NHS_NUMBER, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("NhsNumberRecognizer")
         .with_validator(Mod11NhsValidator)

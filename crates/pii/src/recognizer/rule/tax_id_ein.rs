@@ -1,6 +1,6 @@
 //! `TAX_ID_EIN` recognizer (US Employer Identification Number).
 
-use crate::recognizer::{Category, EinPrefixValidator, Pattern, entity};
+use crate::recognizer::{Category, EinPrefixValidator, Rule, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -10,10 +10,10 @@ use crate::score::Score;
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn tax_id_ein() -> Pattern {
+pub fn tax_id_ein() -> Rule {
     let pattern =
         Regex::new("US EIN", r"\b\d{2}-\d{7}\b", Score::from_static(0.5)).expect("static EIN pattern compiles");
-    Pattern::new(entity::TAX_ID_EIN, vec![pattern])
+    Rule::new(entity::TAX_ID_EIN, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("TaxIdEinRecognizer")
         .with_validator(EinPrefixValidator)

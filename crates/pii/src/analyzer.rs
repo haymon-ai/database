@@ -48,7 +48,7 @@ impl Analyzer {
     /// Build an analyzer pre-loaded with the default recognizer registry.
     #[must_use]
     pub fn with_defaults() -> Self {
-        let recognizers = crate::recognizer::pattern::all()
+        let recognizers = crate::recognizer::rule::all()
             .into_iter()
             .map(|r| Box::new(r) as Box<dyn Recognizer>)
             .collect();
@@ -171,7 +171,7 @@ impl Builder {
         }
 
         let cat_ok = |c: Category| effective_cats.as_ref().is_none_or(|cats| cats.contains(&c));
-        let kept: Vec<Box<dyn Recognizer>> = crate::recognizer::pattern::all()
+        let kept: Vec<Box<dyn Recognizer>> = crate::recognizer::rule::all()
             .into_iter()
             .filter(|r| cat_ok(r.category()))
             .map(|r| Box::new(r) as Box<dyn Recognizer>)

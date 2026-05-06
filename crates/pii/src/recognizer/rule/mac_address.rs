@@ -1,6 +1,6 @@
 //! `MAC_ADDRESS` recognizer.
 
-use crate::recognizer::{Category, Pattern, entity};
+use crate::recognizer::{Category, Rule, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -10,14 +10,14 @@ use crate::score::Score;
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn mac_address() -> Pattern {
+pub fn mac_address() -> Rule {
     let pattern = Regex::new(
         "MAC (colon/dash)",
         r"(?i)\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b",
         Score::from_static(0.5),
     )
     .expect("static MAC pattern compiles");
-    Pattern::new(entity::MAC_ADDRESS, vec![pattern])
+    Rule::new(entity::MAC_ADDRESS, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("MacAddressRecognizer")
         .with_category(Category::Network)

@@ -1,6 +1,6 @@
 //! `JWT_TOKEN` recognizer (header `alg` field validated; signature NOT verified).
 
-use crate::recognizer::{Category, JwtHeaderValidator, Pattern, entity};
+use crate::recognizer::{Category, JwtHeaderValidator, Rule, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -10,14 +10,14 @@ use crate::score::Score;
 ///
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
-pub fn jwt_token() -> Pattern {
+pub fn jwt_token() -> Rule {
     let pattern = Regex::new(
         "JWT (3 base64url segments)",
         r"\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b",
         Score::from_static(0.3),
     )
     .expect("static JWT pattern compiles");
-    Pattern::new(entity::JWT_TOKEN, vec![pattern])
+    Rule::new(entity::JWT_TOKEN, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("JwtTokenRecognizer")
         .with_validator(JwtHeaderValidator)
