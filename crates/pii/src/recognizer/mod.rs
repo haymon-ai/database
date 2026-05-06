@@ -4,7 +4,7 @@ mod category;
 mod keyword_context;
 mod severity;
 mod types;
-mod validators;
+mod validator;
 
 pub mod entity;
 pub mod pattern;
@@ -14,4 +14,4 @@ pub use keyword_context::KeywordContextValidator;
 pub use pattern::Pattern;
 pub use severity::Severity;
 pub use types::{EntityType, Recognizer, ValidationOutcome, Validator};
-pub use validators::{AndValidator, IbanValidator, IpAddressValidator, LuhnValidator, NoopValidator, UsSsnValidator};
+pub use validator::{AndValidator, IbanValidator, IpAddressValidator, LuhnValidator, NoopValidator, UsSsnValidator};
