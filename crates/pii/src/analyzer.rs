@@ -4,7 +4,7 @@ use dbmcp_config::{PiiCategory, PiiConfig};
 
 use crate::error::AnalyzerBuildError;
 use crate::overlap;
-use crate::recognizer::{Category, Recognizer};
+use crate::recognizer::{Category, Rule};
 use crate::result::RecognizerResult;
 use crate::score::Score;
 
@@ -19,20 +19,9 @@ pub struct AnalyzeOptions {
 }
 
 /// Registry of recognizers and the public entry point for PII analysis.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Analyzer {
-    recognizers: Vec<Box<dyn Recognizer>>,
-}
-
-impl std::fmt::Debug for Analyzer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Analyzer")
-            .field(
-                "recognizers",
-                &self.recognizers.iter().map(|r| r.name()).collect::<Vec<_>>(),
-            )
-            .finish()
-    }
+    recognizers: Vec<Rule>,
 }
 
 impl Analyzer {
@@ -44,16 +33,14 @@ impl Analyzer {
     /// Build an analyzer pre-loaded with the default recognizer registry.
     #[must_use]
     pub fn with_defaults() -> Self {
-        let recognizers = crate::recognizer::rule::all()
-            .into_iter()
-            .map(|r| Box::new(r) as Box<dyn Recognizer>)
-            .collect();
-        Self { recognizers }
+        Self {
+            recognizers: crate::recognizer::rule::all(),
+        }
     }
 
     #[cfg(test)]
-    pub(crate) fn register(&mut self, recognizer: Box<dyn Recognizer>) -> &mut Self {
-        self.recognizers.push(recognizer);
+    pub(crate) fn register(&mut self, rule: Rule) -> &mut Self {
+        self.recognizers.push(rule);
         self
     }
 
@@ -63,7 +50,7 @@ impl Analyzer {
         let results = self
             .recognizers
             .iter()
-            .flat_map(|r| r.analyze(text, opts))
+            .flat_map(|r| r.analyze(text))
             .filter(|r| r.score >= opts.min_score)
             .collect();
         overlap::resolve(results)
@@ -75,9 +62,9 @@ impl Analyzer {
         Builder::default()
     }
 
-    /// Iterate the registry's recognizers in registration order.
-    pub fn recognizers(&self) -> impl Iterator<Item = &dyn Recognizer> + '_ {
-        self.recognizers.iter().map(std::convert::AsRef::as_ref)
+    /// Iterate the registry's rules in registration order.
+    pub fn recognizers(&self) -> impl Iterator<Item = &Rule> + '_ {
+        self.recognizers.iter()
     }
 
     /// Resolve a [`PiiConfig`] to an [`Analyzer`].
@@ -148,10 +135,9 @@ impl Builder {
             return Ok(Analyzer::with_defaults());
         };
 
-        let kept: Vec<Box<dyn Recognizer>> = crate::recognizer::rule::all()
+        let kept: Vec<Rule> = crate::recognizer::rule::all()
             .into_iter()
             .filter(|r| cats.contains(&r.category()))
-            .map(|r| Box::new(r) as Box<dyn Recognizer>)
             .collect();
 
         for &cat in &cats {

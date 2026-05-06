@@ -1,6 +1,6 @@
 //! `NHS_NUMBER` recognizer (UK NHS patient identifier with mod-11 checksum).
 
-use crate::recognizer::{Category, Mod11NhsValidator, Rule, entity};
+use crate::recognizer::{Category, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -20,19 +20,17 @@ pub fn nhs_number() -> Rule {
     Rule::new(entity::NHS_NUMBER, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("NhsNumberRecognizer")
-        .with_validator(Mod11NhsValidator)
+        .with_validator(Validator::Mod11Nhs)
         .with_category(Category::Government)
 }
 
 #[cfg(test)]
 mod tests {
     use super::nhs_number;
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches(text: &str) -> Vec<String> {
         let r = nhs_number();
-        r.analyze(text, &AnalyzeOptions::default())
+        r.analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()

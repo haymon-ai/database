@@ -6,7 +6,7 @@
 //! mixed-notation rule). False positives the regex lets through are dropped
 //! by the parser.
 
-use crate::recognizer::{Category, IpAddressValidator, Rule, entity};
+use crate::recognizer::{Category, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -33,6 +33,6 @@ pub fn ip_address() -> Rule {
     Rule::new(entity::IP_ADDRESS, vec![ipv4, ipv6])
         .expect("non-empty pattern list")
         .with_name("IpRecognizer")
-        .with_validator(IpAddressValidator)
+        .with_validator(Validator::IpAddress)
         .with_category(Category::Network)
 }

@@ -1,6 +1,6 @@
 //! `VAT_NUMBER` recognizer (EU / UK / Northern Ireland VAT identifier).
 
-use crate::recognizer::{Category, Rule, VatCountryLengthValidator, entity};
+use crate::recognizer::{Category, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -20,19 +20,17 @@ pub fn vat_number() -> Rule {
     Rule::new(entity::VAT_NUMBER, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("VatNumberRecognizer")
-        .with_validator(VatCountryLengthValidator)
+        .with_validator(Validator::VatCountryLength)
         .with_category(Category::Government)
 }
 
 #[cfg(test)]
 mod tests {
     use super::vat_number;
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches(text: &str) -> Vec<String> {
         let r = vat_number();
-        r.analyze(text, &AnalyzeOptions::default())
+        r.analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()

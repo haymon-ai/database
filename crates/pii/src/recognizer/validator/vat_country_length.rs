@@ -1,15 +1,7 @@
 //! EU / UK VAT-number country-length validator.
 
 use super::digits::collect_upper_alnum;
-use crate::recognizer::{ValidationOutcome, Validator};
-
-/// EU / UK VAT-number country-length validator.
-///
-/// Format `<ISO2><alphanumeric>`. Checks the alphanumeric body length against
-/// a per-country window. Unknown prefix → [`ValidationOutcome::Unknown`] so
-/// niche/new countries are not over-rejected.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct VatCountryLengthValidator;
+use crate::recognizer::ValidationOutcome;
 
 const VAT_COUNTRY_LENGTHS: &[([u8; 2], u32, u32)] = &[
     (*b"AT", 9, 9),   // U + 8 digits
@@ -44,24 +36,27 @@ const VAT_COUNTRY_LENGTHS: &[([u8; 2], u32, u32)] = &[
     (*b"XI", 9, 12), // Northern Ireland post-Brexit
 ];
 
-impl Validator for VatCountryLengthValidator {
-    fn validate(&self, candidate: &str) -> ValidationOutcome {
-        // ISO2 prefix + up to 12-char body fits in 14 bytes.
-        let Some((buf, len)) = collect_upper_alnum::<14>(candidate) else {
-            return ValidationOutcome::Invalid;
-        };
-        if len < 3 {
-            return ValidationOutcome::Invalid;
-        }
-        let prefix = [buf[0], buf[1]];
-        let Ok(body_len) = u32::try_from(len - 2) else {
-            return ValidationOutcome::Invalid;
-        };
-        for &(code, lo, hi) in VAT_COUNTRY_LENGTHS {
-            if code == prefix {
-                return ValidationOutcome::from_bool((lo..=hi).contains(&body_len));
-            }
-        }
-        ValidationOutcome::Unknown
+/// EU / UK VAT-number country-length validator.
+///
+/// Format `<ISO2><alphanumeric>`. Checks the alphanumeric body length against
+/// a per-country window. Unknown prefix → [`ValidationOutcome::Unknown`] so
+/// niche/new countries are not over-rejected.
+pub(super) fn validate(candidate: &str) -> ValidationOutcome {
+    // ISO2 prefix + up to 12-char body fits in 14 bytes.
+    let Some((buf, len)) = collect_upper_alnum::<14>(candidate) else {
+        return ValidationOutcome::Invalid;
+    };
+    if len < 3 {
+        return ValidationOutcome::Invalid;
     }
+    let prefix = [buf[0], buf[1]];
+    let Ok(body_len) = u32::try_from(len - 2) else {
+        return ValidationOutcome::Invalid;
+    };
+    for &(code, lo, hi) in VAT_COUNTRY_LENGTHS {
+        if code == prefix {
+            return ValidationOutcome::from_bool((lo..=hi).contains(&body_len));
+        }
+    }
+    ValidationOutcome::Unknown
 }

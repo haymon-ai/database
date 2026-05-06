@@ -1,6 +1,6 @@
 //! `ROUTING_NUMBER_US` recognizer (ABA checksum + keyword-context).
 
-use crate::recognizer::{AbaRoutingValidator, AndValidator, Category, KeywordValidator, Rule, entity};
+use crate::recognizer::{Category, KeywordValidator, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -15,7 +15,10 @@ const KEYWORDS: &[&str] = &["routing", "aba", "rtn", "bank"];
 pub fn routing_number_us() -> Rule {
     let pattern = Regex::new("US ABA routing", r"\b\d{9}\b", Score::from_static(0.4))
         .expect("static ABA routing pattern compiles");
-    let validator = AndValidator::new(AbaRoutingValidator, KeywordValidator::new(KEYWORDS));
+    let validator = Validator::And(
+        Box::new(Validator::AbaRouting),
+        Box::new(Validator::Keyword(KeywordValidator::new(KEYWORDS))),
+    );
     Rule::new(entity::ROUTING_NUMBER_US, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("RoutingNumberUsRecognizer")
@@ -26,12 +29,10 @@ pub fn routing_number_us() -> Rule {
 #[cfg(test)]
 mod tests {
     use super::routing_number_us;
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches(text: &str) -> Vec<String> {
         let r = routing_number_us();
-        r.analyze(text, &AnalyzeOptions::default())
+        r.analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()

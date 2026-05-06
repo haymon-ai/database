@@ -1,6 +1,6 @@
 //! `TAX_ID_EIN` recognizer (US Employer Identification Number).
 
-use crate::recognizer::{Category, EinPrefixValidator, Rule, entity};
+use crate::recognizer::{Category, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -16,19 +16,17 @@ pub fn tax_id_ein() -> Rule {
     Rule::new(entity::TAX_ID_EIN, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("TaxIdEinRecognizer")
-        .with_validator(EinPrefixValidator)
+        .with_validator(Validator::EinPrefix)
         .with_category(Category::Government)
 }
 
 #[cfg(test)]
 mod tests {
     use super::tax_id_ein;
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches(text: &str) -> Vec<String> {
         let r = tax_id_ein();
-        r.analyze(text, &AnalyzeOptions::default())
+        r.analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()

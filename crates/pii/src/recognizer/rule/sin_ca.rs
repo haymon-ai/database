@@ -1,6 +1,6 @@
 //! `SIN_CA` recognizer (Canadian Social Insurance Number, Luhn-validated).
 
-use crate::recognizer::{Category, LuhnSinValidator, Rule, entity};
+use crate::recognizer::{Category, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -20,19 +20,17 @@ pub fn sin_ca() -> Rule {
     Rule::new(entity::SIN_CA, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("SinCaRecognizer")
-        .with_validator(LuhnSinValidator)
+        .with_validator(Validator::LuhnSin)
         .with_category(Category::Government)
 }
 
 #[cfg(test)]
 mod tests {
     use super::sin_ca;
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches(text: &str) -> Vec<String> {
         let r = sin_ca();
-        r.analyze(text, &AnalyzeOptions::default())
+        r.analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()

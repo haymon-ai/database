@@ -1,6 +1,6 @@
 //! `CVV` recognizer (keyword-context required).
 
-use crate::recognizer::{Category, KeywordValidator, Rule, entity};
+use crate::recognizer::{Category, KeywordValidator, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -18,19 +18,17 @@ pub fn cvv() -> Rule {
     Rule::new(entity::CVV, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("CvvRecognizer")
-        .with_validator(KeywordValidator::new(KEYWORDS))
+        .with_validator(Validator::Keyword(KeywordValidator::new(KEYWORDS)))
         .with_category(Category::Financial)
 }
 
 #[cfg(test)]
 mod tests {
     use super::cvv;
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches(text: &str) -> Vec<String> {
         let r = cvv();
-        r.analyze(text, &AnalyzeOptions::default())
+        r.analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()

@@ -160,8 +160,10 @@ impl Redactor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::recognizer::Recognizer;
-    use crate::{EntityType, RecognizerResult};
+    use crate::EntityType;
+    use crate::recognizer::{Rule, Validator};
+    use crate::regex::Regex;
+    use crate::score::Score;
     use dbmcp_config::PiiOperator;
     use serde_json::json;
 
@@ -450,27 +452,19 @@ mod tests {
         assert_eq!(rows[0]["text_col"], "<EMAIL_ADDRESS>");
     }
 
-    /// Custom recognizer that panics on first analyze call — used to exercise
-    /// the fail-closed `catch_unwind` branch.
-    #[derive(Debug)]
-    struct PanickingRecognizer;
-
-    impl Recognizer for PanickingRecognizer {
-        fn name(&self) -> &'static str {
-            "panicking_test_recognizer"
-        }
-        fn supported_entities(&self) -> &[EntityType] {
-            &[]
-        }
-        fn analyze(&self, _text: &str, _opts: &AnalyzeOptions) -> Vec<RecognizerResult> {
-            panic!("intentional test panic");
-        }
+    /// Build a rule whose validator panics on first invocation — used to
+    /// exercise the fail-closed `catch_unwind` branch.
+    fn panicking_rule() -> Rule {
+        let regex = Regex::new("anything", r".+", Score::from_static(0.9)).expect("static panic-rule regex compiles");
+        Rule::new(EntityType::new("PANIC"), vec![regex])
+            .expect("non-empty pattern list")
+            .with_validator(Validator::Panic)
     }
 
     #[test]
     fn panicking_recognizer_surfaces_internal_error() {
         let mut analyzer = Analyzer::empty();
-        analyzer.register(Box::new(PanickingRecognizer));
+        analyzer.register(panicking_rule());
         let r = Redactor::with_analyzer(analyzer);
         let mut rows = vec![json!({"msg": "anything"})];
         let err = r.apply(&mut rows).expect_err("must fail-closed");
@@ -482,7 +476,7 @@ mod tests {
     #[test]
     fn panic_at_depth_propagates_internal_error() {
         let mut analyzer = Analyzer::empty();
-        analyzer.register(Box::new(PanickingRecognizer));
+        analyzer.register(panicking_rule());
         let r = Redactor::with_analyzer(analyzer);
         // PII-bearing string lives 4 levels deep.
         let mut rows = vec![json!({"a": {"b": {"c": {"d": "anything"}}}})];

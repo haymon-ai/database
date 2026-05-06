@@ -9,7 +9,7 @@
 //! attach a [`crate::KeywordValidator`] without forcing keyword
 //! requirements on the strongly-anchored providers.
 
-use crate::recognizer::{Category, KeywordValidator, Rule, entity};
+use crate::recognizer::{Category, KeywordValidator, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -54,19 +54,17 @@ pub fn api_key_aws_secret() -> Rule {
     Rule::new(entity::API_KEY, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("ApiKeyAwsSecretRecognizer")
-        .with_validator(KeywordValidator::new(AWS_SECRET_KEYWORDS))
+        .with_validator(Validator::Keyword(KeywordValidator::new(AWS_SECRET_KEYWORDS)))
         .with_category(Category::DigitalIdentity)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{api_key_aws_secret, api_key_strong};
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches_strong(text: &str) -> Vec<String> {
         api_key_strong()
-            .analyze(text, &AnalyzeOptions::default())
+            .analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()
@@ -74,7 +72,7 @@ mod tests {
 
     fn matches_secret(text: &str) -> Vec<String> {
         api_key_aws_secret()
-            .analyze(text, &AnalyzeOptions::default())
+            .analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()

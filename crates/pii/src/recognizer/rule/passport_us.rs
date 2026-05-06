@@ -1,6 +1,6 @@
 //! `PASSPORT_US` recognizer (keyword-context required).
 
-use crate::recognizer::{Category, KeywordValidator, Rule, entity};
+use crate::recognizer::{Category, KeywordValidator, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -18,19 +18,17 @@ pub fn passport_us() -> Rule {
     Rule::new(entity::PASSPORT_US, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("PassportUsRecognizer")
-        .with_validator(KeywordValidator::new(KEYWORDS))
+        .with_validator(Validator::Keyword(KeywordValidator::new(KEYWORDS)))
         .with_category(Category::Government)
 }
 
 #[cfg(test)]
 mod tests {
     use super::passport_us;
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches(text: &str) -> Vec<String> {
         let r = passport_us();
-        r.analyze(text, &AnalyzeOptions::default())
+        r.analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()

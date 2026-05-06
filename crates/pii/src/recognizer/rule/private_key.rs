@@ -1,6 +1,6 @@
 //! `PRIVATE_KEY` recognizer (PEM-fenced block; BEGIN-type == END-type).
 
-use crate::recognizer::{Category, PrivateKeyTypeValidator, Rule, entity};
+use crate::recognizer::{Category, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -20,19 +20,17 @@ pub fn private_key() -> Rule {
     Rule::new(entity::PRIVATE_KEY, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("PrivateKeyRecognizer")
-        .with_validator(PrivateKeyTypeValidator)
+        .with_validator(Validator::PrivateKeyType)
         .with_category(Category::DigitalIdentity)
 }
 
 #[cfg(test)]
 mod tests {
     use super::private_key;
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches(text: &str) -> Vec<String> {
         private_key()
-            .analyze(text, &AnalyzeOptions::default())
+            .analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()

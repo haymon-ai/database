@@ -1,6 +1,6 @@
 //! `NINO_UK` recognizer (UK National Insurance Number with prefix blocklist).
 
-use crate::recognizer::{Category, NinoBlocklistValidator, Rule, entity};
+use crate::recognizer::{Category, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -20,19 +20,17 @@ pub fn nino_uk() -> Rule {
     Rule::new(entity::NINO_UK, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("NinoUkRecognizer")
-        .with_validator(NinoBlocklistValidator)
+        .with_validator(Validator::NinoBlocklist)
         .with_category(Category::Government)
 }
 
 #[cfg(test)]
 mod tests {
     use super::nino_uk;
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches(text: &str) -> Vec<String> {
         let r = nino_uk();
-        r.analyze(text, &AnalyzeOptions::default())
+        r.analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()

@@ -26,12 +26,10 @@ pub fn mac_address() -> Rule {
 #[cfg(test)]
 mod tests {
     use super::mac_address;
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches(text: &str) -> Vec<String> {
         let r = mac_address();
-        r.analyze(text, &AnalyzeOptions::default())
+        r.analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()

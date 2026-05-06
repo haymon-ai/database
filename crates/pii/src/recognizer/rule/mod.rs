@@ -1,16 +1,14 @@
 //! Rule-driven recognizer plus the built-in catalog shipped by default.
 //!
 //! [`Rule`] is the generic regex/checksum recognizer used by every built-in
-//! entity type and by user-supplied custom recognizers. The submodules expose
-//! pre-configured constructors — eight v1 entries plus the catalog-expansion
-//! set — registered in deterministic order so overlap-resolution tie-breaks
-//! stay stable.
+//! entity type. The submodules expose pre-configured constructors —
+//! eight v1 entries plus the catalog-expansion set — registered in
+//! deterministic order so overlap-resolution tie-breaks stay stable.
 
 use std::borrow::Cow;
 use std::slice;
 
-use super::{Category, EntityType, NoopValidator, Recognizer, ValidationOutcome, Validator};
-use crate::analyzer::AnalyzeOptions;
+use super::{Category, EntityType, ValidationOutcome, Validator};
 use crate::error::RecognizerError;
 use crate::regex::Regex;
 use crate::result::{AnalysisExplanation, RecognizerResult};
@@ -68,23 +66,14 @@ pub use url::url;
 pub use us_ssn::us_ssn;
 pub use vat_number::vat_number;
 
-/// Rule-driven recognizer used by every built-in entity type and by user-supplied custom recognizers.
+/// Rule-driven recognizer used by every built-in entity type.
+#[derive(Debug)]
 pub struct Rule {
     entity_type: EntityType,
     name: Cow<'static, str>,
     regexes: Vec<Regex>,
-    validator: Box<dyn Validator>,
+    validator: Validator,
     category: Category,
-}
-
-impl std::fmt::Debug for Rule {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Rule")
-            .field("entity_type", &self.entity_type)
-            .field("name", &self.name)
-            .field("regexes", &self.regexes)
-            .finish_non_exhaustive()
-    }
 }
 
 impl Rule {
@@ -102,7 +91,7 @@ impl Rule {
             entity_type,
             name,
             regexes,
-            validator: Box::new(NoopValidator),
+            validator: Validator::Noop,
             category: Category::Personal,
         })
     }
@@ -116,11 +105,8 @@ impl Rule {
 
     /// Attach a validator hook that runs against every regex match.
     #[must_use]
-    pub fn with_validator<V>(mut self, validator: V) -> Self
-    where
-        V: Validator + 'static,
-    {
-        self.validator = Box::new(validator);
+    pub fn with_validator(mut self, validator: Validator) -> Self {
+        self.validator = validator;
         self
     }
 
@@ -131,10 +117,36 @@ impl Rule {
         self
     }
 
-    /// Inherent accessor for the recognizer's category tag.
+    /// Recognizer's display name; surfaced in [`crate::AnalysisExplanation`].
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Entity types this recognizer is capable of emitting.
+    #[must_use]
+    pub fn supported_entities(&self) -> &[EntityType] {
+        slice::from_ref(&self.entity_type)
+    }
+
+    /// Top-level PII category this recognizer covers.
     #[must_use]
     pub fn category(&self) -> Category {
         self.category
+    }
+
+    /// Analyze `text` and return the recognizer's own results, pre-overlap.
+    #[must_use]
+    pub fn analyze(&self, text: &str) -> Vec<RecognizerResult> {
+        self.regexes
+            .iter()
+            .flat_map(|regex| {
+                regex
+                    .compiled
+                    .find_iter(text)
+                    .filter_map(move |m| self.build_result(regex, m.start(), m.end(), text))
+            })
+            .collect()
     }
 
     fn build_result(&self, regex: &Regex, start: usize, end: usize, text: &str) -> Option<RecognizerResult> {
@@ -165,31 +177,5 @@ impl Rule {
                 final_score,
             },
         })
-    }
-}
-
-impl Recognizer for Rule {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn supported_entities(&self) -> &[EntityType] {
-        slice::from_ref(&self.entity_type)
-    }
-
-    fn analyze(&self, text: &str, _opts: &AnalyzeOptions) -> Vec<RecognizerResult> {
-        self.regexes
-            .iter()
-            .flat_map(|regex| {
-                regex
-                    .compiled
-                    .find_iter(text)
-                    .filter_map(move |m| self.build_result(regex, m.start(), m.end(), text))
-            })
-            .collect()
-    }
-
-    fn category(&self) -> Category {
-        self.category
     }
 }

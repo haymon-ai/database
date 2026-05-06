@@ -1,6 +1,6 @@
 //! `SORT_CODE_UK` recognizer (keyword-context required).
 
-use crate::recognizer::{Category, KeywordValidator, Rule, entity};
+use crate::recognizer::{Category, KeywordValidator, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -22,19 +22,17 @@ pub fn sort_code_uk() -> Rule {
     Rule::new(entity::SORT_CODE_UK, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("SortCodeUkRecognizer")
-        .with_validator(KeywordValidator::new(KEYWORDS))
+        .with_validator(Validator::Keyword(KeywordValidator::new(KEYWORDS)))
         .with_category(Category::Financial)
 }
 
 #[cfg(test)]
 mod tests {
     use super::sort_code_uk;
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches(text: &str) -> Vec<String> {
         let r = sort_code_uk();
-        r.analyze(text, &AnalyzeOptions::default())
+        r.analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()

@@ -1,14 +1,7 @@
 //! US EIN (employer ID) prefix validator.
 
 use super::digits::collect_digits;
-use crate::recognizer::{ValidationOutcome, Validator};
-
-/// US EIN (employer ID) prefix validator.
-///
-/// Format `NN-NNNNNNN`. The first two digits MUST appear in the IRS-published
-/// valid-prefix list. Out-of-list prefixes are rejected.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct EinPrefixValidator;
+use crate::recognizer::ValidationOutcome;
 
 /// IRS-published valid EIN prefixes, sorted ascending for binary search.
 const EIN_VALID_PREFIXES: &[u32] = &[
@@ -17,12 +10,14 @@ const EIN_VALID_PREFIXES: &[u32] = &[
     71, 72, 73, 74, 75, 76, 77, 80, 81, 82, 83, 84, 85, 86, 87, 88, 90, 91, 92, 93, 94, 95, 98, 99,
 ];
 
-impl Validator for EinPrefixValidator {
-    fn validate(&self, candidate: &str) -> ValidationOutcome {
-        let Some(d) = collect_digits::<9>(candidate) else {
-            return ValidationOutcome::Invalid;
-        };
-        let prefix = d[0] * 10 + d[1];
-        ValidationOutcome::from_bool(EIN_VALID_PREFIXES.binary_search(&prefix).is_ok())
-    }
+/// US EIN (employer ID) prefix validator.
+///
+/// Format `NN-NNNNNNN`. The first two digits MUST appear in the IRS-published
+/// valid-prefix list. Out-of-list prefixes are rejected.
+pub(super) fn validate(candidate: &str) -> ValidationOutcome {
+    let Some(d) = collect_digits::<9>(candidate) else {
+        return ValidationOutcome::Invalid;
+    };
+    let prefix = d[0] * 10 + d[1];
+    ValidationOutcome::from_bool(EIN_VALID_PREFIXES.binary_search(&prefix).is_ok())
 }

@@ -1,6 +1,6 @@
 //! `JWT_TOKEN` recognizer (header `alg` field validated; signature NOT verified).
 
-use crate::recognizer::{Category, JwtHeaderValidator, Rule, entity};
+use crate::recognizer::{Category, Rule, Validator, entity};
 use crate::regex::Regex;
 use crate::score::Score;
 
@@ -20,19 +20,17 @@ pub fn jwt_token() -> Rule {
     Rule::new(entity::JWT_TOKEN, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("JwtTokenRecognizer")
-        .with_validator(JwtHeaderValidator)
+        .with_validator(Validator::JwtHeader)
         .with_category(Category::DigitalIdentity)
 }
 
 #[cfg(test)]
 mod tests {
     use super::jwt_token;
-    use crate::analyzer::AnalyzeOptions;
-    use crate::recognizer::Recognizer;
 
     fn matches(text: &str) -> Vec<String> {
         jwt_token()
-            .analyze(text, &AnalyzeOptions::default())
+            .analyze(text)
             .into_iter()
             .map(|res| text[res.start..res.end].to_string())
             .collect()
