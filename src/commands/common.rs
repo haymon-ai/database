@@ -169,6 +169,16 @@ pub(crate) struct PiiArguments {
         default_value_t = PiiConfig::DEFAULT_OPERATOR,
     )]
     pub(crate) operator: PiiOperator,
+
+    /// Comma-separated PII categories the analyzer should cover
+    /// (personal, financial, government, contact, network, digital-identity, crypto)
+    #[arg(
+        long = "pii-categories",
+        env = "PII_CATEGORIES",
+        value_delimiter = ',',
+        num_args = 1..,
+    )]
+    pub(crate) categories: Option<Vec<dbmcp_config::PiiCategory>>,
 }
 
 impl TryFrom<&PiiArguments> for PiiConfig {
@@ -178,6 +188,7 @@ impl TryFrom<&PiiArguments> for PiiConfig {
         let candidate = Self {
             enabled: args.enabled,
             operator: args.operator,
+            categories: args.categories.clone(),
         };
         candidate.validate()?;
         Ok(candidate)
@@ -273,6 +284,7 @@ mod tests {
         unsafe {
             std::env::remove_var("PII_ENABLE");
             std::env::remove_var("PII_OPERATOR");
+            std::env::remove_var("PII_CATEGORIES");
         }
     }
 
@@ -391,6 +403,57 @@ mod tests {
         assert!(
             pii_pos < flag_pos,
             "PII heading must precede --pii in help output:\n{help}"
+        );
+    }
+
+    #[test]
+    fn clap_pii_categories_default_unset() {
+        clear_pii_env();
+        let cli = TestCli::try_parse_from(Vec::<&str>::new()).unwrap();
+        assert!(cli.pii.categories.is_none(), "categories must default to None");
+    }
+
+    #[test]
+    fn clap_pii_categories_comma_separated() {
+        use dbmcp_config::PiiCategory;
+        clear_pii_env();
+        let cli = TestCli::try_parse_from(["--pii-categories", "financial,government"])
+            .expect("comma-separated categories parse");
+        let cats = cli.pii.categories.expect("categories set");
+        assert_eq!(cats, vec![PiiCategory::Financial, PiiCategory::Government]);
+    }
+
+    #[test]
+    fn clap_pii_categories_kebab_digital_identity() {
+        use dbmcp_config::PiiCategory;
+        clear_pii_env();
+        let cli =
+            TestCli::try_parse_from(["--pii-categories", "digital-identity"]).expect("digital-identity kebab parses");
+        let cats = cli.pii.categories.expect("categories set");
+        assert_eq!(cats, vec![PiiCategory::DigitalIdentity]);
+    }
+
+    #[test]
+    fn clap_rejects_unknown_pii_category() {
+        clear_pii_env();
+        let err = TestCli::try_parse_from(["--pii-categories", "healthcare"]).expect_err("healthcare is not in v1");
+        let msg = err.to_string();
+        assert!(msg.contains("healthcare"), "error must name the offending value: {msg}");
+    }
+
+    #[test]
+    fn pii_config_categories_empty_vec_errors_via_try_from() {
+        // clap normally never produces an empty Vec (num_args=1..), but the validator
+        // still defends against direct PiiConfig construction with Some(empty).
+        let cfg = PiiConfig {
+            enabled: true,
+            operator: PiiOperator::Replace,
+            categories: Some(Vec::new()),
+        };
+        let errors = cfg.validate().expect_err("empty categories must error");
+        assert!(
+            errors.iter().any(|e| matches!(e, ConfigError::PiiCategoriesEmpty)),
+            "expected PiiCategoriesEmpty in {errors:?}"
         );
     }
 }

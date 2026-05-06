@@ -1817,6 +1817,7 @@ fn handler_with_redaction(redact_pii: bool) -> SqliteHandler {
         pii: PiiConfig {
             enabled: redact_pii,
             operator: PiiOperator::Replace,
+            ..PiiConfig::default()
         },
     })
 }
@@ -1828,6 +1829,7 @@ fn handler_with_operator(operator: PiiOperator) -> SqliteHandler {
         pii: PiiConfig {
             enabled: true,
             operator,
+            ..PiiConfig::default()
         },
     })
 }

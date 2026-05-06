@@ -89,12 +89,43 @@ impl Analyzer {
 
     /// Resolve a [`dbmcp_config::PiiConfig`] to an [`Analyzer`].
     ///
-    /// Currently always returns [`Analyzer::with_defaults`] — the legacy 8 v1
-    /// recognizers. Category routing lives on [`Analyzer::builder`] until the
-    /// config-side `categories` field lands.
+    /// - `categories` unset → [`Analyzer::with_defaults`] (the legacy 8 v1
+    ///   recognizers; FR-302 backward-compat).
+    /// - `categories` set → builder filters the registry by category set.
+    /// - On builder error, falls back to `with_defaults` and logs at `warn`
+    ///   level so a misconfiguration never disables redaction silently.
     #[must_use]
-    pub fn from_pii_config(_cfg: &dbmcp_config::PiiConfig) -> Self {
-        Self::with_defaults()
+    pub fn from_pii_config(cfg: &dbmcp_config::PiiConfig) -> Self {
+        let Some(cats) = cfg.categories.as_ref() else {
+            return Self::with_defaults();
+        };
+        match Self::builder()
+            .categories(cats.iter().copied().map(map_category))
+            .build()
+        {
+            Ok(a) => a,
+            Err(err) => {
+                tracing::warn!(
+                    target: "dbmcp::pii",
+                    error = %err,
+                    "PII analyzer build failed; falling back to with_defaults()"
+                );
+                Self::with_defaults()
+            }
+        }
+    }
+}
+
+fn map_category(c: dbmcp_config::PiiCategory) -> crate::recognizer::Category {
+    use dbmcp_config::PiiCategory as W;
+    match c {
+        W::Personal => crate::recognizer::Category::Personal,
+        W::Financial => crate::recognizer::Category::Financial,
+        W::Government => crate::recognizer::Category::Government,
+        W::Contact => crate::recognizer::Category::Contact,
+        W::Network => crate::recognizer::Category::Network,
+        W::DigitalIdentity => crate::recognizer::Category::DigitalIdentity,
+        W::Crypto => crate::recognizer::Category::Crypto,
     }
 }
 

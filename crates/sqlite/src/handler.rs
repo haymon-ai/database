@@ -71,10 +71,12 @@ impl SqliteHandler {
         Self {
             config: config.database.clone(),
             connection: SqliteConnection::new(&config.database),
-            redactor: config
-                .pii
-                .enabled
-                .then(|| Redactor::with_operator_config(config.pii.operator.into())),
+            redactor: config.pii.enabled.then(|| {
+                Redactor::new(
+                    dbmcp_pii::Analyzer::from_pii_config(&config.pii),
+                    config.pii.operator.into(),
+                )
+            }),
             tool_router: build_tool_router(config.database.read_only),
         }
     }

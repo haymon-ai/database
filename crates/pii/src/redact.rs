@@ -91,6 +91,15 @@ impl Redactor {
         }
     }
 
+    /// Builds a redactor wrapping a caller-supplied analyzer and operator config.
+    #[must_use]
+    pub fn new(analyzer: Analyzer, operator: OperatorConfig) -> Self {
+        Self {
+            analyzer: Arc::new(analyzer),
+            operator,
+        }
+    }
+
     /// Walks every reachable string leaf in `rows` through the analyzer pipeline.
     ///
     /// Mutates `rows` in place. Recurses into [`Value::Object`] values
