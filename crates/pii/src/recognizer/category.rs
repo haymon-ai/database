@@ -7,7 +7,7 @@
 
 use std::str::FromStr;
 
-/// Closed set of v1 PII categories tagging every built-in recognizer.
+/// Closed set of PII categories tagging every built-in recognizer.
 ///
 /// Marked `#[non_exhaustive]` so future additions (`Healthcare`, `Industries`,
 /// `International`) are non-breaking.
@@ -31,7 +31,7 @@ pub enum Category {
 }
 
 impl Category {
-    /// All v1 variants in declaration order.
+    /// All variants in declaration order.
     pub const ALL: &'static [Category] = &[
         Category::Personal,
         Category::Financial,

@@ -10,7 +10,7 @@ use dbmcp_pii::{
     AnalyzeOptions, Analyzer, AnalyzerBuildError, Category, EntityType, MAX_SCORE, Score, Severity, entity,
 };
 
-const V1_NAMES: &[&str] = &[
+const DEFAULT_NAMES: &[&str] = &[
     "EMAIL_ADDRESS",
     "CREDIT_CARD",
     "IBAN_CODE",
@@ -232,11 +232,8 @@ fn ct_006_overlap_higher_score_wins_cross_type() {
 fn with_defaults_is_eight() {
     let a = Analyzer::with_defaults();
     let got = entity_names(&a);
-    let want: Vec<String> = V1_NAMES.iter().map(|s| (*s).to_string()).collect();
-    assert_eq!(
-        got, want,
-        "with_defaults() must stay at the original 8 v1 recognizers (FR-105 / Q1)"
-    );
+    let want: Vec<String> = DEFAULT_NAMES.iter().map(|s| (*s).to_string()).collect();
+    assert_eq!(got, want, "with_defaults() must stay at the original 8 recognizers");
 }
 
 #[test]
@@ -260,7 +257,7 @@ fn tag_table_is_frozen() {
         .collect();
     tags.sort_by(|a, b| a.0.cmp(&b.0));
 
-    // Frozen 8-row tag table for the v1 recognizers.
+    // Frozen 8-row tag table for the built-in recognizers.
     let expected = vec![
         ("CREDIT_CARD".to_string(), Category::Financial, Severity::Critical),
         ("CRYPTO".to_string(), Category::Crypto, Severity::High),

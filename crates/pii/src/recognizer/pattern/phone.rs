@@ -1,6 +1,6 @@
 //! `PHONE_NUMBER` recognizer.
 //!
-//! v1: regex-only — E.164 plus region-targeted patterns for `US`, `UK`, `DE`,
+//! Regex-only — E.164 plus region-targeted patterns for `US`, `UK`, `DE`,
 //! all at score `0.4`. `libphonenumber`-grade parse/validation deferred.
 
 use crate::recognizer::{Category, Pattern, Severity, entity};

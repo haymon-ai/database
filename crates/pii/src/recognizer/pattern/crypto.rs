@@ -1,6 +1,6 @@
 //! `CRYPTO` recognizer for BTC and ETH wallet addresses.
 //!
-//! v1 has no checksum validator (`Base58Check` / `EIP-55`) — flagged future work.
+//! No checksum validator (`Base58Check` / `EIP-55`) yet — future work.
 
 use crate::recognizer::{Category, Pattern, Severity, entity};
 use crate::regex::Regex;

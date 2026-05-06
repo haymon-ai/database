@@ -2,7 +2,7 @@
 //!
 //! [`Pattern`] is the generic regex/checksum recognizer used by every built-in
 //! entity type and by user-supplied custom recognizers. The submodules expose
-//! pre-configured constructors — the eight v1 entries — registered in
+//! pre-configured constructors — the eight built-in entries — registered in
 //! deterministic order so overlap-resolution tie-breaks stay stable.
 
 use std::borrow::Cow;

@@ -4,7 +4,7 @@
 //! derived [`Ord`]). Used as a floor in [`crate::analyzer::Analyzer`] builder
 //! filters.
 
-/// Closed set of v1 severity tiers.
+/// Closed set of severity tiers.
 ///
 /// `#[non_exhaustive]` so additional tiers can be inserted without a major
 /// version bump.
@@ -22,7 +22,7 @@ pub enum Severity {
 }
 
 impl Severity {
-    /// All v1 variants in declaration order (low → critical).
+    /// All variants in declaration order (low → critical).
     pub const ALL: &'static [Severity] = &[Severity::Low, Severity::Medium, Severity::High, Severity::Critical];
 }
 

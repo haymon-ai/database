@@ -45,7 +45,7 @@ impl Analyzer {
         Self::default()
     }
 
-    /// Build an analyzer pre-loaded with the eight v1 default recognizers.
+    /// Build an analyzer pre-loaded with the eight default recognizers.
     #[must_use]
     pub fn with_defaults() -> Self {
         let recognizers = crate::recognizer::pattern::all()
@@ -90,8 +90,7 @@ impl Analyzer {
 
     /// Resolve a [`PiiConfig`] to an [`Analyzer`].
     ///
-    /// - `categories` unset → [`Analyzer::with_defaults`] (the legacy 8 v1
-    ///   recognizers; FR-302 backward-compat).
+    /// - `categories` unset → [`Analyzer::with_defaults`].
     /// - `categories` set → builder filters the registry by category set.
     /// - On builder error, falls back to `with_defaults` and logs at `warn`
     ///   level so a misconfiguration never disables redaction silently.
@@ -100,20 +99,17 @@ impl Analyzer {
         let Some(cats) = config.categories.as_ref() else {
             return Self::with_defaults();
         };
-        match Self::builder()
+        Self::builder()
             .categories(cats.iter().copied().map(map_category))
             .build()
-        {
-            Ok(a) => a,
-            Err(err) => {
+            .unwrap_or_else(|err| {
                 tracing::warn!(
                     target: "dbmcp::pii",
                     error = %err,
                     "PII analyzer build failed; falling back to with_defaults()"
                 );
                 Self::with_defaults()
-            }
-        }
+            })
     }
 }
 
@@ -182,7 +178,7 @@ impl Builder {
         let floor = self.min_severity;
 
         // If neither categories nor floor is set, fall through to
-        // with_defaults() — the 8 v1 recognizers, no filter.
+        // with_defaults() — the 8 default recognizers, no filter.
         if effective_cats.is_none() && floor.is_none() {
             return Ok(Analyzer::with_defaults());
         }
