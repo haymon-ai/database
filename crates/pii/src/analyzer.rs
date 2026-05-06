@@ -40,9 +40,8 @@ impl std::fmt::Debug for Analyzer {
 }
 
 impl Analyzer {
-    /// Build an analyzer with no recognizers; caller registers their own.
-    #[must_use]
-    pub fn empty() -> Self {
+    #[cfg(test)]
+    pub(crate) fn empty() -> Self {
         Self::default()
     }
 
@@ -56,8 +55,8 @@ impl Analyzer {
         Self { recognizers }
     }
 
-    /// Register a recognizer at the end of the registry.
-    pub fn register(&mut self, recognizer: Box<dyn Recognizer>) -> &mut Self {
+    #[cfg(test)]
+    pub(crate) fn register(&mut self, recognizer: Box<dyn Recognizer>) -> &mut Self {
         self.recognizers.push(recognizer);
         self
     }
@@ -136,23 +135,11 @@ fn map_category(c: PiiCategory) -> Category {
 /// See `specs/095-pii-recognizer-catalog/data-model.md` for the resolution
 /// rules. `Analyzer::with_defaults()` stays frozen at the original 8
 /// recognizers regardless of this builder.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Builder {
     categories: Option<Vec<Category>>,
     min_severity: Option<Severity>,
-    custom: Vec<Box<dyn Recognizer>>,
     allow_empty_categories: bool,
-}
-
-impl std::fmt::Debug for Builder {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Builder")
-            .field("categories", &self.categories)
-            .field("min_severity", &self.min_severity)
-            .field("custom_count", &self.custom.len())
-            .field("allow_empty_categories", &self.allow_empty_categories)
-            .finish()
-    }
 }
 
 impl Builder {
@@ -176,13 +163,6 @@ impl Builder {
         self
     }
 
-    /// Append a user-supplied recognizer; participates in the same filter as built-ins.
-    #[must_use]
-    pub fn custom_recognizer(mut self, recognizer: impl Recognizer + 'static) -> Self {
-        self.custom.push(Box::new(recognizer));
-        self
-    }
-
     /// When `true`, [`Builder::build`] does not error if a requested category
     /// resolves to zero recognizers in the current registry.
     #[must_use]
@@ -202,30 +182,20 @@ impl Builder {
         let effective_cats = self.categories;
         let floor = self.min_severity;
 
-        // If neither categories nor floor nor custom is set, fall through to
+        // If neither categories nor floor is set, fall through to
         // with_defaults() — the 8 v1 recognizers, no filter.
-        if effective_cats.is_none() && floor.is_none() && self.custom.is_empty() {
+        if effective_cats.is_none() && floor.is_none() {
             return Ok(Analyzer::with_defaults());
         }
 
-        // Merge built-in registries (v1 + extended), filter, then box surviving entries.
-        // Boxing post-filter avoids ~30 dropped allocations on narrow category requests.
         let cat_ok = |c: Category| effective_cats.as_ref().is_none_or(|cats| cats.contains(&c));
         let sev_ok = |s: Severity| floor.is_none_or(|min| s >= min);
-        let mut kept: Vec<Box<dyn Recognizer>> = crate::recognizer::pattern::all()
+        let kept: Vec<Box<dyn Recognizer>> = crate::recognizer::pattern::all()
             .into_iter()
             .filter(|r| cat_ok(r.category()) && sev_ok(r.severity()))
             .map(|r| Box::new(r) as Box<dyn Recognizer>)
             .collect();
-        kept.extend(
-            self.custom
-                .into_iter()
-                .filter(|r| cat_ok(r.category()) && sev_ok(r.severity())),
-        );
 
-        // If any requested category contributed zero recognizers, error
-        // unless allow_empty_categories(true). Linear scan is fine for ≤7
-        // requested categories against ~24 recognizers (~168 ops max).
         if !self.allow_empty_categories
             && let Some(cats) = &effective_cats
         {

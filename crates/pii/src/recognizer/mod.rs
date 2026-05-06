@@ -1,7 +1,6 @@
 //! Recognizer abstraction, entity-type newtype, validator hook, and built-in registry.
 
 mod category;
-mod deny_list;
 mod keyword_context;
 mod severity;
 mod types;
@@ -11,7 +10,6 @@ pub mod entity;
 pub mod pattern;
 
 pub use category::{Category, ParseCategoryError};
-pub use deny_list::deny_list_recognizer;
 pub use keyword_context::KeywordContextValidator;
 pub use pattern::Pattern;
 pub use severity::Severity;

@@ -39,7 +39,7 @@ pub use crate::error::{AnalyzerBuildError, OperatorError, PatternError, Recogniz
 pub use crate::operator::{ChunkCount, HashAlgorithm, Operator, OperatorKind};
 pub use crate::recognizer::{
     AndValidator, Category, EntityType, KeywordContextValidator, ParseCategoryError, Pattern, Recognizer, Severity,
-    ValidationOutcome, Validator, deny_list_recognizer,
+    ValidationOutcome, Validator,
 };
 pub use crate::redact::{RedactionError, RedactionStats, Redactor};
 pub use crate::regex::Regex;

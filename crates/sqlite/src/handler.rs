@@ -78,12 +78,6 @@ impl SqliteHandler {
             tool_router: build_tool_router(config.database.read_only),
         }
     }
-
-    /// Replaces the active redactor — test-only helper for fault injection.
-    #[doc(hidden)]
-    pub fn set_redactor_for_test(&mut self, redactor: Option<Redactor>) {
-        self.redactor = redactor;
-    }
 }
 
 impl From<SqliteHandler> for Server {

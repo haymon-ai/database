@@ -16,11 +16,11 @@ pub enum PatternError {
     },
 }
 
-/// Errors that surface when constructing a [`crate::Pattern`] or a deny-list helper.
+/// Errors that surface when constructing a [`crate::Pattern`].
 #[derive(Debug, Error)]
 pub enum RecognizerError {
-    /// Caller supplied no patterns and no deny-list terms.
-    #[error("recognizer requires at least one pattern or deny-list term")]
+    /// Caller supplied no patterns.
+    #[error("recognizer requires at least one pattern")]
     EmptyPatternList,
 }
 
