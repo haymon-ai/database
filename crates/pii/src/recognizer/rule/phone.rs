@@ -18,9 +18,9 @@ pub fn phone_number() -> Rule {
     let s = Score::from_static(0.4);
     let patterns = vec![
         Regex::new("E.164", r"\+\d{8,15}\b", s).expect("E.164 compiles"),
-        Regex::new("US", r"\b(?:\+?1[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b", s).expect("US compiles"),
-        Regex::new("UK", r"\b(?:\+?44[\s-]?)?0?[1-9](?:[\s-]?\d){8,9}\b", s).expect("UK compiles"),
-        Regex::new("DE", r"\b(?:\+?49[\s-]?)?0?[1-9](?:[\s-]?\d){7,11}\b", s).expect("DE compiles"),
+        Regex::new("US", r"[+(]?\b(?:\+?1[\s-]?)?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b", s).expect("US compiles"),
+        Regex::new("UK", r"\+?\b(?:44[\s-]?)?0?[1-9](?:[\s-]?\d){8,9}\b", s).expect("UK compiles"),
+        Regex::new("DE", r"\+?\b(?:49[\s-]?)?0?[1-9](?:[\s-]?\d){7,11}\b", s).expect("DE compiles"),
     ];
     Rule::new(entity::PHONE_NUMBER, patterns)
         .expect("non-empty pattern list")
@@ -71,6 +71,27 @@ mod tests {
     #[test]
     fn uk_local_form_redacts() {
         assert!(redacts("02012345678"));
+    }
+
+    #[test]
+    fn span_includes_leading_paren_and_plus() {
+        // Leading `(` and `+` must be inside at least one match span — the
+        // overlap-resolver later picks the longest. The previous bug left the
+        // sigil outside every span, producing `(<PHONE_NUMBER>` /
+        // `+<PHONE_NUMBER>` after redaction.
+        for input in [
+            "(415) 555-2671",
+            "+44 20 7946 0958",
+            "+49 30 12345678",
+            "+14155552671",
+            "02012345678",
+        ] {
+            let hits = matches(input);
+            assert!(
+                hits.iter().any(|h| h == input),
+                "{input}: no full-span hit; got {hits:?}"
+            );
+        }
     }
 
     #[test]
