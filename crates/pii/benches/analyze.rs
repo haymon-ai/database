@@ -1,4 +1,4 @@
-//! Analyzer benches: recognizer match throughput, per-category cost, build cost.
+//! Analyzer benches: recognizer match throughput, per-rule cost, build cost.
 
 use std::hint::black_box;
 use std::time::Duration;
@@ -25,18 +25,19 @@ fn bench_all_recognizers(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_by_category(c: &mut Criterion) {
+fn bench_by_rule(c: &mut Criterion) {
     let opts = AnalyzeOptions::default();
     let payload = mixed_payload(64 * 1024);
 
-    let mut group = c.benchmark_group("analyze/by_category");
+    let mut group = c.benchmark_group("analyze/by_rule");
     group.throughput(Throughput::Bytes(payload.len() as u64));
-    for &cat in Category::ALL {
-        let analyzer = Analyzer::builder()
-            .categories([cat])
-            .build()
-            .expect("category has at least one recognizer");
-        group.bench_with_input(BenchmarkId::from_parameter(cat.as_kebab()), &payload, |b, text| {
+    group.sample_size(50);
+    group.measurement_time(Duration::from_secs(3));
+
+    for rule in Analyzer::with_defaults().into_rules() {
+        let label = rule.name().to_owned();
+        let analyzer = Analyzer::from_rules(vec![rule]);
+        group.bench_with_input(BenchmarkId::from_parameter(label), &payload, |b, text| {
             b.iter(|| analyzer.analyze(black_box(text), black_box(&opts)));
         });
     }
@@ -63,5 +64,5 @@ fn bench_analyzer_build(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_all_recognizers, bench_by_category, bench_analyzer_build,);
+criterion_group!(benches, bench_all_recognizers, bench_by_rule, bench_analyzer_build,);
 criterion_main!(benches);
