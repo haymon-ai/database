@@ -4,16 +4,15 @@ use std::hint::black_box;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use dbmcp_pii::Redactor;
+use dbmcp_pii::corpus::Corpus;
 use serde_json::{Map, Value, json};
 
 mod common;
 
-use common::corpus_positives;
-
 fn pii_pool() -> Vec<String> {
     let mut pool = Vec::new();
-    for name in ["email.txt", "ip.txt", "credit_card.txt", "iban.txt"] {
-        pool.extend(corpus_positives(name));
+    for stem in ["email", "ip", "credit_card", "iban"] {
+        pool.extend(Corpus::load(stem).positives);
     }
     pool
 }

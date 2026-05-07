@@ -22,6 +22,7 @@
 
 pub mod analyzer;
 pub mod anonymizer;
+pub mod corpus;
 pub mod error;
 pub mod operator;
 pub mod overlap;

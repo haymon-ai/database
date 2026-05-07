@@ -8,7 +8,6 @@ use dbmcp_pii::{
     AnalysisExplanation, AnalyzeOptions, Analyzer, ChunkCount, EntityType, HashAlgorithm, Operator, OperatorConfig,
     RecognizerResult, Score, ValidationOutcome, anonymize, entity,
 };
-use proptest::prelude::*;
 
 fn make_result(et: &str, start: usize, end: usize) -> RecognizerResult {
     make_result_scored(et, start, end, Score::new(0.5).unwrap())
@@ -121,27 +120,48 @@ fn us2_4_hash_deterministic_per_input() {
     assert_eq!(a.text, b.text);
 }
 
-proptest! {
-    #![proptest_config(ProptestConfig::with_cases(64))]
+#[test]
+fn new_offsets_are_codepoint_aligned() {
+    let cases: &[(&str, &str, usize, usize)] = &[
+        ("ascii_mid_span", "hello world goodbye", 6, 5),
+        ("ascii_full_span", "hello", 0, 5),
+        ("ascii_span_overflows", "hello", 2, 80),
+        ("ascii_max_len", "abcdefghijklmnopqrstuvwxyz0123456789", 10, 20),
+        ("empty_text", "", 0, 1),
+        ("multibyte_accent", "café résumé", 0, 6),
+        ("multibyte_emoji", "🎉 party 🎉", 0, 9),
+        ("multibyte_cjk", "日本語テスト", 0, 9),
+        ("offstart_inside_char", "café résumé", 2, 5),
+        ("offend_inside_char", "🎉 party", 1, 4),
+    ];
 
-    #[test]
-    fn new_offsets_are_codepoint_aligned(
-        text in "[a-zA-Z0-9 .]{0,80}",
-        start in 0usize..40,
-        len in 1usize..40,
-    ) {
-
-        let bounded_start = align_to_char_boundary(&text, start);
-        let bounded_end = align_to_char_boundary(&text, bounded_start + len);
+    for (label, text, raw_start, raw_len) in cases {
+        let bounded_start = align_to_char_boundary(text, *raw_start);
+        let bounded_end = align_to_char_boundary(text, bounded_start + *raw_len);
         if bounded_end <= bounded_start {
-            return Ok(());
+            continue;
         }
         let r = make_result("X", bounded_start, bounded_end);
-        let out = anonymize(&text, vec![r], &OperatorConfig::default());
+        let out = anonymize(text, vec![r], &OperatorConfig::default());
         for op in &out.operations {
-            prop_assert!(out.text.is_char_boundary(op.new_start));
-            prop_assert!(out.text.is_char_boundary(op.new_end));
-            prop_assert!(op.new_end <= out.text.len());
+            assert!(
+                out.text.is_char_boundary(op.new_start),
+                "{label}: new_start {} not a char boundary in {:?}",
+                op.new_start,
+                out.text,
+            );
+            assert!(
+                out.text.is_char_boundary(op.new_end),
+                "{label}: new_end {} not a char boundary in {:?}",
+                op.new_end,
+                out.text,
+            );
+            assert!(
+                op.new_end <= out.text.len(),
+                "{label}: new_end {} exceeds rewritten len {}",
+                op.new_end,
+                out.text.len(),
+            );
         }
     }
 }
