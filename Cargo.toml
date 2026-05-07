@@ -62,6 +62,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Dev/test dependencies
+criterion = { version = "0.7", features = ["html_reports"] }
 insta = { version = "1", features = ["json", "redactions"] }
 proptest = "1"
 

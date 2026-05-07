@@ -19,7 +19,20 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 proptest = { workspace = true }
+
+[[bench]]
+name = "analyze"
+harness = false
+
+[[bench]]
+name = "anonymize"
+harness = false
+
+[[bench]]
+name = "redact"
+harness = false
 
 [lints]
 workspace = true
