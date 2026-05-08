@@ -47,10 +47,10 @@ mod tests {
     }
 
     #[test]
-    fn unknown_prefix_preserved_at_regex_score() {
-        // Unknown prefix → validator returns Unknown → regex score preserved.
-        // The recogniser still emits the span (documented behaviour).
-        assert_eq!(matches("VAT XX123456789"), vec!["XX123456789"]);
+    fn unknown_prefix_rejected() {
+        // Unknown ISO2 prefix → validator Invalid, match dropped. Stops
+        // all-uppercase English words being tagged as VAT identifiers.
+        assert!(matches("VAT XX123456789").is_empty());
     }
 
     #[test]

@@ -36,11 +36,14 @@ const VAT_COUNTRY_LENGTHS: &[([u8; 2], u32, u32)] = &[
     (*b"XI", 9, 12), // Northern Ireland post-Brexit
 ];
 
-/// EU / UK VAT-number country-length validator.
+/// EU/UK VAT validator: known prefix, in-window body, at least one digit.
 ///
-/// Format `<ISO2><alphanumeric>`. Checks the alphanumeric body length against
-/// a per-country window. Unknown prefix → [`ValidationOutcome::Unknown`] so
-/// niche/new countries are not over-rejected.
+/// Format `<ISO2><alphanumeric>`. Returns [`ValidationOutcome::Valid`] only
+/// when the ISO2 prefix is in the EU/UK/XI table, the body length matches
+/// the per-country window, and the body contains at least one ASCII digit.
+/// All other cases return [`ValidationOutcome::Invalid`]. Unknown prefixes
+/// and digit-less bodies are rejected to avoid all-uppercase English words
+/// (e.g. `CERTIFICATE`, `INFRASTRUCTURE`) being tagged as VAT identifiers.
 pub(super) fn validate(candidate: &str) -> ValidationOutcome {
     // ISO2 prefix + up to 12-char body fits in 14 bytes.
     let Some((buf, len)) = collect_upper_alnum::<14>(candidate) else {
@@ -53,10 +56,14 @@ pub(super) fn validate(candidate: &str) -> ValidationOutcome {
     let Ok(body_len) = u32::try_from(len - 2) else {
         return ValidationOutcome::Invalid;
     };
+    let body_has_digit = buf[2..len].iter().any(u8::is_ascii_digit);
+    if !body_has_digit {
+        return ValidationOutcome::Invalid;
+    }
     for &(code, lo, hi) in VAT_COUNTRY_LENGTHS {
         if code == prefix {
             return ValidationOutcome::from_bool((lo..=hi).contains(&body_len));
         }
     }
-    ValidationOutcome::Unknown
+    ValidationOutcome::Invalid
 }
