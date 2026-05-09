@@ -41,4 +41,4 @@ pub use crate::operators::{ChunkCount, HashAlgorithm, Operator};
 pub use crate::redact::{RedactionError, RedactionStats, Redactor};
 pub use crate::result::{AnalysisExplanation, RecognizerResult};
 pub use crate::score::{MAX_SCORE, Score};
-pub use crate::types::{Category, EntityType, ValidationOutcome, entity};
+pub use crate::types::{Category, Entity, ParseEntityError, ValidationOutcome};

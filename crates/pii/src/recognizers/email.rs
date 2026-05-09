@@ -5,7 +5,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 
 /// Build the `EMAIL_ADDRESS` recognizer.
 ///
@@ -21,7 +21,7 @@ pub fn email() -> Recognizer {
         Score::from_static(0.5),
     )
     .expect("static email pattern compiles");
-    Recognizer::new(entity::EMAIL_ADDRESS, vec![pattern])
+    Recognizer::new(Entity::EmailAddress, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("EmailRecognizer")
         .with_category(Category::Personal)

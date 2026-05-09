@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::Validator;
 
 /// Build the `NHS_NUMBER` recognizer.
@@ -19,7 +19,7 @@ pub fn nhs_number() -> Recognizer {
         Score::from_static(0.4),
     )
     .expect("static NHS pattern compiles");
-    Recognizer::new(entity::NHS_NUMBER, vec![pattern])
+    Recognizer::new(Entity::NhsNumber, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("NhsNumberRecognizer")
         .with_validator(Validator::Mod11Nhs)

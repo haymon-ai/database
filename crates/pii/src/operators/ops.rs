@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use crate::types::EntityType;
+use crate::types::Entity;
 
 use super::{hash, mask};
 
@@ -66,15 +66,13 @@ pub enum OperatorKind {
 impl Operator {
     /// Default placeholder operator: `Replace { new_value: "<{entity_type}>" }`.
     ///
-    /// Built-in entity types are returned as `Cow::Borrowed(&'static str)` (zero
-    /// allocation); custom entity types fall back to a one-time `format!`.
+    /// Always borrows a `'static` placeholder from [`Entity::placeholder`] —
+    /// zero allocation since the entity set is closed.
     #[must_use]
-    pub fn default_for(entity_type: &EntityType) -> Self {
-        let new_value = match builtin_placeholder(entity_type.as_str()) {
-            Some(s) => Cow::Borrowed(s),
-            None => Cow::Owned(format!("<{}>", entity_type.as_str())),
-        };
-        Self::Replace { new_value }
+    pub const fn default_for(entity: Entity) -> Self {
+        Self::Replace {
+            new_value: Cow::Borrowed(entity.placeholder()),
+        }
     }
 
     /// Default `Mask` per spec clarification: `'*'`, full span, length-preserving.
@@ -120,34 +118,4 @@ impl Operator {
             Self::Hash { algorithm } => Cow::Owned(hash::apply(candidate, *algorithm)),
         }
     }
-}
-
-fn builtin_placeholder(entity_type: &str) -> Option<&'static str> {
-    Some(match entity_type {
-        "EMAIL_ADDRESS" => "<EMAIL_ADDRESS>",
-        "CREDIT_CARD" => "<CREDIT_CARD>",
-        "IBAN_CODE" => "<IBAN_CODE>",
-        "IP_ADDRESS" => "<IP_ADDRESS>",
-        "URL" => "<URL>",
-        "PHONE_NUMBER" => "<PHONE_NUMBER>",
-        "CRYPTO" => "<CRYPTO>",
-        "US_SSN" => "<US_SSN>",
-        "API_KEY" => "<API_KEY>",
-        "BANK_ACCOUNT_UK" => "<BANK_ACCOUNT_UK>",
-        "CVV" => "<CVV>",
-        "ITIN" => "<ITIN>",
-        "JWT_TOKEN" => "<JWT_TOKEN>",
-        "MAC_ADDRESS" => "<MAC_ADDRESS>",
-        "NHS_NUMBER" => "<NHS_NUMBER>",
-        "NINO_UK" => "<NINO_UK>",
-        "PASSPORT_UK" => "<PASSPORT_UK>",
-        "PASSPORT_US" => "<PASSPORT_US>",
-        "PRIVATE_KEY" => "<PRIVATE_KEY>",
-        "ROUTING_NUMBER_US" => "<ROUTING_NUMBER_US>",
-        "SIN_CA" => "<SIN_CA>",
-        "SORT_CODE_UK" => "<SORT_CODE_UK>",
-        "TAX_ID_EIN" => "<TAX_ID_EIN>",
-        "VAT_NUMBER" => "<VAT_NUMBER>",
-        _ => return None,
-    })
 }

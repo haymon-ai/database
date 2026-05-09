@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::Validator;
 
 /// Build the `TAX_ID_EIN` recognizer.
@@ -15,7 +15,7 @@ use crate::validators::Validator;
 pub fn tax_id_ein() -> Recognizer {
     let pattern =
         Regex::new("US EIN", r"\b\d{2}-\d{7}\b", Score::from_static(0.5)).expect("static EIN pattern compiles");
-    Recognizer::new(entity::TAX_ID_EIN, vec![pattern])
+    Recognizer::new(Entity::TaxIdEin, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("TaxIdEinRecognizer")
         .with_validator(Validator::EinPrefix)

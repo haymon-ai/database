@@ -12,7 +12,7 @@ use crate::error::RecognizerError;
 use crate::regex::Regex;
 use crate::result::{AnalysisExplanation, RecognizerResult};
 use crate::score::{MAX_SCORE, MIN_SCORE};
-use crate::types::{Category, EntityType, ValidationOutcome};
+use crate::types::{Category, Entity, ValidationOutcome};
 use crate::validators::Validator;
 
 mod all;
@@ -70,7 +70,7 @@ pub use vat_number::vat_number;
 /// Generic regex/checksum recognizer used by every built-in entity type.
 #[derive(Debug)]
 pub struct Recognizer {
-    entity_type: EntityType,
+    entity_type: Entity,
     name: Cow<'static, str>,
     regexes: Vec<Regex>,
     validator: Validator,
@@ -78,12 +78,12 @@ pub struct Recognizer {
 }
 
 impl Recognizer {
-    /// Build a recognizer for `entity_type`. Defaults: name `"<EntityType>Recognizer"`, no validator.
+    /// Build a recognizer for `entity_type`. Defaults: name `"<Entity>Recognizer"`, no validator.
     ///
     /// # Errors
     ///
     /// Returns [`RecognizerError::EmptyPatternList`] when `regexes` is empty.
-    pub fn new(entity_type: EntityType, regexes: Vec<Regex>) -> Result<Self, RecognizerError> {
+    pub fn new(entity_type: Entity, regexes: Vec<Regex>) -> Result<Self, RecognizerError> {
         if regexes.is_empty() {
             return Err(RecognizerError::EmptyPatternList);
         }
@@ -126,7 +126,7 @@ impl Recognizer {
 
     /// Entity types this recognizer is capable of emitting.
     #[must_use]
-    pub fn supported_entities(&self) -> &[EntityType] {
+    pub fn supported_entities(&self) -> &[Entity] {
         slice::from_ref(&self.entity_type)
     }
 
@@ -166,7 +166,7 @@ impl Recognizer {
             return None;
         }
         Some(RecognizerResult {
-            entity_type: self.entity_type.clone(),
+            entity_type: self.entity_type,
             start,
             end,
             score: final_score,

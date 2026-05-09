@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::Validator;
 
 /// Build the `NINO_UK` recognizer.
@@ -19,7 +19,7 @@ pub fn nino_uk() -> Recognizer {
         Score::from_static(0.4),
     )
     .expect("static NINO pattern compiles");
-    Recognizer::new(entity::NINO_UK, vec![pattern])
+    Recognizer::new(Entity::NinoUk, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("NinoUkRecognizer")
         .with_validator(Validator::NinoBlocklist)

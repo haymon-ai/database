@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 
 /// Build the `MAC_ADDRESS` recognizer.
 ///
@@ -18,7 +18,7 @@ pub fn mac_address() -> Recognizer {
         Score::from_static(0.5),
     )
     .expect("static MAC pattern compiles");
-    Recognizer::new(entity::MAC_ADDRESS, vec![pattern])
+    Recognizer::new(Entity::MacAddress, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("MacAddressRecognizer")
         .with_category(Category::Network)

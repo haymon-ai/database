@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 
 /// Build the `URL` recognizer.
 ///
@@ -18,7 +18,7 @@ pub fn url() -> Recognizer {
         Score::from_static(0.5),
     )
     .expect("static URL pattern compiles");
-    Recognizer::new(entity::URL, vec![pattern])
+    Recognizer::new(Entity::Url, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("UrlRecognizer")
         .with_category(Category::Network)

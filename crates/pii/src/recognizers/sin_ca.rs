@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::{KeywordValidator, Validator};
 
 const KEYWORDS: &[&str] = &[
@@ -30,7 +30,7 @@ pub fn sin_ca() -> Recognizer {
         Box::new(Validator::LuhnSin),
         Box::new(Validator::Keyword(KeywordValidator::new(KEYWORDS))),
     );
-    Recognizer::new(entity::SIN_CA, vec![pattern])
+    Recognizer::new(Entity::SinCa, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("SinCaRecognizer")
         .with_validator(validator)

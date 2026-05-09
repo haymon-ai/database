@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::Validator;
 
 /// Build the `JWT_TOKEN` recognizer.
@@ -19,7 +19,7 @@ pub fn jwt_token() -> Recognizer {
         Score::from_static(0.3),
     )
     .expect("static JWT pattern compiles");
-    Recognizer::new(entity::JWT_TOKEN, vec![pattern])
+    Recognizer::new(Entity::JwtToken, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("JwtTokenRecognizer")
         .with_validator(Validator::JwtHeader)

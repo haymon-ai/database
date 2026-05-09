@@ -22,6 +22,7 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
+use crate::types::Entity;
 use crate::{AnalyzeOptions, Analyzer, OperatorConfig, anonymize};
 
 /// Errors produced by [`Redactor::apply`].
@@ -44,7 +45,7 @@ pub struct RedactionStats {
     /// Total spans rewritten across the request.
     pub total: u64,
     /// Per-entity-type counts; `BTreeMap` keeps tracing output stable.
-    pub by_entity: BTreeMap<String, u64>,
+    pub by_entity: BTreeMap<Entity, u64>,
     /// Number of `Value::String` leaves examined by the analyzer.
     ///
     /// Counts every leaf the walker reached, even ones that produced no
@@ -122,11 +123,7 @@ impl Redactor {
                         }
                         for op in &anon.operations {
                             stats.total += 1;
-                            if let Some(v) = stats.by_entity.get_mut(op.entity_type.as_str()) {
-                                *v += 1;
-                            } else {
-                                stats.by_entity.insert(op.entity_type.as_str().to_owned(), 1);
-                            }
+                            *stats.by_entity.entry(op.entity_type).or_insert(0) += 1;
                         }
                         *s = anon.text;
                     }
@@ -157,7 +154,6 @@ impl Redactor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::EntityType;
     use crate::recognizers::Recognizer;
     use crate::regex::Regex;
     use crate::score::Score;
@@ -176,7 +172,7 @@ mod tests {
         let stats = r.apply(&mut rows).expect("apply ok");
         assert_eq!(rows[0]["msg"], "ping me at <EMAIL_ADDRESS>");
         assert_eq!(stats.total, 1);
-        assert_eq!(stats.by_entity.get("EMAIL_ADDRESS").copied(), Some(1));
+        assert_eq!(stats.by_entity.get(&Entity::EmailAddress).copied(), Some(1));
         assert_eq!(stats.string_leaves_scanned, 1);
     }
 
@@ -197,7 +193,7 @@ mod tests {
         assert_eq!(rows[0]["arr"], json!(["<EMAIL_ADDRESS>"]));
         assert_eq!(rows[0]["obj"], json!({"k": "<EMAIL_ADDRESS>"}));
         assert_eq!(stats.total, 2);
-        assert_eq!(stats.by_entity.get("EMAIL_ADDRESS").copied(), Some(2));
+        assert_eq!(stats.by_entity.get(&Entity::EmailAddress).copied(), Some(2));
         assert_eq!(stats.string_leaves_scanned, 2);
     }
 
@@ -232,8 +228,8 @@ mod tests {
         assert!(rows[0][3].is_null());
         assert_eq!(rows[0][4], json!({"ip": "<IP_ADDRESS>"}));
         assert_eq!(stats.total, 2);
-        assert_eq!(stats.by_entity.get("EMAIL_ADDRESS").copied(), Some(1));
-        assert_eq!(stats.by_entity.get("IP_ADDRESS").copied(), Some(1));
+        assert_eq!(stats.by_entity.get(&Entity::EmailAddress).copied(), Some(1));
+        assert_eq!(stats.by_entity.get(&Entity::IpAddress).copied(), Some(1));
         assert_eq!(stats.string_leaves_scanned, 2);
     }
 
@@ -454,7 +450,7 @@ mod tests {
     /// exercise the fail-closed `catch_unwind` branch.
     fn panicking_rule() -> Recognizer {
         let regex = Regex::new("anything", r".+", Score::from_static(0.9)).expect("static panic-rule regex compiles");
-        Recognizer::new(EntityType::new("PANIC"), vec![regex])
+        Recognizer::new(Entity::EmailAddress, vec![regex])
             .expect("non-empty pattern list")
             .with_validator(Validator::Panic)
     }

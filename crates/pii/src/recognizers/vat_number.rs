@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::Validator;
 
 /// Build the `VAT_NUMBER` recognizer.
@@ -19,7 +19,7 @@ pub fn vat_number() -> Recognizer {
         Score::from_static(0.4),
     )
     .expect("static VAT pattern compiles");
-    Recognizer::new(entity::VAT_NUMBER, vec![pattern])
+    Recognizer::new(Entity::VatNumber, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("VatNumberRecognizer")
         .with_validator(Validator::VatCountryLength)

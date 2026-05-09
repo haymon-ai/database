@@ -7,7 +7,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::Validator;
 
 /// Build the `IP_ADDRESS` recognizer.
@@ -29,7 +29,7 @@ pub fn ip_address() -> Recognizer {
     )
     .expect("static IPv6 pattern compiles");
 
-    Recognizer::new(entity::IP_ADDRESS, vec![ipv4, ipv6])
+    Recognizer::new(Entity::IpAddress, vec![ipv4, ipv6])
         .expect("non-empty pattern list")
         .with_name("IpRecognizer")
         .with_validator(Validator::IpAddress)

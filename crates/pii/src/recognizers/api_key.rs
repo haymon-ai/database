@@ -12,7 +12,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::{KeywordValidator, Validator};
 
 const AWS_SECRET_KEYWORDS: &[&str] = &["secret", "aws_secret_access_key", "aws_secret"];
@@ -32,7 +32,7 @@ pub fn api_key_strong() -> Recognizer {
         Regex::new("Google API", r"\bAIza[0-9A-Za-z_\-]{35}\b", s).expect("Google API compiles"),
         Regex::new("OpenAI", r"\bsk-[A-Za-z0-9]{48}\b", s).expect("OpenAI compiles"),
     ];
-    Recognizer::new(entity::API_KEY, patterns)
+    Recognizer::new(Entity::ApiKey, patterns)
         .expect("non-empty pattern list")
         .with_name("ApiKeyRecognizer")
         .with_category(Category::DigitalIdentity)
@@ -51,7 +51,7 @@ pub fn api_key_strong() -> Recognizer {
 pub fn api_key_aws_secret() -> Recognizer {
     let pattern = Regex::new("AWS secret", r"\b[A-Za-z0-9+/]{40}\b", Score::from_static(0.3))
         .expect("AWS secret pattern compiles");
-    Recognizer::new(entity::API_KEY, vec![pattern])
+    Recognizer::new(Entity::ApiKey, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("ApiKeyAwsSecretRecognizer")
         .with_validator(Validator::Keyword(KeywordValidator::new(AWS_SECRET_KEYWORDS)))

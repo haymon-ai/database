@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::{KeywordValidator, Validator};
 
 const KEYWORDS: &[&str] = &["passport", "travel document"];
@@ -17,7 +17,7 @@ const KEYWORDS: &[&str] = &["passport", "travel document"];
 pub fn passport_us() -> Recognizer {
     let pattern = Regex::new("US passport", r"(?i)\b[PE]\d{6,8}\b", Score::from_static(0.4))
         .expect("static US passport pattern compiles");
-    Recognizer::new(entity::PASSPORT_US, vec![pattern])
+    Recognizer::new(Entity::PassportUs, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("PassportUsRecognizer")
         .with_validator(Validator::Keyword(KeywordValidator::new(KEYWORDS)))

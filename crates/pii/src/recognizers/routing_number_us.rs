@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::{KeywordValidator, Validator};
 
 const KEYWORDS: &[&str] = &["routing", "aba", "rtn", "bank"];
@@ -21,7 +21,7 @@ pub fn routing_number_us() -> Recognizer {
         Box::new(Validator::AbaRouting),
         Box::new(Validator::Keyword(KeywordValidator::new(KEYWORDS))),
     );
-    Recognizer::new(entity::ROUTING_NUMBER_US, vec![pattern])
+    Recognizer::new(Entity::RoutingNumberUs, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("RoutingNumberUsRecognizer")
         .with_validator(validator)

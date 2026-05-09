@@ -7,7 +7,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::Validator;
 
 /// Build the `US_SSN` recognizer.
@@ -19,7 +19,7 @@ use crate::validators::Validator;
 pub fn us_ssn() -> Recognizer {
     let pattern = Regex::new("US SSN", r"\b\d{3}[- ]?\d{2}[- ]?\d{4}\b", Score::from_static(0.6))
         .expect("static SSN pattern compiles");
-    Recognizer::new(entity::US_SSN, vec![pattern])
+    Recognizer::new(Entity::UsSsn, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("UsSsnRecognizer")
         .with_validator(Validator::UsSsn)

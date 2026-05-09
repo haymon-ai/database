@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::{KeywordValidator, Validator};
 
 const KEYWORDS: &[&str] = &["account", "acct", "sort", "bank", "iban"];
@@ -21,7 +21,7 @@ pub fn bank_account_uk() -> Recognizer {
         Score::from_static(0.4),
     )
     .expect("static UK bank-account pattern compiles");
-    Recognizer::new(entity::BANK_ACCOUNT_UK, vec![pattern])
+    Recognizer::new(Entity::BankAccountUk, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("BankAccountUkRecognizer")
         .with_validator(Validator::Keyword(KeywordValidator::new(KEYWORDS)))

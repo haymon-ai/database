@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::Validator;
 
 /// Build the `ITIN` recognizer.
@@ -15,7 +15,7 @@ use crate::validators::Validator;
 pub fn itin() -> Recognizer {
     let pattern = Regex::new("US ITIN", r"\b9\d{2}-?[789]\d-?\d{4}\b", Score::from_static(0.5))
         .expect("static ITIN pattern compiles");
-    Recognizer::new(entity::ITIN, vec![pattern])
+    Recognizer::new(Entity::Itin, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("ItinRecognizer")
         .with_validator(Validator::ItinRange)

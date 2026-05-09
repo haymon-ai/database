@@ -5,7 +5,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::Validator;
 
 /// Build the `CREDIT_CARD` recognizer.
@@ -21,7 +21,7 @@ pub fn credit_card() -> Recognizer {
         Score::from_static(0.3),
     )
     .expect("static credit-card pattern compiles");
-    Recognizer::new(entity::CREDIT_CARD, vec![pattern])
+    Recognizer::new(Entity::CreditCard, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("CreditCardRecognizer")
         .with_validator(Validator::Luhn)

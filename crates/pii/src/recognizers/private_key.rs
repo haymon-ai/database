@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::Validator;
 
 /// Build the `PRIVATE_KEY` recognizer.
@@ -19,7 +19,7 @@ pub fn private_key() -> Recognizer {
         Score::from_static(0.6),
     )
     .expect("static PEM pattern compiles");
-    Recognizer::new(entity::PRIVATE_KEY, vec![pattern])
+    Recognizer::new(Entity::PrivateKey, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("PrivateKeyRecognizer")
         .with_validator(Validator::PrivateKeyType)

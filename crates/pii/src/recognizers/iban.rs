@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::Validator;
 
 /// Build the `IBAN_CODE` recognizer.
@@ -19,7 +19,7 @@ pub fn iban() -> Recognizer {
         Score::from_static(0.5),
     )
     .expect("static IBAN pattern compiles");
-    Recognizer::new(entity::IBAN_CODE, vec![pattern])
+    Recognizer::new(Entity::IbanCode, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("IbanRecognizer")
         .with_validator(Validator::Iban)

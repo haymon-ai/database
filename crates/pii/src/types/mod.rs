@@ -1,10 +1,9 @@
-//! Core PII types: category tag, entity-type newtype, validation outcome, built-in entity constants.
+//! Core PII types: category tag, entity-type enum, validation outcome.
 
 pub mod category;
 pub mod entity;
-pub mod entity_type;
 pub mod validation;
 
 pub use category::{Category, ParseCategoryError};
-pub use entity_type::EntityType;
+pub use entity::{Entity, ParseEntityError};
 pub use validation::ValidationOutcome;

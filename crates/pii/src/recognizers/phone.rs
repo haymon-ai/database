@@ -7,7 +7,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::Validator;
 
 /// Build the `PHONE_NUMBER` recognizer.
@@ -24,7 +24,7 @@ pub fn phone_number() -> Recognizer {
         Regex::new("UK", r"\+?\b(?:44[\s-]?)?0?[1-9](?:[\s-]?\d){8,9}\b", s).expect("UK compiles"),
         Regex::new("DE", r"\+?\b(?:49[\s-]?)?0?[1-9](?:[\s-]?\d){7,11}\b", s).expect("DE compiles"),
     ];
-    Recognizer::new(entity::PHONE_NUMBER, patterns)
+    Recognizer::new(Entity::PhoneNumber, patterns)
         .expect("non-empty pattern list")
         .with_name("PhoneRecognizer")
         .with_validator(Validator::PhoneNational)

@@ -5,7 +5,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 
 /// Build the `CRYPTO` recognizer.
 ///
@@ -19,7 +19,7 @@ pub fn crypto() -> Recognizer {
         Regex::new("BTC (legacy / SegWit-P2SH)", r"\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b", s).expect("BTC compiles"),
         Regex::new("ETH", r"\b0x[a-fA-F0-9]{40}\b", s).expect("ETH compiles"),
     ];
-    Recognizer::new(entity::CRYPTO, patterns)
+    Recognizer::new(Entity::Crypto, patterns)
         .expect("non-empty pattern list")
         .with_name("CryptoRecognizer")
         .with_category(Category::Crypto)

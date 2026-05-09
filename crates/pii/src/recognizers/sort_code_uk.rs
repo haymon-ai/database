@@ -3,7 +3,7 @@
 use super::Recognizer;
 use crate::regex::Regex;
 use crate::score::Score;
-use crate::types::{Category, entity};
+use crate::types::{Category, Entity};
 use crate::validators::{KeywordValidator, Validator};
 
 const KEYWORDS: &[&str] = &["sort", "sortcode", "sort code"];
@@ -21,7 +21,7 @@ pub fn sort_code_uk() -> Recognizer {
         Score::from_static(0.4),
     )
     .expect("static UK sort-code pattern compiles");
-    Recognizer::new(entity::SORT_CODE_UK, vec![pattern])
+    Recognizer::new(Entity::SortCodeUk, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("SortCodeUkRecognizer")
         .with_validator(Validator::Keyword(KeywordValidator::new(KEYWORDS)))
