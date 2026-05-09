@@ -158,9 +158,10 @@ impl Redactor {
 mod tests {
     use super::*;
     use crate::EntityType;
-    use crate::recognizer::{Rule, Validator};
+    use crate::recognizers::Recognizer;
     use crate::regex::Regex;
     use crate::score::Score;
+    use crate::validators::Validator;
     use dbmcp_config::PiiOperator;
     use serde_json::json;
 
@@ -451,9 +452,9 @@ mod tests {
 
     /// Build a rule whose validator panics on first invocation — used to
     /// exercise the fail-closed `catch_unwind` branch.
-    fn panicking_rule() -> Rule {
+    fn panicking_rule() -> Recognizer {
         let regex = Regex::new("anything", r".+", Score::from_static(0.9)).expect("static panic-rule regex compiles");
-        Rule::new(EntityType::new("PANIC"), vec![regex])
+        Recognizer::new(EntityType::new("PANIC"), vec![regex])
             .expect("non-empty pattern list")
             .with_validator(Validator::Panic)
     }

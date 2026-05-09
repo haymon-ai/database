@@ -25,18 +25,20 @@ pub mod anonymizer;
 #[cfg(feature = "test-support")]
 pub mod corpus;
 pub mod error;
-pub mod operator;
+pub mod operators;
 pub mod overlap;
-pub mod recognizer;
+pub mod recognizers;
 pub mod redact;
 pub mod regex;
 pub mod result;
 pub mod score;
+pub mod types;
+pub mod validators;
 
 pub use crate::analyzer::{AnalyzeOptions, Analyzer};
 pub use crate::anonymizer::{OperatorConfig, anonymize};
-pub use crate::operator::{ChunkCount, HashAlgorithm, Operator};
-pub use crate::recognizer::{Category, EntityType, ValidationOutcome, entity};
+pub use crate::operators::{ChunkCount, HashAlgorithm, Operator};
 pub use crate::redact::{RedactionError, RedactionStats, Redactor};
 pub use crate::result::{AnalysisExplanation, RecognizerResult};
 pub use crate::score::{MAX_SCORE, Score};
+pub use crate::types::{Category, EntityType, ValidationOutcome, entity};

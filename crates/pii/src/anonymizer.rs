@@ -5,10 +5,10 @@ use std::collections::HashMap;
 
 use dbmcp_config::PiiOperator;
 
-use crate::operator::Operator;
+use crate::operators::Operator;
 use crate::overlap;
-use crate::recognizer::EntityType;
 use crate::result::{OperatorResult, RecognizerResult};
+use crate::types::EntityType;
 
 /// Per-entity-type operator map handed to [`anonymize`].
 #[derive(Debug, Clone, Default)]
@@ -37,7 +37,7 @@ impl OperatorConfig {
 
 impl From<PiiOperator> for OperatorConfig {
     fn from(op: PiiOperator) -> Self {
-        use crate::operator::HashAlgorithm;
+        use crate::operators::HashAlgorithm;
         let default = match op {
             PiiOperator::Replace => None,
             PiiOperator::Mask => Some(Operator::default_mask()),
@@ -124,7 +124,7 @@ pub fn anonymize(text: &str, results: Vec<RecognizerResult>, config: &OperatorCo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::operator::HashAlgorithm;
+    use crate::operators::HashAlgorithm;
 
     #[test]
     fn pii_operator_replace_maps_to_default_none() {

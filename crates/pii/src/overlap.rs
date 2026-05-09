@@ -98,9 +98,9 @@ mod tests {
     use std::borrow::Cow;
 
     use super::resolve;
-    use crate::recognizer::{EntityType, ValidationOutcome};
     use crate::result::{AnalysisExplanation, RecognizerResult};
     use crate::score::Score;
+    use crate::types::{EntityType, ValidationOutcome};
 
     fn rr(et: &str, start: usize, end: usize, score: f32) -> RecognizerResult {
         let s = Score::new(score).unwrap();
