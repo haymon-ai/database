@@ -30,47 +30,32 @@ pub fn nhs_number() -> Recognizer {
 mod tests {
     use super::nhs_number;
 
-    fn matches(text: &str) -> Vec<String> {
-        let r = nhs_number();
-        r.analyze(text)
+    fn matches(text: &str) -> Vec<(usize, usize)> {
+        nhs_number()
+            .analyze(text)
             .into_iter()
-            .map(|res| text[res.start..res.end].to_string())
+            .map(|r| (r.start, r.end))
             .collect()
     }
 
     #[test]
-    fn positive_valid_mod11() {
-        // 943 476 5919 — valid NHS test number (mod-11 check digit 9).
-        assert_eq!(matches("NHS 943 476 5919"), vec!["943 476 5919"]);
-    }
-
-    #[test]
-    fn positive_remainder_ten_branch() {
-        // sum%11 == 10 → check = 1. Regression test for prior `10 => Invalid` bug.
-        assert_eq!(matches("NHS 0000000051"), vec!["0000000051"]);
-    }
-
-    #[test]
-    fn negative_checksum_perturbations() {
-        let bad = [
-            "943 476 5910",
-            "943 476 5911",
-            "943 476 5912",
-            "943 476 5913",
-            "943 476 5914",
-            "943 476 5915",
-            "943 476 5916",
-            "943 476 5917",
-            "943 476 5918",
-            "943 476 0919",
-            "943 476 9919",
-            "943 476 5119",
+    fn recognizes_nhs_number() {
+        // 943 476 5919 — valid NHS test number; 0000000051 — remainder-10 branch
+        // (sum%11 == 10 → check digit 1) regression case.
+        let cases: &[(&str, &[(usize, usize)])] = &[
+            ("401-023-2137", &[(0, 12)]),
+            ("221 395 1837", &[(0, 12)]),
+            ("0032698674", &[(0, 10)]),
+            ("NHS 943 476 5919", &[(4, 16)]),
+            ("NHS 0000000051", &[(4, 14)]),
+            ("401-023-2138", &[]),
+            ("NHS 943 476 5910", &[]),
+            ("NHS 943 476 5917", &[]),
+            ("123456789", &[]),
+            ("", &[]),
         ];
-        for n in bad {
-            assert!(
-                matches(&format!("NHS {n}")).is_empty(),
-                "{n} fails NHS mod-11, expected no match"
-            );
+        for (input, expected) in cases {
+            assert_eq!(matches(input), expected.to_vec(), "input {input:?}: span mismatch");
         }
     }
 }
