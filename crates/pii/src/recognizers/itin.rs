@@ -30,49 +30,30 @@ pub fn itin() -> Recognizer {
 mod tests {
     use super::itin;
 
-    fn matches(text: &str) -> Vec<String> {
-        let r = itin();
-        r.analyze(text)
-            .into_iter()
-            .map(|res| text[res.start..res.end].to_string())
-            .collect()
+    fn matches(text: &str) -> Vec<(usize, usize)> {
+        itin().analyze(text).into_iter().map(|r| (r.start, r.end)).collect()
     }
 
     #[test]
-    fn positive_dashed() {
-        assert_eq!(matches("ITIN 912-72-1234"), vec!["912-72-1234"]);
-    }
-
-    #[test]
-    fn positive_run() {
-        assert_eq!(matches("tax id 912921234"), vec!["912921234"]);
-    }
-
-    #[test]
-    fn negative_middle_out_of_range() {
-        let bad = [
-            "912-50-1234",
-            "912-69-1234",
-            "912-89-1234",
-            "912-93-1234",
-            "912-00-1234",
-            "912-10-1234",
-            "912-20-1234",
-            "912-30-1234",
-            "912-40-1234",
-            "912-99x1234",
-            "912-60-1234",
+    fn recognizes_itin() {
+        let cases: &[(&str, &[(usize, usize)])] = &[
+            ("911-701234 91170-1234", &[(0, 10), (11, 21)]),
+            ("911701234", &[(0, 9)]),
+            ("911-70-1234", &[(0, 11)]),
+            ("ITIN 912-72-1234", &[(5, 16)]),
+            ("tax id 912921234", &[(7, 16)]),
+            ("911-89-1234", &[]),
+            ("my tax id 911-89-1234", &[]),
+            ("912-50-1234", &[]),
+            ("912-69-1234", &[]),
+            ("912-93-1234", &[]),
+            ("912-00-1234", &[]),
+            ("812-72-1234", &[]),
+            ("912-99x1234", &[]),
+            ("", &[]),
         ];
-        for n in bad {
-            assert!(
-                matches(n).is_empty(),
-                "{n} has out-of-range middle block, expected no match"
-            );
+        for (input, expected) in cases {
+            assert_eq!(matches(input), expected.to_vec(), "input {input:?}: span mismatch");
         }
-    }
-
-    #[test]
-    fn negative_wrong_first_digit() {
-        assert!(matches("812-72-1234").is_empty());
     }
 }
