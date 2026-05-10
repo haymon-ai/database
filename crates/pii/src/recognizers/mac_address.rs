@@ -28,34 +28,28 @@ pub fn mac_address() -> Recognizer {
 mod tests {
     use super::mac_address;
 
-    fn matches(text: &str) -> Vec<String> {
-        let r = mac_address();
-        r.analyze(text)
+    fn matches(text: &str) -> Vec<(usize, usize)> {
+        mac_address()
+            .analyze(text)
             .into_iter()
-            .map(|res| text[res.start..res.end].to_string())
+            .map(|r| (r.start, r.end))
             .collect()
     }
 
     #[test]
-    fn positive_colon() {
-        assert_eq!(matches("interface 01:23:45:AB:CD:EF"), vec!["01:23:45:AB:CD:EF"]);
-    }
-
-    #[test]
-    fn positive_dash() {
-        assert_eq!(matches("nic 01-23-45-ab-cd-ef present"), vec!["01-23-45-ab-cd-ef"]);
-    }
-
-    #[test]
-    fn negative_too_short() {
-        assert!(matches("01:23:45:AB:CD").is_empty());
-    }
-
-    #[test]
-    fn seven_octets_still_match_first_six() {
-        // Regex anchors on \b before/after the 6-octet token; the trailing `:01`
-        // does not break the first match. Documented: oversized run yields the
-        // legal 6-octet span at the head.
-        assert_eq!(matches("01:23:45:AB:CD:EF:01"), vec!["01:23:45:AB:CD:EF"]);
+    fn recognizes_mac_address() {
+        let cases: &[(&str, &[(usize, usize)])] = &[
+            ("interface 01:23:45:AB:CD:EF", &[(10, 27)]),
+            ("nic 01-23-45-ab-cd-ef present", &[(4, 21)]),
+            ("01-23-45-AB-CD-EF", &[(0, 17)]),
+            ("dev1 00:11:22:33:44:55 dev2 aa-bb-cc-dd-ee-ff", &[(5, 22), (28, 45)]),
+            ("01:23:45:AB:CD:EF:01", &[(0, 17)]),
+            ("01:23:45:AB:CD", &[]),
+            ("01:23:45:AB:CD:GG", &[]),
+            ("", &[]),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(matches(input), expected.to_vec(), "input {input:?}: span mismatch");
+        }
     }
 }
