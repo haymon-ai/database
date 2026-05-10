@@ -1,10 +1,10 @@
 //! `NINO_UK` recognizer (UK National Insurance Number with prefix blocklist).
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
 use crate::validators::Validator;
+use crate::{Category, Entity};
 
 /// Build the `NINO_UK` recognizer.
 ///
@@ -13,7 +13,7 @@ use crate::validators::Validator;
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
 pub fn nino_uk() -> Recognizer {
-    let pattern = Regex::new(
+    let pattern = Pattern::new(
         "UK NINO",
         r"(?i)\b[A-Z]{2}[ -]?\d{2}[ -]?\d{2}[ -]?\d{2}[ -]?[A-D]?\b",
         Score::from_static(0.4),

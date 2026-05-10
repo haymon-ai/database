@@ -1,7 +1,7 @@
 //! UK NHS-number mod-11 checksum validator.
 
 use super::digits::collect_digits;
-use crate::types::ValidationOutcome;
+use crate::ValidationOutcome;
 
 /// UK NHS number mod-11 validator.
 ///
@@ -29,7 +29,7 @@ pub(super) fn validate(candidate: &str) -> ValidationOutcome {
 #[cfg(test)]
 mod tests {
     use super::validate;
-    use crate::types::ValidationOutcome;
+    use crate::ValidationOutcome;
 
     #[test]
     fn remainder_ten_branch_is_valid() {

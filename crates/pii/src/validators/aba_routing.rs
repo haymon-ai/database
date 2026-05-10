@@ -1,7 +1,7 @@
 //! US ABA routing-number checksum validator.
 
 use super::digits::collect_digits;
-use crate::types::ValidationOutcome;
+use crate::ValidationOutcome;
 
 /// US ABA routing-number checksum.
 ///

@@ -19,7 +19,7 @@ mod vat_country_length;
 
 use std::ops::Range;
 
-use crate::types::ValidationOutcome;
+use crate::ValidationOutcome;
 
 pub use keyword::KeywordValidator;
 

@@ -3,7 +3,7 @@
 use base64::Engine;
 use serde::Deserialize;
 
-use crate::types::ValidationOutcome;
+use crate::ValidationOutcome;
 
 #[derive(Deserialize)]
 struct Header {

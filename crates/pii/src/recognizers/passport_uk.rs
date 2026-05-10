@@ -1,10 +1,10 @@
 //! `PASSPORT_UK` recognizer (keyword-context required).
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
 use crate::validators::{KeywordValidator, Validator};
+use crate::{Category, Entity};
 
 const KEYWORDS: &[&str] = &["passport", "travel document"];
 
@@ -15,7 +15,7 @@ const KEYWORDS: &[&str] = &["passport", "travel document"];
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
 pub fn passport_uk() -> Recognizer {
-    let pattern = Regex::new("UK passport (9 digits)", r"\b\d{9}\b", Score::from_static(0.4))
+    let pattern = Pattern::new("UK passport (9 digits)", r"\b\d{9}\b", Score::from_static(0.4))
         .expect("static UK passport pattern compiles");
     Recognizer::new(Entity::PassportUk, vec![pattern])
         .expect("non-empty pattern list")

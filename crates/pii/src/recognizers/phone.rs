@@ -5,10 +5,10 @@
 //! runs that aren't valid national-format phones (issue #147).
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
 use crate::validators::Validator;
+use crate::{Category, Entity};
 
 /// Build the `PHONE_NUMBER` recognizer.
 ///
@@ -19,10 +19,10 @@ use crate::validators::Validator;
 pub fn phone_number() -> Recognizer {
     let s = Score::from_static(0.4);
     let patterns = vec![
-        Regex::new("E.164", r"\+\d{8,15}\b", s).expect("E.164 compiles"),
-        Regex::new("US", r"[+(]?\b(?:1[\s-]?)?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b", s).expect("US compiles"),
-        Regex::new("UK", r"\+?\b(?:44[\s-]?)?0?[1-9](?:[\s-]?\d){8,9}\b", s).expect("UK compiles"),
-        Regex::new("DE", r"\+?\b(?:49[\s-]?)?0?[1-9](?:[\s-]?\d){7,11}\b", s).expect("DE compiles"),
+        Pattern::new("E.164", r"\+\d{8,15}\b", s).expect("E.164 compiles"),
+        Pattern::new("US", r"[+(]?\b(?:1[\s-]?)?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b", s).expect("US compiles"),
+        Pattern::new("UK", r"\+?\b(?:44[\s-]?)?0?[1-9](?:[\s-]?\d){8,9}\b", s).expect("UK compiles"),
+        Pattern::new("DE", r"\+?\b(?:49[\s-]?)?0?[1-9](?:[\s-]?\d){7,11}\b", s).expect("DE compiles"),
     ];
     Recognizer::new(Entity::PhoneNumber, patterns)
         .expect("non-empty pattern list")

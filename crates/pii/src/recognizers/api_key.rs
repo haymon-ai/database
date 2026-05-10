@@ -10,10 +10,10 @@
 //! requirements on the strongly-anchored providers.
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
 use crate::validators::{KeywordValidator, Validator};
+use crate::{Category, Entity};
 
 const AWS_SECRET_KEYWORDS: &[&str] = &["secret", "aws_secret_access_key", "aws_secret"];
 
@@ -26,11 +26,11 @@ const AWS_SECRET_KEYWORDS: &[&str] = &["secret", "aws_secret_access_key", "aws_s
 pub fn api_key_strong() -> Recognizer {
     let s = Score::from_static(0.6);
     let patterns = vec![
-        Regex::new("AWS access", r"\bAKIA[A-Z2-7]{16}\b", s).expect("AWS access compiles"),
-        Regex::new("GitHub PAT", r"\bgh[pousr]_[A-Za-z0-9]{36}\b", s).expect("GitHub PAT compiles"),
-        Regex::new("Stripe live", r"\b(?:sk|pk)_live_[A-Za-z0-9]{24,}\b", s).expect("Stripe compiles"),
-        Regex::new("Google API", r"\bAIza[0-9A-Za-z_\-]{35}\b", s).expect("Google API compiles"),
-        Regex::new("OpenAI", r"\bsk-[A-Za-z0-9]{48}\b", s).expect("OpenAI compiles"),
+        Pattern::new("AWS access", r"\bAKIA[A-Z2-7]{16}\b", s).expect("AWS access compiles"),
+        Pattern::new("GitHub PAT", r"\bgh[pousr]_[A-Za-z0-9]{36}\b", s).expect("GitHub PAT compiles"),
+        Pattern::new("Stripe live", r"\b(?:sk|pk)_live_[A-Za-z0-9]{24,}\b", s).expect("Stripe compiles"),
+        Pattern::new("Google API", r"\bAIza[0-9A-Za-z_\-]{35}\b", s).expect("Google API compiles"),
+        Pattern::new("OpenAI", r"\bsk-[A-Za-z0-9]{48}\b", s).expect("OpenAI compiles"),
     ];
     Recognizer::new(Entity::ApiKey, patterns)
         .expect("non-empty pattern list")
@@ -49,7 +49,7 @@ pub fn api_key_strong() -> Recognizer {
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
 pub fn api_key_aws_secret() -> Recognizer {
-    let pattern = Regex::new("AWS secret", r"\b[A-Za-z0-9+/]{40}\b", Score::from_static(0.3))
+    let pattern = Pattern::new("AWS secret", r"\b[A-Za-z0-9+/]{40}\b", Score::from_static(0.3))
         .expect("AWS secret pattern compiles");
     Recognizer::new(Entity::ApiKey, vec![pattern])
         .expect("non-empty pattern list")

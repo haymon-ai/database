@@ -1,7 +1,7 @@
 //! UK NINO prefix blocklist validator.
 
 use super::digits::collect_upper_alnum;
-use crate::types::ValidationOutcome;
+use crate::ValidationOutcome;
 
 const NINO_BLOCKED_PREFIXES: &[[u8; 2]] = &[*b"BG", *b"GB", *b"KN", *b"NK", *b"NT", *b"TN", *b"ZZ"];
 
@@ -49,7 +49,7 @@ pub(super) fn validate(candidate: &str) -> ValidationOutcome {
 #[cfg(test)]
 mod tests {
     use super::validate;
-    use crate::types::ValidationOutcome;
+    use crate::ValidationOutcome;
 
     #[test]
     fn rejects_disallowed_first_letter() {

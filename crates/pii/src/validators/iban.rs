@@ -1,6 +1,6 @@
 //! IBAN mod-97 checksum validator.
 
-use crate::types::ValidationOutcome;
+use crate::ValidationOutcome;
 
 /// IBAN mod-97 validator. Accepts upper-case input; whitespace stripped before checking.
 pub(super) fn validate(candidate: &str) -> ValidationOutcome {
@@ -42,7 +42,7 @@ fn mod97<I: Iterator<Item = u8>>(bytes: I) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::validate;
-    use crate::types::ValidationOutcome;
+    use crate::ValidationOutcome;
 
     #[test]
     fn iban_valid_de() {

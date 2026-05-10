@@ -2,7 +2,7 @@
 
 use super::digits::collect_digits;
 use super::luhn::luhn_passes;
-use crate::types::ValidationOutcome;
+use crate::ValidationOutcome;
 
 /// Luhn checksum gated to exactly 9 digits, used by `SIN_CA`.
 ///

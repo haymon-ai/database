@@ -1,7 +1,7 @@
 //! US ITIN middle-block range validator.
 
 use super::digits::collect_digits;
-use crate::types::ValidationOutcome;
+use crate::ValidationOutcome;
 
 /// US ITIN middle-block range validator.
 ///

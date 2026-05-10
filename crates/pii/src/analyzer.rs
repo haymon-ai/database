@@ -2,12 +2,12 @@
 
 use dbmcp_config::{PiiCategory, PiiConfig};
 
+use crate::Category;
 use crate::error::AnalyzerBuildError;
 use crate::overlap;
 use crate::recognizers::Recognizer;
 use crate::result::RecognizerResult;
 use crate::score::Score;
-use crate::types::Category;
 
 /// Per-call overrides handed to [`Analyzer::analyze`].
 ///

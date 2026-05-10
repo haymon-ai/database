@@ -3,9 +3,9 @@
 //! Pattern adapted from Presidio's `EmailRecognizer.PATTERNS["Email (Medium)"]`.
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
+use crate::{Category, Entity};
 
 /// Build the `EMAIL_ADDRESS` recognizer.
 ///
@@ -15,7 +15,7 @@ use crate::types::{Category, Entity};
 /// both are unit-tested.
 #[must_use]
 pub fn email() -> Recognizer {
-    let pattern = Regex::new(
+    let pattern = Pattern::new(
         "Email (Medium)",
         r"\b[A-Za-z0-9!#$%&'*+\-/=?^_`{|}~]+(?:\.[A-Za-z0-9!#$%&'*+\-/=?^_`{|}~]+)*@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+\b",
         Score::from_static(0.5),

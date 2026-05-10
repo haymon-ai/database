@@ -100,7 +100,7 @@ mod tests {
     use super::resolve;
     use crate::result::{AnalysisExplanation, RecognizerResult};
     use crate::score::Score;
-    use crate::types::{Entity, ValidationOutcome};
+    use crate::{Entity, ValidationOutcome};
 
     fn rr(et: Entity, start: usize, end: usize, score: f32) -> RecognizerResult {
         let s = Score::new(score).unwrap();

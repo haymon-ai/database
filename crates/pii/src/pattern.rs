@@ -11,15 +11,15 @@ use crate::score::Score;
 /// Backed by the linear-time `regex` crate (RE2 semantics). Compiled eagerly
 /// so a bad pattern is rejected at construction, not at match time.
 #[derive(Clone)]
-pub struct Regex {
+pub struct Pattern {
     name: Cow<'static, str>,
     score: Score,
     pub(crate) compiled: regex::Regex,
 }
 
-impl fmt::Debug for Regex {
+impl fmt::Debug for Pattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Regex")
+        f.debug_struct("Pattern")
             .field("name", &self.name)
             .field("regex", &self.compiled.as_str())
             .field("score", &self.score)
@@ -27,7 +27,7 @@ impl fmt::Debug for Regex {
     }
 }
 
-impl Regex {
+impl Pattern {
     /// Build a pattern.
     ///
     /// # Errors
@@ -46,13 +46,13 @@ impl Regex {
         })
     }
 
-    /// Regex's human-readable name; surfaced in [`crate::AnalysisExplanation`].
+    /// Pattern's human-readable name; surfaced in [`crate::AnalysisExplanation`].
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// Regex name as a cheap-to-clone [`Cow`]; static literals stay borrowed.
+    /// Pattern name as a cheap-to-clone [`Cow`]; static literals stay borrowed.
     pub(crate) fn name_cow(&self) -> Cow<'static, str> {
         self.name.clone()
     }
@@ -72,7 +72,7 @@ impl Regex {
 
 #[cfg(test)]
 mod tests {
-    use super::Regex;
+    use super::Pattern;
     use crate::error::PatternError;
     use crate::score::Score;
 
@@ -82,21 +82,21 @@ mod tests {
 
     #[test]
     fn rejects_invalid_regex() {
-        let err = Regex::new("bad", "(unclosed", s(0.5)).unwrap_err();
+        let err = Pattern::new("bad", "(unclosed", s(0.5)).unwrap_err();
         assert!(matches!(err, PatternError::InvalidRegex(_)));
     }
 
     #[test]
     #[allow(clippy::float_cmp)]
     fn accepts_valid_regex() {
-        let p = Regex::new("digits", r"\b\d+\b", s(0.5)).unwrap();
+        let p = Pattern::new("digits", r"\b\d+\b", s(0.5)).unwrap();
         assert_eq!(p.score().as_f32(), 0.5);
     }
 
     #[test]
     fn rejects_lookbehind() {
         // The `regex` crate does not support lookbehind; the pattern is rejected.
-        let err = Regex::new("bad_lb", r"(?<!a)b", s(0.5)).unwrap_err();
+        let err = Pattern::new("bad_lb", r"(?<!a)b", s(0.5)).unwrap_err();
         assert!(matches!(err, PatternError::InvalidRegex(_)));
     }
 }

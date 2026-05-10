@@ -1,10 +1,10 @@
 //! `JWT_TOKEN` recognizer (header `alg` field validated; signature NOT verified).
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
 use crate::validators::Validator;
+use crate::{Category, Entity};
 
 /// Build the `JWT_TOKEN` recognizer.
 ///
@@ -13,7 +13,7 @@ use crate::validators::Validator;
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
 pub fn jwt_token() -> Recognizer {
-    let pattern = Regex::new(
+    let pattern = Pattern::new(
         "JWT (3 base64url segments)",
         r"\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b",
         Score::from_static(0.3),

@@ -1,10 +1,10 @@
 //! `CVV` recognizer (keyword-context required).
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
 use crate::validators::{KeywordValidator, Validator};
+use crate::{Category, Entity};
 
 const KEYWORDS: &[&str] = &["cvv", "cvc", "csc", "security code"];
 
@@ -16,7 +16,7 @@ const KEYWORDS: &[&str] = &["cvv", "cvc", "csc", "security code"];
 #[must_use]
 pub fn cvv() -> Recognizer {
     let pattern =
-        Regex::new("CVV (3-4 digits)", r"\b\d{3,4}\b", Score::from_static(0.3)).expect("static CVV pattern compiles");
+        Pattern::new("CVV (3-4 digits)", r"\b\d{3,4}\b", Score::from_static(0.3)).expect("static CVV pattern compiles");
     Recognizer::new(Entity::Cvv, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("CvvRecognizer")

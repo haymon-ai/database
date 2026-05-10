@@ -5,7 +5,7 @@
 //! digit run shorter than 11 digits — the false-positive class fixed
 //! by issue #147.
 
-use crate::types::ValidationOutcome;
+use crate::ValidationOutcome;
 
 /// Phone-number national-format grammar validator.
 ///
@@ -61,7 +61,7 @@ pub(super) fn validate(candidate: &str) -> ValidationOutcome {
 #[cfg(test)]
 mod tests {
     use super::validate;
-    use crate::types::ValidationOutcome;
+    use crate::ValidationOutcome;
 
     fn is_valid(s: &str) -> bool {
         validate(s) != ValidationOutcome::Invalid

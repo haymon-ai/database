@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use crate::score::Score;
-use crate::types::{Entity, ValidationOutcome};
+use crate::{Entity, ValidationOutcome};
 
 /// One detected PII span with audit trail.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

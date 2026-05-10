@@ -1,10 +1,10 @@
 //! `SIN_CA` recognizer (Luhn-validated, keyword-context required).
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
 use crate::validators::{KeywordValidator, Validator};
+use crate::{Category, Entity};
 
 const KEYWORDS: &[&str] = &[
     "sin",
@@ -20,7 +20,7 @@ const KEYWORDS: &[&str] = &[
 /// Panics only if the bundled regex source, score literal, or keyword set is rejected at construction.
 #[must_use]
 pub fn sin_ca() -> Recognizer {
-    let pattern = Regex::new(
+    let pattern = Pattern::new(
         "Canadian SIN",
         r"\b\d{3}[- ]?\d{3}[- ]?\d{3}\b",
         Score::from_static(0.4),

@@ -1,6 +1,6 @@
 //! Luhn checksum validator for credit-card numbers.
 
-use crate::types::ValidationOutcome;
+use crate::ValidationOutcome;
 
 /// Luhn checksum validator for credit-card numbers.
 ///
@@ -49,7 +49,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::validate;
-    use crate::types::ValidationOutcome;
+    use crate::ValidationOutcome;
 
     #[test]
     fn luhn_valid_visa() {

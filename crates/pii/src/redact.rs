@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::types::Entity;
+use crate::Entity;
 use crate::{AnalyzeOptions, Analyzer, OperatorConfig, anonymize};
 
 /// Errors produced by [`Redactor::apply`].
@@ -154,8 +154,8 @@ impl Redactor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pattern::Pattern;
     use crate::recognizers::Recognizer;
-    use crate::regex::Regex;
     use crate::score::Score;
     use crate::validators::Validator;
     use dbmcp_config::PiiOperator;
@@ -449,7 +449,7 @@ mod tests {
     /// Build a rule whose validator panics on first invocation — used to
     /// exercise the fail-closed `catch_unwind` branch.
     fn panicking_rule() -> Recognizer {
-        let regex = Regex::new("anything", r".+", Score::from_static(0.9)).expect("static panic-rule regex compiles");
+        let regex = Pattern::new("anything", r".+", Score::from_static(0.9)).expect("static panic-rule regex compiles");
         Recognizer::new(Entity::EmailAddress, vec![regex])
             .expect("non-empty pattern list")
             .with_validator(Validator::Panic)

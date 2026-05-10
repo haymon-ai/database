@@ -5,10 +5,10 @@
 //! positives the regex lets through are dropped by the parser.
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
 use crate::validators::Validator;
+use crate::{Category, Entity};
 
 /// Build the `IP_ADDRESS` recognizer.
 ///
@@ -20,9 +20,9 @@ pub fn ip_address() -> Recognizer {
     let s06 = Score::from_static(0.6);
 
     let ipv4 =
-        Regex::new("IPv4", r"\b\d{1,3}(?:\.\d{1,3}){3}(?:/\d{1,2})?\b", s06).expect("static IPv4 pattern compiles");
+        Pattern::new("IPv4", r"\b\d{1,3}(?:\.\d{1,3}){3}(?:/\d{1,2})?\b", s06).expect("static IPv4 pattern compiles");
 
-    let ipv6 = Regex::new(
+    let ipv6 = Pattern::new(
         "IPv6",
         r"\b(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}(?:/\d{1,3})?\b|\b(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*(?:/\d{1,3})?\b|::[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*(?:/\d{1,3})?\b|\b(?:[0-9A-Fa-f]{1,4}:){2,7}:(?:/\d{1,3})?\b",
         s06,

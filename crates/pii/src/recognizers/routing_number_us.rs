@@ -1,10 +1,10 @@
 //! `ROUTING_NUMBER_US` recognizer (ABA checksum + keyword-context).
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
 use crate::validators::{KeywordValidator, Validator};
+use crate::{Category, Entity};
 
 const KEYWORDS: &[&str] = &["routing", "aba", "rtn", "bank"];
 
@@ -15,7 +15,7 @@ const KEYWORDS: &[&str] = &["routing", "aba", "rtn", "bank"];
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
 pub fn routing_number_us() -> Recognizer {
-    let pattern = Regex::new("US ABA routing", r"\b\d{9}\b", Score::from_static(0.4))
+    let pattern = Pattern::new("US ABA routing", r"\b\d{9}\b", Score::from_static(0.4))
         .expect("static ABA routing pattern compiles");
     let validator = Validator::And(
         Box::new(Validator::AbaRouting),

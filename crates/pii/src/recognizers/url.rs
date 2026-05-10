@@ -1,9 +1,9 @@
 //! `URL` recognizer.
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
+use crate::{Category, Entity};
 
 /// Build the `URL` recognizer.
 ///
@@ -12,7 +12,7 @@ use crate::types::{Category, Entity};
 /// Panics only if the bundled regex source or score constant is rejected at construction.
 #[must_use]
 pub fn url() -> Recognizer {
-    let pattern = Regex::new(
+    let pattern = Pattern::new(
         "URL (http/https)",
         r"\bhttps?://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+\b",
         Score::from_static(0.5),

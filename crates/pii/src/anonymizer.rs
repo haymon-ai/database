@@ -5,10 +5,10 @@ use std::collections::HashMap;
 
 use dbmcp_config::PiiOperator;
 
+use crate::Entity;
 use crate::operators::Operator;
 use crate::overlap;
 use crate::result::{OperatorResult, RecognizerResult};
-use crate::types::Entity;
 
 /// Per-entity-type operator map handed to [`anonymize`].
 #[derive(Debug, Clone, Default)]

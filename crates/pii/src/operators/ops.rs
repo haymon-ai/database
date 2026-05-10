@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use crate::types::Entity;
+use crate::Entity;
 
 use super::{hash, mask};
 

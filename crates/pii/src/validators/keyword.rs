@@ -7,7 +7,7 @@
 
 use std::ops::Range;
 
-use crate::types::ValidationOutcome;
+use crate::ValidationOutcome;
 
 /// Default character window either side of the candidate span.
 pub const DEFAULT_WINDOW: usize = 64;

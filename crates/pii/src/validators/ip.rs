@@ -3,7 +3,7 @@
 use std::net::IpAddr;
 use std::str::FromStr;
 
-use crate::types::ValidationOutcome;
+use crate::ValidationOutcome;
 
 /// IP-address validator that delegates to [`std::net::IpAddr::from_str`].
 ///
@@ -19,7 +19,7 @@ pub(super) fn validate(candidate: &str) -> ValidationOutcome {
 #[cfg(test)]
 mod tests {
     use super::validate;
-    use crate::types::ValidationOutcome;
+    use crate::ValidationOutcome;
 
     #[test]
     fn ip_valid_v4() {

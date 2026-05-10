@@ -9,11 +9,11 @@ use std::borrow::Cow;
 use std::slice;
 
 use crate::error::RecognizerError;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::result::{AnalysisExplanation, RecognizerResult};
 use crate::score::{MAX_SCORE, MIN_SCORE};
-use crate::types::{Category, Entity, ValidationOutcome};
 use crate::validators::Validator;
+use crate::{Category, Entity, ValidationOutcome};
 
 mod all;
 mod api_key;
@@ -72,7 +72,7 @@ pub use vat_number::vat_number;
 pub struct Recognizer {
     entity_type: Entity,
     name: Cow<'static, str>,
-    regexes: Vec<Regex>,
+    regexes: Vec<Pattern>,
     validator: Validator,
     category: Category,
 }
@@ -83,7 +83,7 @@ impl Recognizer {
     /// # Errors
     ///
     /// Returns [`RecognizerError::EmptyPatternList`] when `regexes` is empty.
-    pub fn new(entity_type: Entity, regexes: Vec<Regex>) -> Result<Self, RecognizerError> {
+    pub fn new(entity_type: Entity, regexes: Vec<Pattern>) -> Result<Self, RecognizerError> {
         if regexes.is_empty() {
             return Err(RecognizerError::EmptyPatternList);
         }
@@ -150,7 +150,7 @@ impl Recognizer {
             .collect()
     }
 
-    fn build_result(&self, regex: &Regex, start: usize, end: usize, text: &str) -> Option<RecognizerResult> {
+    fn build_result(&self, regex: &Pattern, start: usize, end: usize, text: &str) -> Option<RecognizerResult> {
         if start >= end || !text.is_char_boundary(start) || !text.is_char_boundary(end) {
             return None;
         }

@@ -1,10 +1,10 @@
 //! `VAT_NUMBER` recognizer (EU / UK / Northern Ireland VAT identifier).
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
 use crate::validators::Validator;
+use crate::{Category, Entity};
 
 /// Build the `VAT_NUMBER` recognizer.
 ///
@@ -13,7 +13,7 @@ use crate::validators::Validator;
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
 pub fn vat_number() -> Recognizer {
-    let pattern = Regex::new(
+    let pattern = Pattern::new(
         "VAT (ISO2 + body)",
         r"\b[A-Z]{2}[A-Z0-9]{7,12}\b",
         Score::from_static(0.4),

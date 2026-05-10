@@ -1,9 +1,9 @@
 //! `MAC_ADDRESS` recognizer.
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
+use crate::{Category, Entity};
 
 /// Build the `MAC_ADDRESS` recognizer.
 ///
@@ -12,7 +12,7 @@ use crate::types::{Category, Entity};
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
 pub fn mac_address() -> Recognizer {
-    let pattern = Regex::new(
+    let pattern = Pattern::new(
         "MAC (colon/dash)",
         r"(?i)\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b",
         Score::from_static(0.5),

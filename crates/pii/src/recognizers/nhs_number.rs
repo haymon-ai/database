@@ -1,10 +1,10 @@
 //! `NHS_NUMBER` recognizer (UK NHS patient identifier with mod-11 checksum).
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
 use crate::validators::Validator;
+use crate::{Category, Entity};
 
 /// Build the `NHS_NUMBER` recognizer.
 ///
@@ -13,7 +13,7 @@ use crate::validators::Validator;
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
 pub fn nhs_number() -> Recognizer {
-    let pattern = Regex::new(
+    let pattern = Pattern::new(
         "UK NHS number",
         r"\b\d{3}[- ]?\d{3}[- ]?\d{4}\b",
         Score::from_static(0.4),

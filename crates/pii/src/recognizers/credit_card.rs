@@ -3,10 +3,10 @@
 //! Pattern adapted from Presidio's `CreditCardRecognizer.PATTERNS["All Credit Cards (weak)"]`.
 
 use super::Recognizer;
-use crate::regex::Regex;
+use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::types::{Category, Entity};
 use crate::validators::Validator;
+use crate::{Category, Entity};
 
 /// Build the `CREDIT_CARD` recognizer.
 ///
@@ -15,7 +15,7 @@ use crate::validators::Validator;
 /// Panics only if the bundled regex source or score constant is rejected at construction.
 #[must_use]
 pub fn credit_card() -> Recognizer {
-    let pattern = Regex::new(
+    let pattern = Pattern::new(
         "All Credit Cards (weak)",
         r"\b((4\d{3})|(5[0-5]\d{2})|(6\d{3})|(1\d{3})|(3\d{3}))[- ]?(\d{3,4})[- ]?(\d{3,4})[- ]?(\d{3,5})\b",
         Score::from_static(0.3),
