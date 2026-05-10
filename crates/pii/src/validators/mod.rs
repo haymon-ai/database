@@ -1,6 +1,7 @@
 //! Built-in validators as a tagged enum, plus the [`KeywordValidator`] data carrier.
 
 mod aba_routing;
+mod crypto;
 mod digits;
 mod ein_prefix;
 mod iban;
@@ -31,6 +32,8 @@ pub enum Validator {
     Noop,
     /// US ABA routing-number checksum.
     AbaRouting,
+    /// Bitcoin `Base58Check` (P2PKH/P2SH) and Bech32/Bech32m (segwit) checksum.
+    Crypto,
     /// US EIN (employer ID) prefix.
     EinPrefix,
     /// IBAN mod-97.
@@ -79,6 +82,7 @@ impl Validator {
         match self {
             Self::Noop => ValidationOutcome::Unknown,
             Self::AbaRouting => aba_routing::validate(candidate),
+            Self::Crypto => crypto::validate(candidate),
             Self::EinPrefix => ein_prefix::validate(candidate),
             Self::Iban => iban::validate(candidate),
             Self::IpAddress => ip::validate(candidate),
