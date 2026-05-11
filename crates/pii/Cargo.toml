@@ -10,6 +10,8 @@ autobenches = false
 
 [dependencies]
 base64 = { workspace = true }
+bech32 = { workspace = true }
+bs58 = { workspace = true }
 dbmcp-config = { workspace = true }
 fancy-regex = { workspace = true }
 regex = { workspace = true }

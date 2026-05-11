@@ -1,9 +1,8 @@
-//! `NINO_UK` recognizer (UK National Insurance Number with prefix blocklist).
+//! `NINO_UK` recognizer (UK National Insurance Number; blocklist enforced in regex).
 
 use super::Recognizer;
 use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::validators::Validator;
 use crate::{Category, Entity};
 
 /// Build the `NINO_UK` recognizer.
@@ -22,7 +21,6 @@ pub fn nino_uk() -> Recognizer {
     Recognizer::new(Entity::NinoUk, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("NinoUkRecognizer")
-        .with_validator(Validator::Noop)
         .with_category(Category::Government)
 }
 

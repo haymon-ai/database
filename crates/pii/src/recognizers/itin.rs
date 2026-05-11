@@ -3,7 +3,6 @@
 use super::Recognizer;
 use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::validators::Validator;
 use crate::{Category, Entity};
 
 /// Build the `ITIN` recognizer.
@@ -22,7 +21,6 @@ pub fn itin() -> Recognizer {
     Recognizer::new(Entity::Itin, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("ItinRecognizer")
-        .with_validator(Validator::Noop)
         .with_category(Category::Government)
 }
 
