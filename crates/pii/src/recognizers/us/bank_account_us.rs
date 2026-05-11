@@ -47,11 +47,8 @@ mod tests {
             ("checking account 12345678", &[(17, 25)]),
             ("bank 1234567890123", &[(5, 18)]),
             ("savings acct 9876543210", &[(13, 23)]),
-            // No banking keyword — drop.
             ("order 12345678", &[]),
-            // Too short.
             ("account 1234567", &[]),
-            // Too long.
             ("account 123456789012345678", &[]),
             ("", &[]),
         ];

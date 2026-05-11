@@ -156,11 +156,9 @@ impl Recognizer {
 
 /// Return all built-in recognizers in registration order.
 ///
-/// 30 entries: the 8 v1 recognizers first (preserving tie-break order for
-/// existing deployments), followed by 17 catalog-expansion entries (16 entity
-/// types plus the AWS-secret leg of `API_KEY` shipped as a separate
-/// keyword-context recognizer that shares the `API_KEY` entity type but has a
-/// different validator profile), and then 5 US health/finance/government ports.
+/// Order is load-bearing for overlap tie-breaks. The AWS-secret leg of
+/// `API_KEY` ships as a separate keyword-context recognizer that shares the
+/// `API_KEY` entity type but has a different validator profile.
 #[must_use]
 pub fn all() -> Vec<Recognizer> {
     vec![

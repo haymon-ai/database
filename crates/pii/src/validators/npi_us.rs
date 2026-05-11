@@ -32,7 +32,6 @@ mod tests {
 
     #[test]
     fn valid_npi_passes() {
-        // 1234567893 — canonical CMS NPI example (check digit derived per spec).
         assert_eq!(validate("1234567893"), ValidationOutcome::Valid);
     }
 
@@ -59,8 +58,6 @@ mod tests {
 
     #[test]
     fn degenerate_body_rejected() {
-        // `9999999995` — Luhn(80840 + 9999999995) passes, but body is a single
-        // repeated digit and must be rejected by the dedicated filter.
         assert_eq!(validate("9999999995"), ValidationOutcome::Invalid);
     }
 }

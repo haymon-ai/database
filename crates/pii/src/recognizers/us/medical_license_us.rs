@@ -52,16 +52,12 @@ mod tests {
 
     #[test]
     fn recognizes_medical_license_us() {
-        // AB1234563 — valid DEA checksum (body 123456 → check 3).
         let cases: &[(&str, &[(usize, usize)])] = &[
             ("DEA #: AB1234563", &[(7, 16)]),
             ("dea AB1234563", &[(4, 13)]),
             ("medical certificate A91234563", &[(20, 29)]),
-            // No keyword nearby — drop.
             ("random AB1234563", &[]),
-            // Invalid checksum — drop even with keyword.
             ("DEA AB1234560", &[]),
-            // Disallowed first-letter (`I` is not in the alphabet set).
             ("DEA IB1234563", &[]),
             ("", &[]),
         ];

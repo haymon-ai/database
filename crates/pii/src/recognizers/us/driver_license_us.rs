@@ -96,7 +96,6 @@ mod tests {
             ("driving permit 1234567", &[(15, 22)]),
             ("cdl 12345678901234", &[(4, 18)]),
             ("driving licence 1234567890123456", &[(16, 32)]),
-            // No keyword — drop.
             ("order A1234567", &[]),
             ("", &[]),
         ];

@@ -47,11 +47,8 @@ mod tests {
             ("NPI 1234567893", &[(4, 14)]),
             ("provider 1234-567-893", &[(9, 21)]),
             ("npi 1234 567 893", &[(4, 16)]),
-            // Bad checksum — drop.
             ("NPI 1234567890", &[]),
-            // Wrong entity-type prefix (not 1 or 2).
             ("NPI 3234567893", &[]),
-            // Degenerate body.
             ("NPI 9999999995", &[]),
             ("", &[]),
         ];

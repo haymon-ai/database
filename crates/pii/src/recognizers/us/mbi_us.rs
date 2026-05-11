@@ -10,7 +10,6 @@ use crate::pattern::Pattern;
 use crate::score::Score;
 use crate::{Category, Entity};
 
-// Valid letter set and full alphanumeric set per CMS MBI spec.
 const ALPHA: &str = "ACDEFGHJKMNPQRTUVWXY";
 const ALNUM: &str = "0-9ACDEFGHJKMNPQRTUVWXY";
 
@@ -43,15 +42,11 @@ mod tests {
 
     #[test]
     fn recognizes_mbi_us() {
-        // 1A23D45FG67 follows N-A-AN-N-A-AN-N-A-A-N-N with the CMS letter set.
         let cases: &[(&str, &[(usize, usize)])] = &[
             ("MBI 1A23D45FG67", &[(4, 15)]),
             ("medicare 1A23-D45-FG67", &[(9, 22)]),
-            // Position 2 must be in ACDEFGHJKMNPQRTUVWXY; `S` is excluded.
             ("MBI 1S23D45FG67", &[]),
-            // Position 5 must be in the letter set; `B` is excluded.
             ("MBI 1A23B45FG67", &[]),
-            // Ten characters — too short.
             ("MBI 1A23D45FG6", &[]),
             ("", &[]),
         ];

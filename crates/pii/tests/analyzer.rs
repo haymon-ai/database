@@ -1,6 +1,5 @@
 //! `Analyzer` integration tests: behaviour (validator promotion,
-//! `AnalyzeOptions` filters, overlap rules) and the catalog-expansion
-//! builder contract.
+//! `AnalyzeOptions` filters, overlap rules) and the builder contract.
 
 use dbmcp_pii::{AnalyzeOptions, Analyzer, Category, Entity, MAX_SCORE, Score};
 
@@ -128,10 +127,7 @@ fn with_defaults_registers_full_catalog() {
     let a = Analyzer::with_defaults();
     let got = entity_names(&a);
     let want: Vec<String> = DEFAULT_NAMES.iter().map(|s| (*s).to_string()).collect();
-    assert_eq!(
-        got, want,
-        "with_defaults() must ship the full v1 + catalog-expansion registry"
-    );
+    assert_eq!(got, want, "with_defaults() must ship the full built-in registry");
 }
 
 #[test]
