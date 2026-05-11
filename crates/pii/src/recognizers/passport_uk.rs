@@ -1,12 +1,9 @@
-//! `PASSPORT_UK` recognizer (keyword-context required).
+//! `PASSPORT_UK` recognizer (post-2015 format: 2 letters + 7 digits).
 
 use super::Recognizer;
 use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::validators::{KeywordValidator, Validator};
 use crate::{Category, Entity};
-
-const KEYWORDS: &[&str] = &["passport", "travel document"];
 
 /// Build the `PASSPORT_UK` recognizer.
 ///
@@ -15,12 +12,11 @@ const KEYWORDS: &[&str] = &["passport", "travel document"];
 /// Panics only if the bundled regex source or score literal is rejected at construction.
 #[must_use]
 pub fn passport_uk() -> Recognizer {
-    let pattern = Pattern::new("UK passport (9 digits)", r"\b\d{9}\b", Score::from_static(0.4))
+    let pattern = Pattern::new("UK Passport (weak)", r"(?i)\b[A-Z]{2}\d{7}\b", Score::from_static(0.1))
         .expect("static UK passport pattern compiles");
     Recognizer::new(Entity::PassportUk, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("PassportUkRecognizer")
-        .with_validator(Validator::Keyword(KeywordValidator::new(KEYWORDS)))
         .with_category(Category::Government)
 }
 
@@ -28,21 +24,34 @@ pub fn passport_uk() -> Recognizer {
 mod tests {
     use super::passport_uk;
 
-    fn matches(text: &str) -> Vec<String> {
-        let r = passport_uk();
-        r.analyze(text)
+    fn matches(text: &str) -> Vec<(usize, usize)> {
+        passport_uk()
+            .analyze(text)
             .into_iter()
-            .map(|res| text[res.start..res.end].to_string())
+            .map(|r| (r.start, r.end))
             .collect()
     }
 
     #[test]
-    fn positive_with_keyword() {
-        assert_eq!(matches("Passport: 925076473"), vec!["925076473"]);
-    }
-
-    #[test]
-    fn negative_no_keyword() {
-        assert!(matches("ticket 925076473").is_empty());
+    fn recognizes_passport_uk() {
+        let cases: &[(&str, &[(usize, usize)])] = &[
+            ("AB1234567", &[(0, 9)]),
+            ("XY9876543", &[(0, 9)]),
+            ("ab1234567", &[(0, 9)]),
+            ("My passport number is CD7654321 and it expires soon", &[(22, 31)]),
+            ("Passports: AB1234567 and XY9876543", &[(11, 20), (25, 34)]),
+            ("A12345678", &[]),
+            ("ABC123456", &[]),
+            ("AB123456", &[]),
+            ("AB12345678", &[]),
+            ("123456789", &[]),
+            ("AB 1234567", &[]),
+            ("1234567AB", &[]),
+            ("XYZAB1234567QRS", &[]),
+            ("", &[]),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(matches(input), expected.to_vec(), "input {input:?}: span mismatch");
+        }
     }
 }
