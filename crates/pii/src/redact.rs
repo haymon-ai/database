@@ -18,12 +18,12 @@
 
 use std::collections::BTreeMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
-use regex::Regex;
 use serde_json::Value;
 
 use crate::Entity;
+use crate::words::push_key_words;
 use crate::{AnalyzeOptions, Analyzer, OperatorConfig, anonymize};
 
 /// Errors produced by [`Redactor::apply`].
@@ -56,34 +56,12 @@ pub struct RedactionStats {
     pub string_leaves_scanned: u64,
 }
 
-fn camel_regex() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"[A-Z][a-z]+|[A-Z]+(?:[A-Z][a-z])|[A-Z]+|[a-z]+|\d+").expect("camel regex compiles"))
-}
-
-/// Push each lowercase token from a JSON object key onto `path`.
-///
-/// Splits on `_`, `-`, `.` separators and on camelCase boundaries. Returns
-/// the number of tokens pushed so the caller can pop them when the subtree
-/// is done. Tokens are ASCII by construction (`camel_regex` only matches
-/// `[A-Za-z0-9]+`), so [`str::to_ascii_lowercase`] is correct and avoids
-/// the Unicode case-folding pass.
-fn push_key_tokens(path: &mut Vec<String>, key: &str) -> usize {
-    let before = path.len();
-    for chunk in key.split(['_', '-', '.']) {
-        for m in camel_regex().find_iter(chunk) {
-            path.push(m.as_str().to_ascii_lowercase());
-        }
-    }
-    path.len() - before
-}
-
 enum Frame<'a> {
-    /// Top-level row or array element — no key tokens to push.
+    /// Top-level row or array element — no key words to push.
     Root(&'a mut Value),
-    /// Object child — `key` is tokenised on entry into the shared path.
+    /// Object child — `key` is split into words on entry into the shared path.
     KeyedChild(&'a mut Value, &'a str),
-    /// Truncates the shared path by `n` tokens once a subtree is done.
+    /// Truncates the shared path by `n` words once a subtree is done.
     Pop(usize),
 }
 
@@ -187,11 +165,10 @@ impl Redactor {
                     }
                     Frame::Root(v) => v,
                     Frame::KeyedChild(v, key) => {
-                        let n = push_key_tokens(&mut path, key);
-                        if n > 0 {
-                            // Pop pushed before children → runs after them (LIFO).
-                            stack.push(Frame::Pop(n));
-                        }
+                        // Pop pushed before children → runs after them (LIFO).
+                        // Pop(0) is a no-op for separator-only keys.
+                        let n = push_key_words(&mut path, key);
+                        stack.push(Frame::Pop(n));
                         v
                     }
                 };
@@ -254,31 +231,6 @@ mod tests {
     use crate::recognizers::Recognizer;
     use crate::score::Score;
 
-    fn tokens(key: &str) -> Vec<String> {
-        let mut out = Vec::new();
-        push_key_tokens(&mut out, key);
-        out
-    }
-
-    #[test]
-    fn tokenize_key_snake_case() {
-        assert_eq!(tokens("customer_phone_number"), vec!["customer", "phone", "number"]);
-    }
-
-    #[test]
-    fn tokenize_key_camel_case() {
-        assert_eq!(tokens("customerPhoneNumber"), vec!["customer", "phone", "number"]);
-    }
-
-    #[test]
-    fn tokenize_key_kebab_case() {
-        assert_eq!(tokens("customer-phone-number"), vec!["customer", "phone", "number"]);
-    }
-
-    #[test]
-    fn tokenize_key_dotted_path() {
-        assert_eq!(tokens("user.phone.number"), vec!["user", "phone", "number"]);
-    }
     use crate::validators::Validator;
     use dbmcp_config::PiiOperator;
     use serde_json::json;

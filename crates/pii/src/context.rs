@@ -3,18 +3,17 @@
 //! Lifts a [`crate::RecognizerResult`] score when one of its source
 //! recognizer's context keywords sits in the prefix / suffix word window
 //! around the match, or in an external context list supplied by the
-//! integration layer (e.g. the redactor's tokenised JSON key path). Word
-//! boundaries are Unicode `\w+` matches resolved by the workspace's
-//! `regex` crate; no lemmatisation step.
+//! integration layer (e.g. the redactor's JSON key path split into
+//! lowercase words). Word boundaries come from [`crate::words`]'s
+//! `char::is_alphanumeric` scan (Unicode `\w+`-style); no lemmatisation
+//! step.
 
 use std::borrow::Cow;
-use std::sync::OnceLock;
-
-use regex::Regex;
 
 use crate::recognizers::Recognizer;
 use crate::result::RecognizerResult;
 use crate::score::{MAX_SCORE, Score};
+use crate::words::{first_word, words};
 
 /// Matching mode for context keyword comparison.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -55,19 +54,6 @@ impl Default for ContextSettings {
             matching_mode: ContextMatchingMode::Substring,
         }
     }
-}
-
-fn word_regex() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"\w+").expect("static word regex compiles"))
-}
-
-/// Tokenise `text` into lowercase word slices.
-fn tokenise(text: &str) -> Vec<String> {
-    word_regex()
-        .find_iter(text)
-        .map(|m| m.as_str().to_lowercase())
-        .collect()
 }
 
 /// Apply the context boost pass to `results` in place, returning the
@@ -135,7 +121,7 @@ fn collect_window(text: &str, start: usize, end: usize, prefix: u16, suffix: u16
 
     // Prefix: walk backward from `start` taking up to `prefix + 1` words.
     // The extra slot accommodates concatenated forms (FR-019).
-    let mut prefix_words = tokenise(&text[..safe_start]);
+    let mut prefix_words = words(&text[..safe_start]);
     let take = usize::from(prefix).saturating_add(1);
     let drop_n = prefix_words.len().saturating_sub(take);
     prefix_words.drain(..drop_n);
@@ -144,13 +130,13 @@ fn collect_window(text: &str, start: usize, end: usize, prefix: u16, suffix: u16
     // Slack-slot reaches into the leading characters of the match itself
     // (covers concatenated forms like "card4012..."): include the first
     // word of the match's own text.
-    if let Some(m) = word_regex().find(&text[safe_start..safe_end]) {
-        out.push(m.as_str().to_lowercase());
+    if let Some(w) = first_word(&text[safe_start..safe_end]) {
+        out.push(w);
     }
 
     // Suffix: take up to `suffix` words from the tail.
     if suffix > 0 {
-        out.extend(tokenise(&text[safe_end..]).into_iter().take(usize::from(suffix)));
+        out.extend(words(&text[safe_end..]).into_iter().take(usize::from(suffix)));
     }
 
     out
@@ -347,7 +333,7 @@ mod tests {
         // the leading word of the match's own text.
         let text = "card4012";
         let out = apply_context_boost(text, vec![result(0.1, "R", 4, 8)], &rec, &[], &default_settings());
-        // Slack slot picks up the leading "card" via prefix tokenisation.
+        // Slack slot picks up the leading "card" via prefix word split.
         assert_eq!(out[0].explanation.supportive_keyword.as_deref(), Some("card"));
     }
 

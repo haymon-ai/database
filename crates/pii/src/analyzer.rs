@@ -57,7 +57,8 @@ impl Analyzer {
 
     /// Same as [`Self::analyze`] but threads an external context word list
     /// into the boost step. Crate-private — populated by the redactor's
-    /// tokenised JSON-key path. Tokens must already be lowercased.
+    /// JSON-key path split into lowercase words. Words must already be
+    /// lowercased.
     #[must_use]
     pub(crate) fn analyze_with_context(
         &self,

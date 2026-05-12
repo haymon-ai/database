@@ -34,6 +34,7 @@ pub mod result;
 pub mod score;
 pub mod validation;
 pub mod validators;
+mod words;
 
 pub use crate::analyzer::{AnalyzeOptions, Analyzer};
 pub use crate::anonymizer::{OperatorConfig, anonymize};
