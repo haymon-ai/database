@@ -27,10 +27,16 @@ use crate::tools::{
 const DESCRIPTION: &str = "Database MCP Server for PostgreSQL";
 
 /// Backend-specific instructions for `PostgreSQL` in read-write mode.
-const INSTRUCTIONS: &str = include_str!("../assets/instructions.md");
+const INSTRUCTIONS: &str = include_str!("../assets/instructions/default.md");
 
 /// Backend-specific instructions for `PostgreSQL` in read-only mode.
-const INSTRUCTIONS_READ_ONLY: &str = include_str!("../assets/instructions.readonly.md");
+const INSTRUCTIONS_READ_ONLY: &str = include_str!("../assets/instructions/read-only.md");
+
+/// Backend-specific instructions when a database name is pinned.
+const INSTRUCTIONS_PINNED: &str = include_str!("../assets/instructions/default.pinned.md");
+
+/// Backend-specific instructions for read-only mode with a pinned database.
+const INSTRUCTIONS_READ_ONLY_PINNED: &str = include_str!("../assets/instructions/read-only.pinned.md");
 
 /// `PostgreSQL` database handler.
 ///
@@ -67,7 +73,7 @@ impl PostgresHandler {
             config: config.database.clone(),
             connection: PostgresConnection::new(&config.database),
             redactor: Redactor::from_config(&config.pii),
-            tool_router: build_tool_router(config.database.read_only),
+            tool_router: build_tool_router(&config.database),
         }
     }
 }
@@ -79,10 +85,19 @@ impl From<PostgresHandler> for Server {
     }
 }
 
-/// Builds the tool router, including write tools only when not in read-only mode.
-fn build_tool_router(read_only: bool) -> ToolRouter<PostgresHandler> {
-    let mut router = ToolRouter::new()
-        .with_async_tool::<ListDatabasesTool>()
+/// Builds the tool router.
+///
+/// Write tools are included only when not in read-only mode. Cross-database
+/// tools are included only when no database name is pinned in the config.
+fn build_tool_router(config: &DatabaseConfig) -> ToolRouter<PostgresHandler> {
+    let mut router = ToolRouter::new();
+
+    let pinned = config.name.is_some();
+    if !pinned {
+        router = router.with_async_tool::<ListDatabasesTool>();
+    }
+
+    router = router
         .with_async_tool::<ListTablesTool>()
         .with_async_tool::<ListViewsTool>()
         .with_async_tool::<ListTriggersTool>()
@@ -92,10 +107,13 @@ fn build_tool_router(read_only: bool) -> ToolRouter<PostgresHandler> {
         .with_async_tool::<ReadQueryTool>()
         .with_async_tool::<ExplainQueryTool>();
 
-    if !read_only {
+    if !config.read_only {
+        if !pinned {
+            router = router
+                .with_async_tool::<CreateDatabaseTool>()
+                .with_async_tool::<DropDatabaseTool>();
+        }
         router = router
-            .with_async_tool::<CreateDatabaseTool>()
-            .with_async_tool::<DropDatabaseTool>()
             .with_async_tool::<DropTableTool>()
             .with_async_tool::<WriteQueryTool>();
     }
@@ -106,11 +124,15 @@ impl ServerHandler for PostgresHandler {
     fn get_info(&self) -> ServerInfo {
         let mut info = server_info();
         info.server_info.description = Some(DESCRIPTION.into());
-        info.instructions = Some(if self.config.read_only {
-            INSTRUCTIONS_READ_ONLY.into()
-        } else {
-            INSTRUCTIONS.into()
-        });
+        info.instructions = Some(
+            match (self.config.read_only, self.config.name.is_some()) {
+                (false, false) => INSTRUCTIONS,
+                (true, false) => INSTRUCTIONS_READ_ONLY,
+                (false, true) => INSTRUCTIONS_PINNED,
+                (true, true) => INSTRUCTIONS_READ_ONLY_PINNED,
+            }
+            .into(),
+        );
         info
     }
 
@@ -152,7 +174,7 @@ mod tests {
             port: 5433,
             user: "pgadmin".into(),
             password: Some("pgpass".into()),
-            name: Some("mydb".into()),
+            name: None,
             ..DatabaseConfig::default()
         }
     }
@@ -168,10 +190,26 @@ mod tests {
         })
     }
 
+    /// Handler whose config pins a specific database name.
+    fn pinned_handler(read_only: bool) -> PostgresHandler {
+        PostgresHandler::new(&Config {
+            database: DatabaseConfig {
+                read_only,
+                name: Some("mydb".into()),
+                ..base_config()
+            },
+            http: None,
+            pii: dbmcp_config::PiiConfig::default(),
+        })
+    }
+
     #[tokio::test]
     async fn handler_exposes_connection_default_db() {
         let handler = PostgresHandler::new(&Config {
-            database: base_config(),
+            database: DatabaseConfig {
+                name: Some("mydb".into()),
+                ..base_config()
+            },
             http: None,
             pii: dbmcp_config::PiiConfig::default(),
         });
@@ -249,5 +287,42 @@ mod tests {
             !ro.has_route("getTableSchema"),
             "read-only router must not expose getTableSchema"
         );
+    }
+
+    #[tokio::test]
+    async fn router_hides_cross_database_tools_when_name_pinned() {
+        let router = pinned_handler(false).tool_router;
+        for present in ["listTables", "readQuery", "explainQuery", "dropTable", "writeQuery"] {
+            assert!(router.has_route(present), "missing tool: {present}");
+        }
+        for absent in ["listDatabases", "createDatabase", "dropDatabase"] {
+            assert!(!router.has_route(absent), "pinned router must not expose {absent}");
+        }
+    }
+
+    #[tokio::test]
+    async fn router_hides_list_databases_when_name_pinned_read_only() {
+        let router = pinned_handler(true).tool_router;
+        assert!(!router.has_route("listDatabases"));
+        assert!(!router.has_route("createDatabase"));
+        assert!(!router.has_route("dropDatabase"));
+        assert!(router.has_route("listTables"));
+        assert!(router.has_route("readQuery"));
+    }
+
+    #[tokio::test]
+    async fn instructions_match_pinned_mode() {
+        for read_only in [false, true] {
+            let instructions = pinned_handler(read_only)
+                .get_info()
+                .instructions
+                .expect("instructions present");
+            for tool in ["listDatabases", "createDatabase", "dropDatabase"] {
+                assert!(
+                    !instructions.contains(tool),
+                    "pinned instructions must not mention {tool} (read_only={read_only})"
+                );
+            }
+        }
     }
 }

@@ -24,10 +24,10 @@ use crate::tools::{
 const DESCRIPTION: &str = "Database MCP Server for SQLite";
 
 /// Backend-specific instructions for `SQLite` in read-write mode.
-const INSTRUCTIONS: &str = include_str!("../assets/instructions.md");
+const INSTRUCTIONS: &str = include_str!("../assets/instructions/default.md");
 
 /// Backend-specific instructions for `SQLite` in read-only mode.
-const INSTRUCTIONS_READ_ONLY: &str = include_str!("../assets/instructions.readonly.md");
+const INSTRUCTIONS_READ_ONLY: &str = include_str!("../assets/instructions/read-only.md");
 
 /// `SQLite` file-based database handler.
 ///
