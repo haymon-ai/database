@@ -7,7 +7,7 @@
 
 use dbmcp_config::{Config, DatabaseConfig};
 use dbmcp_pii::Redactor;
-use dbmcp_server::{Server, ToolSpec, build_tool_router, server_info};
+use dbmcp_server::{Server, ToolRouterExt, ToolSpec, server_info};
 use rmcp::RoleServer;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::tool::ToolCallContext;
@@ -40,19 +40,19 @@ const INSTRUCTIONS_READ_ONLY_PINNED: &str = include_str!("../assets/instructions
 
 /// Declarative tool table: `(tool, read_only, pinned)`.
 const TOOLS: &[ToolSpec<PostgresHandler>] = &[
-    ToolSpec::new::<ListDatabasesTool>(false, true),
-    ToolSpec::new::<ListTablesTool>(false, false),
-    ToolSpec::new::<ListViewsTool>(false, false),
-    ToolSpec::new::<ListTriggersTool>(false, false),
-    ToolSpec::new::<ListFunctionsTool>(false, false),
-    ToolSpec::new::<ListProceduresTool>(false, false),
-    ToolSpec::new::<ListMaterializedViewsTool>(false, false),
-    ToolSpec::new::<ReadQueryTool>(false, false),
-    ToolSpec::new::<ExplainQueryTool>(false, false),
-    ToolSpec::new::<CreateDatabaseTool>(true, true),
-    ToolSpec::new::<DropDatabaseTool>(true, true),
-    ToolSpec::new::<DropTableTool>(true, false),
-    ToolSpec::new::<WriteQueryTool>(true, false),
+    ToolSpec::async_tool::<ListDatabasesTool>(false, true),
+    ToolSpec::async_tool::<ListTablesTool>(false, false),
+    ToolSpec::async_tool::<ListViewsTool>(false, false),
+    ToolSpec::async_tool::<ListTriggersTool>(false, false),
+    ToolSpec::async_tool::<ListFunctionsTool>(false, false),
+    ToolSpec::async_tool::<ListProceduresTool>(false, false),
+    ToolSpec::async_tool::<ListMaterializedViewsTool>(false, false),
+    ToolSpec::async_tool::<ReadQueryTool>(false, false),
+    ToolSpec::async_tool::<ExplainQueryTool>(false, false),
+    ToolSpec::async_tool::<CreateDatabaseTool>(true, true),
+    ToolSpec::async_tool::<DropDatabaseTool>(true, true),
+    ToolSpec::async_tool::<DropTableTool>(true, false),
+    ToolSpec::async_tool::<WriteQueryTool>(true, false),
 ];
 
 /// `PostgreSQL` database handler.
@@ -90,7 +90,7 @@ impl PostgresHandler {
             config: config.database.clone(),
             connection: PostgresConnection::new(&config.database),
             redactor: Redactor::from_config(&config.pii),
-            tool_router: build_tool_router(TOOLS, config.database.read_only, config.database.name.is_some()),
+            tool_router: ToolRouter::from_specs(TOOLS, config.database.read_only, config.database.name.is_some()),
         }
     }
 }

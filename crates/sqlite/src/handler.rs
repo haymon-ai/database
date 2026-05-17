@@ -7,7 +7,7 @@
 
 use dbmcp_config::{Config, DatabaseConfig};
 use dbmcp_pii::Redactor;
-use dbmcp_server::{Server, ToolSpec, build_tool_router, server_info};
+use dbmcp_server::{Server, ToolRouterExt, ToolSpec, server_info};
 use rmcp::RoleServer;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::tool::ToolCallContext;
@@ -33,13 +33,13 @@ const INSTRUCTIONS_READ_ONLY: &str = include_str!("../assets/instructions/read-o
 ///
 /// `SQLite` has no cross-database tools, so every entry is `pinned = false`.
 const TOOLS: &[ToolSpec<SqliteHandler>] = &[
-    ToolSpec::new::<ListTablesTool>(false, false),
-    ToolSpec::new::<ListViewsTool>(false, false),
-    ToolSpec::new::<ListTriggersTool>(false, false),
-    ToolSpec::new::<ReadQueryTool>(false, false),
-    ToolSpec::new::<ExplainQueryTool>(false, false),
-    ToolSpec::new::<WriteQueryTool>(true, false),
-    ToolSpec::new::<DropTableTool>(true, false),
+    ToolSpec::async_tool::<ListTablesTool>(false, false),
+    ToolSpec::async_tool::<ListViewsTool>(false, false),
+    ToolSpec::async_tool::<ListTriggersTool>(false, false),
+    ToolSpec::async_tool::<ReadQueryTool>(false, false),
+    ToolSpec::async_tool::<ExplainQueryTool>(false, false),
+    ToolSpec::async_tool::<WriteQueryTool>(true, false),
+    ToolSpec::async_tool::<DropTableTool>(true, false),
 ];
 
 /// `SQLite` file-based database handler.
@@ -75,7 +75,7 @@ impl SqliteHandler {
             config: config.database.clone(),
             connection: SqliteConnection::new(&config.database),
             redactor: Redactor::from_config(&config.pii),
-            tool_router: build_tool_router(TOOLS, config.database.read_only, false),
+            tool_router: ToolRouter::from_specs(TOOLS, config.database.read_only, false),
         }
     }
 }

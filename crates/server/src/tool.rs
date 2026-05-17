@@ -1,8 +1,8 @@
 //! Declarative tool registry for per-backend MCP routers.
 //!
 //! A backend declares its tools as a `const` slice of [`ToolSpec`] rows, each
-//! row carrying the gating flags for that tool. [`build_tool_router`] folds the
-//! slice into a [`ToolRouter`], skipping tools that the current mode forbids.
+//! row carrying the gating flags for that tool. [`ToolRouterExt::from_specs`]
+//! folds the slice into a [`ToolRouter`], skipping tools the current mode forbids.
 //! This keeps the read-only / pinned gating matrix as data, not control flow.
 
 use rmcp::handler::server::router::tool::{AsyncTool, ToolRouter};
@@ -29,9 +29,9 @@ impl<H: Send + Sync + 'static> std::fmt::Debug for ToolSpec<H> {
 }
 
 impl<H: Send + Sync + 'static> ToolSpec<H> {
-    /// Creates a spec for tool `T` with its read-only and pinned gates.
+    /// Creates a spec for an async tool `T` with its read-only and pinned gates.
     #[must_use]
-    pub const fn new<T: AsyncTool<H> + 'static>(read_only: bool, pinned: bool) -> Self {
+    pub const fn async_tool<T: AsyncTool<H> + 'static>(read_only: bool, pinned: bool) -> Self {
         Self {
             register: ToolRouter::with_async_tool::<T>,
             read_only,
@@ -40,18 +40,21 @@ impl<H: Send + Sync + 'static> ToolSpec<H> {
     }
 }
 
-/// Builds a [`ToolRouter`] from `specs`, skipping mode-gated tools.
-///
-/// Write tools are skipped when `read_only`; cross-database tools when
-/// `pinned`.
-#[must_use]
-pub fn build_tool_router<H: Send + Sync + 'static>(
-    specs: &[ToolSpec<H>],
-    read_only: bool,
-    pinned: bool,
-) -> ToolRouter<H> {
-    specs
-        .iter()
-        .filter(|spec| (!spec.read_only || !read_only) && (!spec.pinned || !pinned))
-        .fold(ToolRouter::new(), |router, spec| (spec.register)(router))
+/// Extends [`ToolRouter`] with declarative construction from a [`ToolSpec`] table.
+pub trait ToolRouterExt<H: Send + Sync + 'static>: Sized {
+    /// Builds a router from `specs`, skipping mode-gated tools.
+    ///
+    /// A spec is skipped when its `read_only` gate coincides with `read_only`
+    /// mode, or its `pinned` gate with `pinned` mode.
+    #[must_use]
+    fn from_specs(specs: &[ToolSpec<H>], read_only: bool, pinned: bool) -> Self;
+}
+
+impl<H: Send + Sync + 'static> ToolRouterExt<H> for ToolRouter<H> {
+    fn from_specs(specs: &[ToolSpec<H>], read_only: bool, pinned: bool) -> Self {
+        specs
+            .iter()
+            .filter(|spec| (!spec.read_only || !read_only) && (!spec.pinned || !pinned))
+            .fold(ToolRouter::new(), |router, spec| (spec.register)(router))
+    }
 }
