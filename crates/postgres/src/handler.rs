@@ -7,7 +7,7 @@
 
 use dbmcp_config::{Config, DatabaseConfig};
 use dbmcp_pii::Redactor;
-use dbmcp_server::{Server, server_info};
+use dbmcp_server::{Server, ToolSpec, build_tool_router, server_info};
 use rmcp::RoleServer;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::tool::ToolCallContext;
@@ -37,6 +37,23 @@ const INSTRUCTIONS_PINNED: &str = include_str!("../assets/instructions/default.p
 
 /// Backend-specific instructions for read-only mode with a pinned database.
 const INSTRUCTIONS_READ_ONLY_PINNED: &str = include_str!("../assets/instructions/read-only.pinned.md");
+
+/// Declarative tool table: `(tool, read_only, pinned)`.
+const TOOLS: &[ToolSpec<PostgresHandler>] = &[
+    ToolSpec::new::<ListDatabasesTool>(false, true),
+    ToolSpec::new::<ListTablesTool>(false, false),
+    ToolSpec::new::<ListViewsTool>(false, false),
+    ToolSpec::new::<ListTriggersTool>(false, false),
+    ToolSpec::new::<ListFunctionsTool>(false, false),
+    ToolSpec::new::<ListProceduresTool>(false, false),
+    ToolSpec::new::<ListMaterializedViewsTool>(false, false),
+    ToolSpec::new::<ReadQueryTool>(false, false),
+    ToolSpec::new::<ExplainQueryTool>(false, false),
+    ToolSpec::new::<CreateDatabaseTool>(true, true),
+    ToolSpec::new::<DropDatabaseTool>(true, true),
+    ToolSpec::new::<DropTableTool>(true, false),
+    ToolSpec::new::<WriteQueryTool>(true, false),
+];
 
 /// `PostgreSQL` database handler.
 ///
@@ -73,7 +90,7 @@ impl PostgresHandler {
             config: config.database.clone(),
             connection: PostgresConnection::new(&config.database),
             redactor: Redactor::from_config(&config.pii),
-            tool_router: build_tool_router(&config.database),
+            tool_router: build_tool_router(TOOLS, config.database.read_only, config.database.name.is_some()),
         }
     }
 }
@@ -83,41 +100,6 @@ impl From<PostgresHandler> for Server {
     fn from(handler: PostgresHandler) -> Self {
         Self::new(handler)
     }
-}
-
-/// Builds the tool router.
-///
-/// Write tools are included only when not in read-only mode. Cross-database
-/// tools are included only when no database name is pinned in the config.
-fn build_tool_router(config: &DatabaseConfig) -> ToolRouter<PostgresHandler> {
-    let mut router = ToolRouter::new();
-
-    let pinned = config.name.is_some();
-    if !pinned {
-        router = router.with_async_tool::<ListDatabasesTool>();
-    }
-
-    router = router
-        .with_async_tool::<ListTablesTool>()
-        .with_async_tool::<ListViewsTool>()
-        .with_async_tool::<ListTriggersTool>()
-        .with_async_tool::<ListFunctionsTool>()
-        .with_async_tool::<ListProceduresTool>()
-        .with_async_tool::<ListMaterializedViewsTool>()
-        .with_async_tool::<ReadQueryTool>()
-        .with_async_tool::<ExplainQueryTool>();
-
-    if !config.read_only {
-        if !pinned {
-            router = router
-                .with_async_tool::<CreateDatabaseTool>()
-                .with_async_tool::<DropDatabaseTool>();
-        }
-        router = router
-            .with_async_tool::<DropTableTool>()
-            .with_async_tool::<WriteQueryTool>();
-    }
-    router
 }
 
 impl ServerHandler for PostgresHandler {

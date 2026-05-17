@@ -7,7 +7,7 @@
 
 use dbmcp_config::{Config, DatabaseConfig};
 use dbmcp_pii::Redactor;
-use dbmcp_server::{Server, server_info};
+use dbmcp_server::{Server, ToolSpec, build_tool_router, server_info};
 use rmcp::RoleServer;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::tool::ToolCallContext;
@@ -28,6 +28,19 @@ const INSTRUCTIONS: &str = include_str!("../assets/instructions/default.md");
 
 /// Backend-specific instructions for `SQLite` in read-only mode.
 const INSTRUCTIONS_READ_ONLY: &str = include_str!("../assets/instructions/read-only.md");
+
+/// Declarative tool table: `(tool, read_only, pinned)`.
+///
+/// `SQLite` has no cross-database tools, so every entry is `pinned = false`.
+const TOOLS: &[ToolSpec<SqliteHandler>] = &[
+    ToolSpec::new::<ListTablesTool>(false, false),
+    ToolSpec::new::<ListViewsTool>(false, false),
+    ToolSpec::new::<ListTriggersTool>(false, false),
+    ToolSpec::new::<ReadQueryTool>(false, false),
+    ToolSpec::new::<ExplainQueryTool>(false, false),
+    ToolSpec::new::<WriteQueryTool>(true, false),
+    ToolSpec::new::<DropTableTool>(true, false),
+];
 
 /// `SQLite` file-based database handler.
 ///
@@ -62,7 +75,7 @@ impl SqliteHandler {
             config: config.database.clone(),
             connection: SqliteConnection::new(&config.database),
             redactor: Redactor::from_config(&config.pii),
-            tool_router: build_tool_router(config.database.read_only),
+            tool_router: build_tool_router(TOOLS, config.database.read_only, false),
         }
     }
 }
@@ -72,23 +85,6 @@ impl From<SqliteHandler> for Server {
     fn from(handler: SqliteHandler) -> Self {
         Self::new(handler)
     }
-}
-
-/// Builds the tool router, including write tools only when not in read-only mode.
-fn build_tool_router(read_only: bool) -> ToolRouter<SqliteHandler> {
-    let mut router = ToolRouter::new()
-        .with_async_tool::<ListTablesTool>()
-        .with_async_tool::<ListViewsTool>()
-        .with_async_tool::<ListTriggersTool>()
-        .with_async_tool::<ReadQueryTool>()
-        .with_async_tool::<ExplainQueryTool>();
-
-    if !read_only {
-        router = router
-            .with_async_tool::<WriteQueryTool>()
-            .with_async_tool::<DropTableTool>();
-    }
-    router
 }
 
 impl ServerHandler for SqliteHandler {
