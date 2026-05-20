@@ -16,7 +16,7 @@ pub(crate) struct ListDatabasesTool;
 impl ListDatabasesTool {
     const NAME: &'static str = "listDatabases";
     const TITLE: &'static str = "List Databases";
-    const DESCRIPTION_UNPINNED: &'static str = include_str!("../../assets/tools/list_databases/unpinned.md");
+    const DESCRIPTION: &'static str = include_str!("../../assets/tools/list_databases/default.md");
 }
 
 impl ToolBase for ListDatabasesTool {
@@ -33,7 +33,7 @@ impl ToolBase for ListDatabasesTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(Self::DESCRIPTION_UNPINNED.into())
+        Some(Self::DESCRIPTION.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {

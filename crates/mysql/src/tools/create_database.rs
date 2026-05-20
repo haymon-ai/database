@@ -17,7 +17,7 @@ pub(crate) struct CreateDatabaseTool;
 impl CreateDatabaseTool {
     const NAME: &'static str = "createDatabase";
     const TITLE: &'static str = "Create Database";
-    const DESCRIPTION_UNPINNED: &'static str = include_str!("../../assets/tools/create_database/unpinned.md");
+    const DESCRIPTION: &'static str = include_str!("../../assets/tools/create_database/default.md");
 }
 
 impl ToolBase for CreateDatabaseTool {
@@ -34,7 +34,7 @@ impl ToolBase for CreateDatabaseTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(Self::DESCRIPTION_UNPINNED.into())
+        Some(Self::DESCRIPTION.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {
