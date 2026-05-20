@@ -50,12 +50,9 @@ impl ToolBase for PinnedListTriggersTool {
 
 impl AsyncTool<PostgresHandler> for PinnedListTriggersTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedListTriggersRequest {
-            cursor,
-            search,
-            detailed,
-        } = params;
-        handler.list_triggers(None, cursor, search, detailed).await
+        handler
+            .list_triggers(None, params.cursor, params.search, params.detailed)
+            .await
     }
 }
 
@@ -86,16 +83,14 @@ impl ToolBase for UnpinnedListTriggersTool {
 
 impl AsyncTool<PostgresHandler> for UnpinnedListTriggersTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedListTriggersRequest {
-            pinned:
-                PinnedListTriggersRequest {
-                    cursor,
-                    search,
-                    detailed,
-                },
-            database,
-        } = params;
-        handler.list_triggers(database, cursor, search, detailed).await
+        handler
+            .list_triggers(
+                params.database,
+                params.inner.cursor,
+                params.inner.search,
+                params.inner.detailed,
+            )
+            .await
     }
 }
 

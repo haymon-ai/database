@@ -50,12 +50,9 @@ impl ToolBase for PinnedListProceduresTool {
 
 impl AsyncTool<PostgresHandler> for PinnedListProceduresTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedListProceduresRequest {
-            cursor,
-            search,
-            detailed,
-        } = params;
-        handler.list_procedures(None, cursor, search, detailed).await
+        handler
+            .list_procedures(None, params.cursor, params.search, params.detailed)
+            .await
     }
 }
 
@@ -86,16 +83,14 @@ impl ToolBase for UnpinnedListProceduresTool {
 
 impl AsyncTool<PostgresHandler> for UnpinnedListProceduresTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedListProceduresRequest {
-            pinned:
-                PinnedListProceduresRequest {
-                    cursor,
-                    search,
-                    detailed,
-                },
-            database,
-        } = params;
-        handler.list_procedures(database, cursor, search, detailed).await
+        handler
+            .list_procedures(
+                params.database,
+                params.inner.cursor,
+                params.inner.search,
+                params.inner.detailed,
+            )
+            .await
     }
 }
 

@@ -32,7 +32,7 @@ pub struct PinnedDropTableRequest {
 #[schemars(rename = "DropTableRequest")]
 pub struct UnpinnedDropTableRequest {
     #[serde(flatten)]
-    pub pinned: PinnedDropTableRequest,
+    pub inner: PinnedDropTableRequest,
     /// Database containing the table. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -61,7 +61,7 @@ pub struct PinnedListTablesRequest {
 #[schemars(rename = "ListTablesRequest")]
 pub struct UnpinnedListTablesRequest {
     #[serde(flatten)]
-    pub pinned: PinnedListTablesRequest,
+    pub inner: PinnedListTablesRequest,
     /// Database to list tables from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -91,7 +91,7 @@ pub struct PinnedListFunctionsRequest {
 #[schemars(rename = "ListFunctionsRequest")]
 pub struct UnpinnedListFunctionsRequest {
     #[serde(flatten)]
-    pub pinned: PinnedListFunctionsRequest,
+    pub inner: PinnedListFunctionsRequest,
     /// Database to list functions from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -120,7 +120,7 @@ pub struct PinnedListViewsRequest {
 #[schemars(rename = "ListViewsRequest")]
 pub struct UnpinnedListViewsRequest {
     #[serde(flatten)]
-    pub pinned: PinnedListViewsRequest,
+    pub inner: PinnedListViewsRequest,
     /// Database to list views from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -149,7 +149,7 @@ pub struct PinnedListMaterializedViewsRequest {
 #[schemars(rename = "ListMaterializedViewsRequest")]
 pub struct UnpinnedListMaterializedViewsRequest {
     #[serde(flatten)]
-    pub pinned: PinnedListMaterializedViewsRequest,
+    pub inner: PinnedListMaterializedViewsRequest,
     /// Database to list materialized views from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -209,7 +209,7 @@ pub struct PinnedListProceduresRequest {
 #[schemars(rename = "ListProceduresRequest")]
 pub struct UnpinnedListProceduresRequest {
     #[serde(flatten)]
-    pub pinned: PinnedListProceduresRequest,
+    pub inner: PinnedListProceduresRequest,
     /// Database to list procedures from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -247,7 +247,7 @@ mod tests {
         let req: UnpinnedListTablesRequest =
             serde_json::from_str(r#"{"database": "mydb", "search": "order"}"#).expect("parse");
         assert_eq!(req.database.as_deref(), Some("mydb"));
-        assert_eq!(req.pinned.search.as_deref(), Some("order"));
+        assert_eq!(req.inner.search.as_deref(), Some("order"));
     }
 
     #[test]
@@ -270,7 +270,7 @@ mod tests {
         let req: UnpinnedListFunctionsRequest =
             serde_json::from_str(r#"{"database": "mydb", "search": "calc"}"#).expect("parse");
         assert_eq!(req.database.as_deref(), Some("mydb"));
-        assert_eq!(req.pinned.search.as_deref(), Some("calc"));
+        assert_eq!(req.inner.search.as_deref(), Some("calc"));
     }
 
     #[test]

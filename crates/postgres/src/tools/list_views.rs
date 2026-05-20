@@ -50,12 +50,9 @@ impl ToolBase for PinnedListViewsTool {
 
 impl AsyncTool<PostgresHandler> for PinnedListViewsTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedListViewsRequest {
-            cursor,
-            search,
-            detailed,
-        } = params;
-        handler.list_views(None, cursor, search, detailed).await
+        handler
+            .list_views(None, params.cursor, params.search, params.detailed)
+            .await
     }
 }
 
@@ -86,16 +83,14 @@ impl ToolBase for UnpinnedListViewsTool {
 
 impl AsyncTool<PostgresHandler> for UnpinnedListViewsTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedListViewsRequest {
-            pinned:
-                PinnedListViewsRequest {
-                    cursor,
-                    search,
-                    detailed,
-                },
-            database,
-        } = params;
-        handler.list_views(database, cursor, search, detailed).await
+        handler
+            .list_views(
+                params.database,
+                params.inner.cursor,
+                params.inner.search,
+                params.inner.detailed,
+            )
+            .await
     }
 }
 

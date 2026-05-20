@@ -141,7 +141,7 @@ pub struct PinnedListViewsRequest {
 #[schemars(rename = "ListViewsRequest")]
 pub struct UnpinnedListViewsRequest {
     #[serde(flatten)]
-    pub pinned: PinnedListViewsRequest,
+    pub inner: PinnedListViewsRequest,
     /// Database to list views from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -200,7 +200,7 @@ pub struct PinnedListTriggersRequest {
 #[schemars(rename = "ListTriggersRequest")]
 pub struct UnpinnedListTriggersRequest {
     #[serde(flatten)]
-    pub pinned: PinnedListTriggersRequest,
+    pub inner: PinnedListTriggersRequest,
     /// Database to list triggers from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -250,7 +250,7 @@ pub struct PinnedListFunctionsRequest {
 #[schemars(rename = "ListFunctionsRequest")]
 pub struct UnpinnedListFunctionsRequest {
     #[serde(flatten)]
-    pub pinned: PinnedListFunctionsRequest,
+    pub inner: PinnedListFunctionsRequest,
     /// Database to list functions from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -329,7 +329,7 @@ pub struct PinnedQueryRequest {
 #[schemars(rename = "QueryRequest")]
 pub struct UnpinnedQueryRequest {
     #[serde(flatten)]
-    pub pinned: PinnedQueryRequest,
+    pub inner: PinnedQueryRequest,
     /// Database to run the query against. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -351,7 +351,7 @@ pub struct PinnedReadQueryRequest {
 #[schemars(rename = "ReadQueryRequest")]
 pub struct UnpinnedReadQueryRequest {
     #[serde(flatten)]
-    pub pinned: PinnedReadQueryRequest,
+    pub inner: PinnedReadQueryRequest,
     /// Database to run the query against. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -392,7 +392,7 @@ pub struct PinnedExplainQueryRequest {
 #[schemars(rename = "ExplainQueryRequest")]
 pub struct UnpinnedExplainQueryRequest {
     #[serde(flatten)]
-    pub pinned: PinnedExplainQueryRequest,
+    pub inner: PinnedExplainQueryRequest,
     /// Database to explain against. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -426,8 +426,8 @@ mod tests {
         let req: UnpinnedListTriggersRequest =
             serde_json::from_str(r#"{"database": "mydb", "search": "audit", "detailed": true}"#).expect("parse");
         assert_eq!(req.database.as_deref(), Some("mydb"));
-        assert_eq!(req.pinned.search.as_deref(), Some("audit"));
-        assert!(req.pinned.detailed);
+        assert_eq!(req.inner.search.as_deref(), Some("audit"));
+        assert!(req.inner.detailed);
     }
 
     #[test]

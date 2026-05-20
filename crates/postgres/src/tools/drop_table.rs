@@ -52,8 +52,7 @@ impl ToolBase for PinnedDropTableTool {
 
 impl AsyncTool<PostgresHandler> for PinnedDropTableTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedDropTableRequest { table, cascade } = params;
-        handler.drop_table(None, table, cascade).await
+        handler.drop_table(None, params.table, params.cascade).await
     }
 }
 
@@ -84,11 +83,9 @@ impl ToolBase for UnpinnedDropTableTool {
 
 impl AsyncTool<PostgresHandler> for UnpinnedDropTableTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedDropTableRequest {
-            pinned: PinnedDropTableRequest { table, cascade },
-            database,
-        } = params;
-        handler.drop_table(database, table, cascade).await
+        handler
+            .drop_table(params.database, params.inner.table, params.inner.cascade)
+            .await
     }
 }
 

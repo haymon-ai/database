@@ -49,8 +49,7 @@ impl ToolBase for PinnedWriteQueryTool {
 
 impl AsyncTool<PostgresHandler> for PinnedWriteQueryTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedQueryRequest { query } = params;
-        handler.write_query(query, None).await
+        handler.write_query(params.query, None).await
     }
 }
 
@@ -81,11 +80,7 @@ impl ToolBase for UnpinnedWriteQueryTool {
 
 impl AsyncTool<PostgresHandler> for UnpinnedWriteQueryTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedQueryRequest {
-            pinned: PinnedQueryRequest { query },
-            database,
-        } = params;
-        handler.write_query(query, database).await
+        handler.write_query(params.inner.query, params.database).await
     }
 }
 

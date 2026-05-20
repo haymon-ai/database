@@ -25,7 +25,7 @@ pub struct PinnedDropTableRequest {
 #[schemars(rename = "DropTableRequest")]
 pub struct UnpinnedDropTableRequest {
     #[serde(flatten)]
-    pub pinned: PinnedDropTableRequest,
+    pub inner: PinnedDropTableRequest,
     /// Database containing the table. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -54,7 +54,7 @@ pub struct PinnedListTablesRequest {
 #[schemars(rename = "ListTablesRequest")]
 pub struct UnpinnedListTablesRequest {
     #[serde(flatten)]
-    pub pinned: PinnedListTablesRequest,
+    pub inner: PinnedListTablesRequest,
     /// Database to list tables from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -85,7 +85,7 @@ pub struct PinnedListFunctionsRequest {
 #[schemars(rename = "ListFunctionsRequest")]
 pub struct UnpinnedListFunctionsRequest {
     #[serde(flatten)]
-    pub pinned: PinnedListFunctionsRequest,
+    pub inner: PinnedListFunctionsRequest,
     /// Database to list functions from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -116,7 +116,7 @@ pub struct PinnedListProceduresRequest {
 #[schemars(rename = "ListProceduresRequest")]
 pub struct UnpinnedListProceduresRequest {
     #[serde(flatten)]
-    pub pinned: PinnedListProceduresRequest,
+    pub inner: PinnedListProceduresRequest,
     /// Database to list procedures from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -145,7 +145,7 @@ pub struct PinnedListViewsRequest {
 #[schemars(rename = "ListViewsRequest")]
 pub struct UnpinnedListViewsRequest {
     #[serde(flatten)]
-    pub pinned: PinnedListViewsRequest,
+    pub inner: PinnedListViewsRequest,
     /// Database to list views from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,

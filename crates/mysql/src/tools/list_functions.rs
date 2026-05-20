@@ -51,12 +51,9 @@ impl ToolBase for PinnedListFunctionsTool {
 
 impl AsyncTool<MysqlHandler> for PinnedListFunctionsTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedListFunctionsRequest {
-            cursor,
-            search,
-            detailed,
-        } = params;
-        handler.list_functions(None, cursor, search, detailed).await
+        handler
+            .list_functions(None, params.cursor, params.search, params.detailed)
+            .await
     }
 }
 
@@ -87,16 +84,14 @@ impl ToolBase for UnpinnedListFunctionsTool {
 
 impl AsyncTool<MysqlHandler> for UnpinnedListFunctionsTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedListFunctionsRequest {
-            pinned:
-                PinnedListFunctionsRequest {
-                    cursor,
-                    search,
-                    detailed,
-                },
-            database,
-        } = params;
-        handler.list_functions(database, cursor, search, detailed).await
+        handler
+            .list_functions(
+                params.database,
+                params.inner.cursor,
+                params.inner.search,
+                params.inner.detailed,
+            )
+            .await
     }
 }
 

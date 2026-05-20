@@ -329,12 +329,9 @@ impl ToolBase for PinnedListTablesTool {
 
 impl AsyncTool<MysqlHandler> for PinnedListTablesTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedListTablesRequest {
-            cursor,
-            search,
-            detailed,
-        } = params;
-        handler.list_tables(None, cursor, search, detailed).await
+        handler
+            .list_tables(None, params.cursor, params.search, params.detailed)
+            .await
     }
 }
 
@@ -365,16 +362,14 @@ impl ToolBase for UnpinnedListTablesTool {
 
 impl AsyncTool<MysqlHandler> for UnpinnedListTablesTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedListTablesRequest {
-            pinned:
-                PinnedListTablesRequest {
-                    cursor,
-                    search,
-                    detailed,
-                },
-            database,
-        } = params;
-        handler.list_tables(database, cursor, search, detailed).await
+        handler
+            .list_tables(
+                params.database,
+                params.inner.cursor,
+                params.inner.search,
+                params.inner.detailed,
+            )
+            .await
     }
 }
 
