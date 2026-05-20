@@ -15,7 +15,7 @@ pub use dbmcp_server::types::{
 /// Request for the `dropTable` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "DropTableRequest")]
-pub struct UnpinnedDropTableRequest {
+pub struct PinnedDropTableRequest {
     /// Name of the table to drop. Must be non-empty.
     pub table: String,
 }
@@ -23,9 +23,9 @@ pub struct UnpinnedDropTableRequest {
 /// Request for the `dropTable` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "DropTableRequest")]
-pub struct PinnedDropTableRequest {
+pub struct UnpinnedDropTableRequest {
     #[serde(flatten)]
-    pub unpinned: UnpinnedDropTableRequest,
+    pub pinned: PinnedDropTableRequest,
     /// Database containing the table. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -34,7 +34,7 @@ pub struct PinnedDropTableRequest {
 /// Request for the MySQL/MariaDB `listTables` tool — supports search + detailed mode.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListTablesRequest")]
-pub struct UnpinnedListTablesRequest {
+pub struct PinnedListTablesRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
@@ -52,9 +52,9 @@ pub struct UnpinnedListTablesRequest {
 /// Request for the MySQL/MariaDB `listTables` tool — supports search + detailed mode.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListTablesRequest")]
-pub struct PinnedListTablesRequest {
+pub struct UnpinnedListTablesRequest {
     #[serde(flatten)]
-    pub unpinned: UnpinnedListTablesRequest,
+    pub pinned: PinnedListTablesRequest,
     /// Database to list tables from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -63,7 +63,7 @@ pub struct PinnedListTablesRequest {
 /// Request for the MySQL/MariaDB `listFunctions` tool — supports search + detailed mode.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListFunctionsRequest")]
-pub struct UnpinnedListFunctionsRequest {
+pub struct PinnedListFunctionsRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
@@ -83,9 +83,9 @@ pub struct UnpinnedListFunctionsRequest {
 /// Request for the MySQL/MariaDB `listFunctions` tool — supports search + detailed mode.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListFunctionsRequest")]
-pub struct PinnedListFunctionsRequest {
+pub struct UnpinnedListFunctionsRequest {
     #[serde(flatten)]
-    pub unpinned: UnpinnedListFunctionsRequest,
+    pub pinned: PinnedListFunctionsRequest,
     /// Database to list functions from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -94,7 +94,7 @@ pub struct PinnedListFunctionsRequest {
 /// Request for the MySQL/MariaDB `listProcedures` tool — supports search + detailed mode.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListProceduresRequest")]
-pub struct UnpinnedListProceduresRequest {
+pub struct PinnedListProceduresRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
@@ -114,9 +114,9 @@ pub struct UnpinnedListProceduresRequest {
 /// Request for the MySQL/MariaDB `listProcedures` tool — supports search + detailed mode.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListProceduresRequest")]
-pub struct PinnedListProceduresRequest {
+pub struct UnpinnedListProceduresRequest {
     #[serde(flatten)]
-    pub unpinned: UnpinnedListProceduresRequest,
+    pub pinned: PinnedListProceduresRequest,
     /// Database to list procedures from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -125,7 +125,7 @@ pub struct PinnedListProceduresRequest {
 /// Request for the MySQL/MariaDB `listViews` tool — supports search + detailed mode.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListViewsRequest")]
-pub struct UnpinnedListViewsRequest {
+pub struct PinnedListViewsRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
@@ -143,9 +143,9 @@ pub struct UnpinnedListViewsRequest {
 /// Request for the MySQL/MariaDB `listViews` tool — supports search + detailed mode.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListViewsRequest")]
-pub struct PinnedListViewsRequest {
+pub struct UnpinnedListViewsRequest {
     #[serde(flatten)]
-    pub unpinned: UnpinnedListViewsRequest,
+    pub pinned: PinnedListViewsRequest,
     /// Database to list views from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -161,14 +161,14 @@ mod tests {
 
     #[test]
     fn unpinned_list_tables_request_defaults_to_brief_mode_without_search() {
-        let req: UnpinnedListTablesRequest = serde_json::from_str("{}").expect("empty object should parse");
+        let req: PinnedListTablesRequest = serde_json::from_str("{}").expect("empty object should parse");
         assert!(req.search.is_none());
         assert!(!req.detailed, "detailed must default to false");
     }
 
     #[test]
     fn unpinned_list_tables_request_accepts_search_and_detailed() {
-        let req: UnpinnedListTablesRequest =
+        let req: PinnedListTablesRequest =
             serde_json::from_str(r#"{"search": "order", "detailed": true}"#).expect("parse");
         assert_eq!(req.search.as_deref(), Some("order"));
         assert!(req.detailed);
@@ -176,20 +176,20 @@ mod tests {
 
     #[test]
     fn pinned_list_tables_request_accepts_database() {
-        let req: PinnedListTablesRequest = serde_json::from_str(r#"{"database": "mydb"}"#).expect("parse");
+        let req: UnpinnedListTablesRequest = serde_json::from_str(r#"{"database": "mydb"}"#).expect("parse");
         assert_eq!(req.database.as_deref(), Some("mydb"));
     }
 
     #[test]
     fn unpinned_list_functions_request_defaults_to_brief_mode_without_search() {
-        let req: UnpinnedListFunctionsRequest = serde_json::from_str("{}").expect("empty object should parse");
+        let req: PinnedListFunctionsRequest = serde_json::from_str("{}").expect("empty object should parse");
         assert!(req.search.is_none());
         assert!(!req.detailed, "detailed must default to false");
     }
 
     #[test]
     fn unpinned_list_functions_request_accepts_search_and_detailed() {
-        let req: UnpinnedListFunctionsRequest =
+        let req: PinnedListFunctionsRequest =
             serde_json::from_str(r#"{"search": "order", "detailed": true}"#).expect("parse");
         assert_eq!(req.search.as_deref(), Some("order"));
         assert!(req.detailed);
@@ -197,20 +197,20 @@ mod tests {
 
     #[test]
     fn pinned_list_functions_request_accepts_database() {
-        let req: PinnedListFunctionsRequest = serde_json::from_str(r#"{"database": "mydb"}"#).expect("parse");
+        let req: UnpinnedListFunctionsRequest = serde_json::from_str(r#"{"database": "mydb"}"#).expect("parse");
         assert_eq!(req.database.as_deref(), Some("mydb"));
     }
 
     #[test]
     fn unpinned_list_procedures_request_defaults_to_brief_mode_without_search() {
-        let req: UnpinnedListProceduresRequest = serde_json::from_str("{}").expect("empty object should parse");
+        let req: PinnedListProceduresRequest = serde_json::from_str("{}").expect("empty object should parse");
         assert!(req.search.is_none());
         assert!(!req.detailed, "detailed must default to false");
     }
 
     #[test]
     fn unpinned_list_procedures_request_accepts_search_and_detailed() {
-        let req: UnpinnedListProceduresRequest =
+        let req: PinnedListProceduresRequest =
             serde_json::from_str(r#"{"search": "archive", "detailed": true}"#).expect("parse");
         assert_eq!(req.search.as_deref(), Some("archive"));
         assert!(req.detailed);
@@ -218,20 +218,20 @@ mod tests {
 
     #[test]
     fn pinned_list_procedures_request_accepts_database() {
-        let req: PinnedListProceduresRequest = serde_json::from_str(r#"{"database": "mydb"}"#).expect("parse");
+        let req: UnpinnedListProceduresRequest = serde_json::from_str(r#"{"database": "mydb"}"#).expect("parse");
         assert_eq!(req.database.as_deref(), Some("mydb"));
     }
 
     #[test]
     fn unpinned_list_views_request_defaults_to_brief_mode_without_search() {
-        let req: UnpinnedListViewsRequest = serde_json::from_str("{}").expect("empty object should parse");
+        let req: PinnedListViewsRequest = serde_json::from_str("{}").expect("empty object should parse");
         assert!(req.search.is_none());
         assert!(!req.detailed, "detailed must default to false");
     }
 
     #[test]
     fn unpinned_list_views_request_accepts_search_and_detailed() {
-        let req: UnpinnedListViewsRequest =
+        let req: PinnedListViewsRequest =
             serde_json::from_str(r#"{"search": "active", "detailed": true}"#).expect("parse");
         assert_eq!(req.search.as_deref(), Some("active"));
         assert!(req.detailed);
@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     fn pinned_list_views_request_accepts_database() {
-        let req: PinnedListViewsRequest = serde_json::from_str(r#"{"database": "mydb"}"#).expect("parse");
+        let req: UnpinnedListViewsRequest = serde_json::from_str(r#"{"database": "mydb"}"#).expect("parse");
         assert_eq!(req.database.as_deref(), Some("mydb"));
     }
 }

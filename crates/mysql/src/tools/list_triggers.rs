@@ -23,51 +23,11 @@ fn annotations() -> ToolAnnotations {
         .open_world(false)
 }
 
-/// Marker type for the `listTriggers` MCP tool (pinned variant — carries `database`).
+/// Marker type for the `listTriggers` MCP tool (pinned variant — no `database` field).
 pub(crate) struct PinnedListTriggersTool;
 
 impl ToolBase for PinnedListTriggersTool {
     type Parameter = PinnedListTriggersRequest;
-    type Output = ListTriggersResponse;
-    type Error = ErrorData;
-
-    fn name() -> Cow<'static, str> {
-        NAME.into()
-    }
-
-    fn title() -> Option<String> {
-        Some(TITLE.into())
-    }
-
-    fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION_UNPINNED.into())
-    }
-
-    fn annotations() -> Option<ToolAnnotations> {
-        Some(annotations())
-    }
-}
-
-impl AsyncTool<MysqlHandler> for PinnedListTriggersTool {
-    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedListTriggersRequest {
-            unpinned:
-                UnpinnedListTriggersRequest {
-                    cursor,
-                    search,
-                    detailed,
-                },
-            database,
-        } = params;
-        handler.list_triggers(database, cursor, search, detailed).await
-    }
-}
-
-/// Marker type for the `listTriggers` MCP tool (unpinned variant — no `database` field).
-pub(crate) struct UnpinnedListTriggersTool;
-
-impl ToolBase for UnpinnedListTriggersTool {
-    type Parameter = UnpinnedListTriggersRequest;
     type Output = ListTriggersResponse;
     type Error = ErrorData;
 
@@ -88,14 +48,54 @@ impl ToolBase for UnpinnedListTriggersTool {
     }
 }
 
-impl AsyncTool<MysqlHandler> for UnpinnedListTriggersTool {
+impl AsyncTool<MysqlHandler> for PinnedListTriggersTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedListTriggersRequest {
+        let PinnedListTriggersRequest {
             cursor,
             search,
             detailed,
         } = params;
         handler.list_triggers(None, cursor, search, detailed).await
+    }
+}
+
+/// Marker type for the `listTriggers` MCP tool (unpinned variant — carries `database`).
+pub(crate) struct UnpinnedListTriggersTool;
+
+impl ToolBase for UnpinnedListTriggersTool {
+    type Parameter = UnpinnedListTriggersRequest;
+    type Output = ListTriggersResponse;
+    type Error = ErrorData;
+
+    fn name() -> Cow<'static, str> {
+        NAME.into()
+    }
+
+    fn title() -> Option<String> {
+        Some(TITLE.into())
+    }
+
+    fn description() -> Option<Cow<'static, str>> {
+        Some(DESCRIPTION_UNPINNED.into())
+    }
+
+    fn annotations() -> Option<ToolAnnotations> {
+        Some(annotations())
+    }
+}
+
+impl AsyncTool<MysqlHandler> for UnpinnedListTriggersTool {
+    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
+        let UnpinnedListTriggersRequest {
+            pinned:
+                PinnedListTriggersRequest {
+                    cursor,
+                    search,
+                    detailed,
+                },
+            database,
+        } = params;
+        handler.list_triggers(database, cursor, search, detailed).await
     }
 }
 

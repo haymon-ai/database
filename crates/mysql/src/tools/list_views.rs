@@ -23,51 +23,11 @@ fn annotations() -> ToolAnnotations {
         .open_world(false)
 }
 
-/// Marker type for the `listViews` MCP tool (pinned variant — carries `database`).
+/// Marker type for the `listViews` MCP tool (pinned variant — no `database` field).
 pub(crate) struct PinnedListViewsTool;
 
 impl ToolBase for PinnedListViewsTool {
     type Parameter = PinnedListViewsRequest;
-    type Output = ListViewsResponse;
-    type Error = ErrorData;
-
-    fn name() -> Cow<'static, str> {
-        NAME.into()
-    }
-
-    fn title() -> Option<String> {
-        Some(TITLE.into())
-    }
-
-    fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION_UNPINNED.into())
-    }
-
-    fn annotations() -> Option<ToolAnnotations> {
-        Some(annotations())
-    }
-}
-
-impl AsyncTool<MysqlHandler> for PinnedListViewsTool {
-    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedListViewsRequest {
-            unpinned:
-                UnpinnedListViewsRequest {
-                    cursor,
-                    search,
-                    detailed,
-                },
-            database,
-        } = params;
-        handler.list_views(database, cursor, search, detailed).await
-    }
-}
-
-/// Marker type for the `listViews` MCP tool (unpinned variant — no `database` field).
-pub(crate) struct UnpinnedListViewsTool;
-
-impl ToolBase for UnpinnedListViewsTool {
-    type Parameter = UnpinnedListViewsRequest;
     type Output = ListViewsResponse;
     type Error = ErrorData;
 
@@ -88,14 +48,54 @@ impl ToolBase for UnpinnedListViewsTool {
     }
 }
 
-impl AsyncTool<MysqlHandler> for UnpinnedListViewsTool {
+impl AsyncTool<MysqlHandler> for PinnedListViewsTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedListViewsRequest {
+        let PinnedListViewsRequest {
             cursor,
             search,
             detailed,
         } = params;
         handler.list_views(None, cursor, search, detailed).await
+    }
+}
+
+/// Marker type for the `listViews` MCP tool (unpinned variant — carries `database`).
+pub(crate) struct UnpinnedListViewsTool;
+
+impl ToolBase for UnpinnedListViewsTool {
+    type Parameter = UnpinnedListViewsRequest;
+    type Output = ListViewsResponse;
+    type Error = ErrorData;
+
+    fn name() -> Cow<'static, str> {
+        NAME.into()
+    }
+
+    fn title() -> Option<String> {
+        Some(TITLE.into())
+    }
+
+    fn description() -> Option<Cow<'static, str>> {
+        Some(DESCRIPTION_UNPINNED.into())
+    }
+
+    fn annotations() -> Option<ToolAnnotations> {
+        Some(annotations())
+    }
+}
+
+impl AsyncTool<MysqlHandler> for UnpinnedListViewsTool {
+    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
+        let UnpinnedListViewsRequest {
+            pinned:
+                PinnedListViewsRequest {
+                    cursor,
+                    search,
+                    detailed,
+                },
+            database,
+        } = params;
+        handler.list_views(database, cursor, search, detailed).await
     }
 }
 

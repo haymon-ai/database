@@ -22,46 +22,11 @@ fn annotations() -> ToolAnnotations {
         .open_world(true)
 }
 
-/// Marker type for the `writeQuery` MCP tool (pinned variant — carries `database`).
+/// Marker type for the `writeQuery` MCP tool (pinned variant — no `database` field).
 pub(crate) struct PinnedWriteQueryTool;
 
 impl ToolBase for PinnedWriteQueryTool {
     type Parameter = PinnedQueryRequest;
-    type Output = QueryResponse;
-    type Error = ErrorData;
-
-    fn name() -> Cow<'static, str> {
-        NAME.into()
-    }
-
-    fn title() -> Option<String> {
-        Some(TITLE.into())
-    }
-
-    fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION_UNPINNED.into())
-    }
-
-    fn annotations() -> Option<ToolAnnotations> {
-        Some(annotations())
-    }
-}
-
-impl AsyncTool<MysqlHandler> for PinnedWriteQueryTool {
-    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedQueryRequest {
-            unpinned: UnpinnedQueryRequest { query },
-            database,
-        } = params;
-        handler.write_query(query, database).await
-    }
-}
-
-/// Marker type for the `writeQuery` MCP tool (unpinned variant — no `database` field).
-pub(crate) struct UnpinnedWriteQueryTool;
-
-impl ToolBase for UnpinnedWriteQueryTool {
-    type Parameter = UnpinnedQueryRequest;
     type Output = QueryResponse;
     type Error = ErrorData;
 
@@ -82,10 +47,45 @@ impl ToolBase for UnpinnedWriteQueryTool {
     }
 }
 
+impl AsyncTool<MysqlHandler> for PinnedWriteQueryTool {
+    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
+        let PinnedQueryRequest { query } = params;
+        handler.write_query(query, None).await
+    }
+}
+
+/// Marker type for the `writeQuery` MCP tool (unpinned variant — carries `database`).
+pub(crate) struct UnpinnedWriteQueryTool;
+
+impl ToolBase for UnpinnedWriteQueryTool {
+    type Parameter = UnpinnedQueryRequest;
+    type Output = QueryResponse;
+    type Error = ErrorData;
+
+    fn name() -> Cow<'static, str> {
+        NAME.into()
+    }
+
+    fn title() -> Option<String> {
+        Some(TITLE.into())
+    }
+
+    fn description() -> Option<Cow<'static, str>> {
+        Some(DESCRIPTION_UNPINNED.into())
+    }
+
+    fn annotations() -> Option<ToolAnnotations> {
+        Some(annotations())
+    }
+}
+
 impl AsyncTool<MysqlHandler> for UnpinnedWriteQueryTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedQueryRequest { query } = params;
-        handler.write_query(query, None).await
+        let UnpinnedQueryRequest {
+            pinned: PinnedQueryRequest { query },
+            database,
+        } = params;
+        handler.write_query(query, database).await
     }
 }
 

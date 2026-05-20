@@ -302,51 +302,11 @@ fn annotations() -> ToolAnnotations {
         .open_world(false)
 }
 
-/// Marker type for the `listTables` MCP tool (pinned variant — carries `database`).
+/// Marker type for the `listTables` MCP tool (pinned variant — no `database` field).
 pub(crate) struct PinnedListTablesTool;
 
 impl ToolBase for PinnedListTablesTool {
     type Parameter = PinnedListTablesRequest;
-    type Output = ListTablesResponse;
-    type Error = ErrorData;
-
-    fn name() -> Cow<'static, str> {
-        NAME.into()
-    }
-
-    fn title() -> Option<String> {
-        Some(TITLE.into())
-    }
-
-    fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION_UNPINNED.into())
-    }
-
-    fn annotations() -> Option<ToolAnnotations> {
-        Some(annotations())
-    }
-}
-
-impl AsyncTool<MysqlHandler> for PinnedListTablesTool {
-    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedListTablesRequest {
-            unpinned:
-                UnpinnedListTablesRequest {
-                    cursor,
-                    search,
-                    detailed,
-                },
-            database,
-        } = params;
-        handler.list_tables(database, cursor, search, detailed).await
-    }
-}
-
-/// Marker type for the `listTables` MCP tool (unpinned variant — no `database` field).
-pub(crate) struct UnpinnedListTablesTool;
-
-impl ToolBase for UnpinnedListTablesTool {
-    type Parameter = UnpinnedListTablesRequest;
     type Output = ListTablesResponse;
     type Error = ErrorData;
 
@@ -367,14 +327,54 @@ impl ToolBase for UnpinnedListTablesTool {
     }
 }
 
-impl AsyncTool<MysqlHandler> for UnpinnedListTablesTool {
+impl AsyncTool<MysqlHandler> for PinnedListTablesTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedListTablesRequest {
+        let PinnedListTablesRequest {
             cursor,
             search,
             detailed,
         } = params;
         handler.list_tables(None, cursor, search, detailed).await
+    }
+}
+
+/// Marker type for the `listTables` MCP tool (unpinned variant — carries `database`).
+pub(crate) struct UnpinnedListTablesTool;
+
+impl ToolBase for UnpinnedListTablesTool {
+    type Parameter = UnpinnedListTablesRequest;
+    type Output = ListTablesResponse;
+    type Error = ErrorData;
+
+    fn name() -> Cow<'static, str> {
+        NAME.into()
+    }
+
+    fn title() -> Option<String> {
+        Some(TITLE.into())
+    }
+
+    fn description() -> Option<Cow<'static, str>> {
+        Some(DESCRIPTION_UNPINNED.into())
+    }
+
+    fn annotations() -> Option<ToolAnnotations> {
+        Some(annotations())
+    }
+}
+
+impl AsyncTool<MysqlHandler> for UnpinnedListTablesTool {
+    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
+        let UnpinnedListTablesRequest {
+            pinned:
+                PinnedListTablesRequest {
+                    cursor,
+                    search,
+                    detailed,
+                },
+            database,
+        } = params;
+        handler.list_tables(database, cursor, search, detailed).await
     }
 }
 

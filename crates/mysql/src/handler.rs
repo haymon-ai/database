@@ -41,33 +41,33 @@ const INSTRUCTIONS_READ_ONLY_PINNED: &str = include_str!("../assets/instructions
 
 /// Declarative tool table: `(tool, read_only, pin_visibility)`.
 ///
-/// Per-database tools expose a `Pinned*Tool` variant (carries a `database`
-/// field) when the config has no pinned db name, and an `Unpinned*Tool`
-/// variant (no `database` field) when one is pinned. Cross-database tools
+/// Per-database tools expose a `Pinned*Tool` variant (no `database` field)
+/// when the config pins a db name, and an `Unpinned*Tool` variant
+/// (carries a `database` field) otherwise. Cross-database tools
 /// (`listDatabases`, `createDatabase`, `dropDatabase`) are hidden in pinned
 /// mode altogether.
 const TOOLS: &[ToolSpec<MysqlHandler>] = &[
     ToolSpec::async_tool::<ListDatabasesTool>(false, PinVisibility::OnlyUnpinned),
-    ToolSpec::async_tool::<PinnedListTablesTool>(false, PinVisibility::OnlyUnpinned),
-    ToolSpec::async_tool::<UnpinnedListTablesTool>(false, PinVisibility::OnlyPinned),
-    ToolSpec::async_tool::<PinnedListViewsTool>(false, PinVisibility::OnlyUnpinned),
-    ToolSpec::async_tool::<UnpinnedListViewsTool>(false, PinVisibility::OnlyPinned),
-    ToolSpec::async_tool::<PinnedListTriggersTool>(false, PinVisibility::OnlyUnpinned),
-    ToolSpec::async_tool::<UnpinnedListTriggersTool>(false, PinVisibility::OnlyPinned),
-    ToolSpec::async_tool::<PinnedListFunctionsTool>(false, PinVisibility::OnlyUnpinned),
-    ToolSpec::async_tool::<UnpinnedListFunctionsTool>(false, PinVisibility::OnlyPinned),
-    ToolSpec::async_tool::<PinnedListProceduresTool>(false, PinVisibility::OnlyUnpinned),
-    ToolSpec::async_tool::<UnpinnedListProceduresTool>(false, PinVisibility::OnlyPinned),
-    ToolSpec::async_tool::<PinnedReadQueryTool>(false, PinVisibility::OnlyUnpinned),
-    ToolSpec::async_tool::<UnpinnedReadQueryTool>(false, PinVisibility::OnlyPinned),
-    ToolSpec::async_tool::<PinnedExplainQueryTool>(false, PinVisibility::OnlyUnpinned),
-    ToolSpec::async_tool::<UnpinnedExplainQueryTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<PinnedListTablesTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<UnpinnedListTablesTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<PinnedListViewsTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<UnpinnedListViewsTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<PinnedListTriggersTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<UnpinnedListTriggersTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<PinnedListFunctionsTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<UnpinnedListFunctionsTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<PinnedListProceduresTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<UnpinnedListProceduresTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<PinnedReadQueryTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<UnpinnedReadQueryTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<PinnedExplainQueryTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<UnpinnedExplainQueryTool>(false, PinVisibility::OnlyUnpinned),
     ToolSpec::async_tool::<CreateDatabaseTool>(true, PinVisibility::OnlyUnpinned),
     ToolSpec::async_tool::<DropDatabaseTool>(true, PinVisibility::OnlyUnpinned),
-    ToolSpec::async_tool::<PinnedDropTableTool>(true, PinVisibility::OnlyUnpinned),
-    ToolSpec::async_tool::<UnpinnedDropTableTool>(true, PinVisibility::OnlyPinned),
-    ToolSpec::async_tool::<PinnedWriteQueryTool>(true, PinVisibility::OnlyUnpinned),
-    ToolSpec::async_tool::<UnpinnedWriteQueryTool>(true, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<PinnedDropTableTool>(true, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<UnpinnedDropTableTool>(true, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<PinnedWriteQueryTool>(true, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<UnpinnedWriteQueryTool>(true, PinVisibility::OnlyUnpinned),
 ];
 
 /// MySQL/MariaDB database handler.

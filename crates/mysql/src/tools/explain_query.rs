@@ -23,46 +23,11 @@ fn annotations() -> ToolAnnotations {
         .open_world(true)
 }
 
-/// Marker type for the `explainQuery` MCP tool (pinned variant — carries `database`).
+/// Marker type for the `explainQuery` MCP tool (pinned variant — no `database` field).
 pub(crate) struct PinnedExplainQueryTool;
 
 impl ToolBase for PinnedExplainQueryTool {
     type Parameter = PinnedExplainQueryRequest;
-    type Output = QueryResponse;
-    type Error = ErrorData;
-
-    fn name() -> Cow<'static, str> {
-        NAME.into()
-    }
-
-    fn title() -> Option<String> {
-        Some(TITLE.into())
-    }
-
-    fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION_UNPINNED.into())
-    }
-
-    fn annotations() -> Option<ToolAnnotations> {
-        Some(annotations())
-    }
-}
-
-impl AsyncTool<MysqlHandler> for PinnedExplainQueryTool {
-    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedExplainQueryRequest {
-            unpinned: UnpinnedExplainQueryRequest { query, analyze },
-            database,
-        } = params;
-        handler.explain_query(database, query, analyze).await
-    }
-}
-
-/// Marker type for the `explainQuery` MCP tool (unpinned variant — no `database` field).
-pub(crate) struct UnpinnedExplainQueryTool;
-
-impl ToolBase for UnpinnedExplainQueryTool {
-    type Parameter = UnpinnedExplainQueryRequest;
     type Output = QueryResponse;
     type Error = ErrorData;
 
@@ -83,10 +48,45 @@ impl ToolBase for UnpinnedExplainQueryTool {
     }
 }
 
+impl AsyncTool<MysqlHandler> for PinnedExplainQueryTool {
+    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
+        let PinnedExplainQueryRequest { query, analyze } = params;
+        handler.explain_query(None, query, analyze).await
+    }
+}
+
+/// Marker type for the `explainQuery` MCP tool (unpinned variant — carries `database`).
+pub(crate) struct UnpinnedExplainQueryTool;
+
+impl ToolBase for UnpinnedExplainQueryTool {
+    type Parameter = UnpinnedExplainQueryRequest;
+    type Output = QueryResponse;
+    type Error = ErrorData;
+
+    fn name() -> Cow<'static, str> {
+        NAME.into()
+    }
+
+    fn title() -> Option<String> {
+        Some(TITLE.into())
+    }
+
+    fn description() -> Option<Cow<'static, str>> {
+        Some(DESCRIPTION_UNPINNED.into())
+    }
+
+    fn annotations() -> Option<ToolAnnotations> {
+        Some(annotations())
+    }
+}
+
 impl AsyncTool<MysqlHandler> for UnpinnedExplainQueryTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedExplainQueryRequest { query, analyze } = params;
-        handler.explain_query(None, query, analyze).await
+        let UnpinnedExplainQueryRequest {
+            pinned: PinnedExplainQueryRequest { query, analyze },
+            database,
+        } = params;
+        handler.explain_query(database, query, analyze).await
     }
 }
 

@@ -26,46 +26,11 @@ fn annotations() -> ToolAnnotations {
         .open_world(true)
 }
 
-/// Marker type for the `readQuery` MCP tool (pinned variant — carries `database`).
+/// Marker type for the `readQuery` MCP tool (pinned variant — no `database` field).
 pub(crate) struct PinnedReadQueryTool;
 
 impl ToolBase for PinnedReadQueryTool {
     type Parameter = PinnedReadQueryRequest;
-    type Output = ReadQueryResponse;
-    type Error = ErrorData;
-
-    fn name() -> Cow<'static, str> {
-        NAME.into()
-    }
-
-    fn title() -> Option<String> {
-        Some(TITLE.into())
-    }
-
-    fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION_UNPINNED.into())
-    }
-
-    fn annotations() -> Option<ToolAnnotations> {
-        Some(annotations())
-    }
-}
-
-impl AsyncTool<MysqlHandler> for PinnedReadQueryTool {
-    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedReadQueryRequest {
-            unpinned: UnpinnedReadQueryRequest { query, cursor },
-            database,
-        } = params;
-        handler.read_query(query, database, cursor).await
-    }
-}
-
-/// Marker type for the `readQuery` MCP tool (unpinned variant — no `database` field).
-pub(crate) struct UnpinnedReadQueryTool;
-
-impl ToolBase for UnpinnedReadQueryTool {
-    type Parameter = UnpinnedReadQueryRequest;
     type Output = ReadQueryResponse;
     type Error = ErrorData;
 
@@ -86,10 +51,45 @@ impl ToolBase for UnpinnedReadQueryTool {
     }
 }
 
+impl AsyncTool<MysqlHandler> for PinnedReadQueryTool {
+    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
+        let PinnedReadQueryRequest { query, cursor } = params;
+        handler.read_query(query, None, cursor).await
+    }
+}
+
+/// Marker type for the `readQuery` MCP tool (unpinned variant — carries `database`).
+pub(crate) struct UnpinnedReadQueryTool;
+
+impl ToolBase for UnpinnedReadQueryTool {
+    type Parameter = UnpinnedReadQueryRequest;
+    type Output = ReadQueryResponse;
+    type Error = ErrorData;
+
+    fn name() -> Cow<'static, str> {
+        NAME.into()
+    }
+
+    fn title() -> Option<String> {
+        Some(TITLE.into())
+    }
+
+    fn description() -> Option<Cow<'static, str>> {
+        Some(DESCRIPTION_UNPINNED.into())
+    }
+
+    fn annotations() -> Option<ToolAnnotations> {
+        Some(annotations())
+    }
+}
+
 impl AsyncTool<MysqlHandler> for UnpinnedReadQueryTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedReadQueryRequest { query, cursor } = params;
-        handler.read_query(query, None, cursor).await
+        let UnpinnedReadQueryRequest {
+            pinned: PinnedReadQueryRequest { query, cursor },
+            database,
+        } = params;
+        handler.read_query(query, database, cursor).await
     }
 }
 

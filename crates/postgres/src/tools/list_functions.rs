@@ -23,51 +23,11 @@ fn annotations() -> ToolAnnotations {
         .open_world(false)
 }
 
-/// Marker type for the `listFunctions` MCP tool (pinned variant — carries `database`).
+/// Marker type for the `listFunctions` MCP tool (pinned variant — no `database` field).
 pub(crate) struct PinnedListFunctionsTool;
 
 impl ToolBase for PinnedListFunctionsTool {
     type Parameter = PinnedListFunctionsRequest;
-    type Output = ListFunctionsResponse;
-    type Error = ErrorData;
-
-    fn name() -> Cow<'static, str> {
-        NAME.into()
-    }
-
-    fn title() -> Option<String> {
-        Some(TITLE.into())
-    }
-
-    fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION_UNPINNED.into())
-    }
-
-    fn annotations() -> Option<ToolAnnotations> {
-        Some(annotations())
-    }
-}
-
-impl AsyncTool<PostgresHandler> for PinnedListFunctionsTool {
-    async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedListFunctionsRequest {
-            unpinned:
-                UnpinnedListFunctionsRequest {
-                    cursor,
-                    search,
-                    detailed,
-                },
-            database,
-        } = params;
-        handler.list_functions(database, cursor, search, detailed).await
-    }
-}
-
-/// Marker type for the `listFunctions` MCP tool (unpinned variant — no `database` field).
-pub(crate) struct UnpinnedListFunctionsTool;
-
-impl ToolBase for UnpinnedListFunctionsTool {
-    type Parameter = UnpinnedListFunctionsRequest;
     type Output = ListFunctionsResponse;
     type Error = ErrorData;
 
@@ -88,14 +48,54 @@ impl ToolBase for UnpinnedListFunctionsTool {
     }
 }
 
-impl AsyncTool<PostgresHandler> for UnpinnedListFunctionsTool {
+impl AsyncTool<PostgresHandler> for PinnedListFunctionsTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedListFunctionsRequest {
+        let PinnedListFunctionsRequest {
             cursor,
             search,
             detailed,
         } = params;
         handler.list_functions(None, cursor, search, detailed).await
+    }
+}
+
+/// Marker type for the `listFunctions` MCP tool (unpinned variant — carries `database`).
+pub(crate) struct UnpinnedListFunctionsTool;
+
+impl ToolBase for UnpinnedListFunctionsTool {
+    type Parameter = UnpinnedListFunctionsRequest;
+    type Output = ListFunctionsResponse;
+    type Error = ErrorData;
+
+    fn name() -> Cow<'static, str> {
+        NAME.into()
+    }
+
+    fn title() -> Option<String> {
+        Some(TITLE.into())
+    }
+
+    fn description() -> Option<Cow<'static, str>> {
+        Some(DESCRIPTION_UNPINNED.into())
+    }
+
+    fn annotations() -> Option<ToolAnnotations> {
+        Some(annotations())
+    }
+}
+
+impl AsyncTool<PostgresHandler> for UnpinnedListFunctionsTool {
+    async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
+        let UnpinnedListFunctionsRequest {
+            pinned:
+                PinnedListFunctionsRequest {
+                    cursor,
+                    search,
+                    detailed,
+                },
+            database,
+        } = params;
+        handler.list_functions(database, cursor, search, detailed).await
     }
 }
 

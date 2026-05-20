@@ -25,46 +25,11 @@ fn annotations() -> ToolAnnotations {
         .open_world(false)
 }
 
-/// Marker type for the `dropTable` MCP tool (pinned variant — carries `database`).
+/// Marker type for the `dropTable` MCP tool (pinned variant — no `database` field).
 pub(crate) struct PinnedDropTableTool;
 
 impl ToolBase for PinnedDropTableTool {
     type Parameter = PinnedDropTableRequest;
-    type Output = MessageResponse;
-    type Error = ErrorData;
-
-    fn name() -> Cow<'static, str> {
-        NAME.into()
-    }
-
-    fn title() -> Option<String> {
-        Some(TITLE.into())
-    }
-
-    fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION_UNPINNED.into())
-    }
-
-    fn annotations() -> Option<ToolAnnotations> {
-        Some(annotations())
-    }
-}
-
-impl AsyncTool<MysqlHandler> for PinnedDropTableTool {
-    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let PinnedDropTableRequest {
-            unpinned: UnpinnedDropTableRequest { table },
-            database,
-        } = params;
-        handler.drop_table(database, table).await
-    }
-}
-
-/// Marker type for the `dropTable` MCP tool (unpinned variant — no `database` field).
-pub(crate) struct UnpinnedDropTableTool;
-
-impl ToolBase for UnpinnedDropTableTool {
-    type Parameter = UnpinnedDropTableRequest;
     type Output = MessageResponse;
     type Error = ErrorData;
 
@@ -85,10 +50,45 @@ impl ToolBase for UnpinnedDropTableTool {
     }
 }
 
+impl AsyncTool<MysqlHandler> for PinnedDropTableTool {
+    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
+        let PinnedDropTableRequest { table } = params;
+        handler.drop_table(None, table).await
+    }
+}
+
+/// Marker type for the `dropTable` MCP tool (unpinned variant — carries `database`).
+pub(crate) struct UnpinnedDropTableTool;
+
+impl ToolBase for UnpinnedDropTableTool {
+    type Parameter = UnpinnedDropTableRequest;
+    type Output = MessageResponse;
+    type Error = ErrorData;
+
+    fn name() -> Cow<'static, str> {
+        NAME.into()
+    }
+
+    fn title() -> Option<String> {
+        Some(TITLE.into())
+    }
+
+    fn description() -> Option<Cow<'static, str>> {
+        Some(DESCRIPTION_UNPINNED.into())
+    }
+
+    fn annotations() -> Option<ToolAnnotations> {
+        Some(annotations())
+    }
+}
+
 impl AsyncTool<MysqlHandler> for UnpinnedDropTableTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        let UnpinnedDropTableRequest { table } = params;
-        handler.drop_table(None, table).await
+        let UnpinnedDropTableRequest {
+            pinned: PinnedDropTableRequest { table },
+            database,
+        } = params;
+        handler.drop_table(database, table).await
     }
 }
 

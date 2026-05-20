@@ -130,7 +130,7 @@ pub struct DropDatabaseRequest {
 /// Request for the `listViews` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListViewsRequest")]
-pub struct UnpinnedListViewsRequest {
+pub struct PinnedListViewsRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
@@ -139,9 +139,9 @@ pub struct UnpinnedListViewsRequest {
 /// Request for the `listViews` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListViewsRequest")]
-pub struct PinnedListViewsRequest {
+pub struct UnpinnedListViewsRequest {
     #[serde(flatten)]
-    pub unpinned: UnpinnedListViewsRequest,
+    pub pinned: PinnedListViewsRequest,
     /// Database to list views from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -180,7 +180,7 @@ impl ListViewsResponse {
 /// Request for the `listTriggers` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListTriggersRequest")]
-pub struct UnpinnedListTriggersRequest {
+pub struct PinnedListTriggersRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
@@ -198,9 +198,9 @@ pub struct UnpinnedListTriggersRequest {
 /// Request for the `listTriggers` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListTriggersRequest")]
-pub struct PinnedListTriggersRequest {
+pub struct UnpinnedListTriggersRequest {
     #[serde(flatten)]
-    pub unpinned: UnpinnedListTriggersRequest,
+    pub pinned: PinnedListTriggersRequest,
     /// Database to list triggers from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -239,7 +239,7 @@ impl ListTriggersResponse {
 /// Request for the `listFunctions` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListFunctionsRequest")]
-pub struct UnpinnedListFunctionsRequest {
+pub struct PinnedListFunctionsRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
@@ -248,9 +248,9 @@ pub struct UnpinnedListFunctionsRequest {
 /// Request for the `listFunctions` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListFunctionsRequest")]
-pub struct PinnedListFunctionsRequest {
+pub struct UnpinnedListFunctionsRequest {
     #[serde(flatten)]
-    pub unpinned: UnpinnedListFunctionsRequest,
+    pub pinned: PinnedListFunctionsRequest,
     /// Database to list functions from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -319,7 +319,7 @@ impl ListProceduresResponse {
 /// Request for the `writeQuery` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "QueryRequest")]
-pub struct UnpinnedQueryRequest {
+pub struct PinnedQueryRequest {
     /// The SQL query to execute.
     pub query: String,
 }
@@ -327,9 +327,9 @@ pub struct UnpinnedQueryRequest {
 /// Request for the `writeQuery` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "QueryRequest")]
-pub struct PinnedQueryRequest {
+pub struct UnpinnedQueryRequest {
     #[serde(flatten)]
-    pub unpinned: UnpinnedQueryRequest,
+    pub pinned: PinnedQueryRequest,
     /// Database to run the query against. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -338,7 +338,7 @@ pub struct PinnedQueryRequest {
 /// Request for the `readQuery` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ReadQueryRequest")]
-pub struct UnpinnedReadQueryRequest {
+pub struct PinnedReadQueryRequest {
     /// The SQL query to execute.
     pub query: String,
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
@@ -349,9 +349,9 @@ pub struct UnpinnedReadQueryRequest {
 /// Request for the `readQuery` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ReadQueryRequest")]
-pub struct PinnedReadQueryRequest {
+pub struct UnpinnedReadQueryRequest {
     #[serde(flatten)]
-    pub unpinned: UnpinnedReadQueryRequest,
+    pub pinned: PinnedReadQueryRequest,
     /// Database to run the query against. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -379,7 +379,7 @@ pub struct ReadQueryResponse {
 /// Request for the `explainQuery` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ExplainQueryRequest")]
-pub struct UnpinnedExplainQueryRequest {
+pub struct PinnedExplainQueryRequest {
     /// The SQL query to explain.
     pub query: String,
     /// If true, use EXPLAIN ANALYZE for actual execution statistics. In read-only mode, only allowed for read-only statements. Defaults to false.
@@ -390,9 +390,9 @@ pub struct UnpinnedExplainQueryRequest {
 /// Request for the `explainQuery` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ExplainQueryRequest")]
-pub struct PinnedExplainQueryRequest {
+pub struct UnpinnedExplainQueryRequest {
     #[serde(flatten)]
-    pub unpinned: UnpinnedExplainQueryRequest,
+    pub pinned: PinnedExplainQueryRequest,
     /// Database to explain against. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
@@ -408,14 +408,14 @@ mod tests {
 
     #[test]
     fn unpinned_list_triggers_request_defaults_to_brief_mode_without_search() {
-        let req: UnpinnedListTriggersRequest = serde_json::from_str("{}").expect("empty object should parse");
+        let req: PinnedListTriggersRequest = serde_json::from_str("{}").expect("empty object should parse");
         assert!(req.search.is_none());
         assert!(!req.detailed, "detailed must default to false");
     }
 
     #[test]
     fn unpinned_list_triggers_request_accepts_search_and_detailed() {
-        let req: UnpinnedListTriggersRequest =
+        let req: PinnedListTriggersRequest =
             serde_json::from_str(r#"{"search": "audit", "detailed": true}"#).expect("parse");
         assert_eq!(req.search.as_deref(), Some("audit"));
         assert!(req.detailed);
@@ -423,11 +423,11 @@ mod tests {
 
     #[test]
     fn pinned_list_triggers_request_accepts_database_and_inner_fields() {
-        let req: PinnedListTriggersRequest =
+        let req: UnpinnedListTriggersRequest =
             serde_json::from_str(r#"{"database": "mydb", "search": "audit", "detailed": true}"#).expect("parse");
         assert_eq!(req.database.as_deref(), Some("mydb"));
-        assert_eq!(req.unpinned.search.as_deref(), Some("audit"));
-        assert!(req.unpinned.detailed);
+        assert_eq!(req.pinned.search.as_deref(), Some("audit"));
+        assert!(req.pinned.detailed);
     }
 
     #[test]
