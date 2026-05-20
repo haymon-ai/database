@@ -7,7 +7,7 @@
 
 use dbmcp_config::{Config, DatabaseConfig};
 use dbmcp_pii::Redactor;
-use dbmcp_server::{Server, ToolRouterExt, ToolSpec, server_info};
+use dbmcp_server::{PinVisibility, Server, ToolRouterExt, ToolSpec, server_info};
 use rmcp::RoleServer;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::tool::ToolCallContext;
@@ -29,17 +29,18 @@ const INSTRUCTIONS: &str = include_str!("../assets/instructions/default.md");
 /// Backend-specific instructions for `SQLite` in read-only mode.
 const INSTRUCTIONS_READ_ONLY: &str = include_str!("../assets/instructions/read-only.md");
 
-/// Declarative tool table: `(tool, read_only, pinned)`.
+/// Declarative tool table: `(tool, read_only, pin_visibility)`.
 ///
-/// `SQLite` has no cross-database tools, so every entry is `pinned = false`.
+/// `SQLite` has no cross-database tools and no `database` request field,
+/// so every tool is `PinVisibility::Always` (visible regardless of pin).
 const TOOLS: &[ToolSpec<SqliteHandler>] = &[
-    ToolSpec::async_tool::<ListTablesTool>(false, false),
-    ToolSpec::async_tool::<ListViewsTool>(false, false),
-    ToolSpec::async_tool::<ListTriggersTool>(false, false),
-    ToolSpec::async_tool::<ReadQueryTool>(false, false),
-    ToolSpec::async_tool::<ExplainQueryTool>(false, false),
-    ToolSpec::async_tool::<WriteQueryTool>(true, false),
-    ToolSpec::async_tool::<DropTableTool>(true, false),
+    ToolSpec::async_tool::<ListTablesTool>(false, PinVisibility::Always),
+    ToolSpec::async_tool::<ListViewsTool>(false, PinVisibility::Always),
+    ToolSpec::async_tool::<ListTriggersTool>(false, PinVisibility::Always),
+    ToolSpec::async_tool::<ReadQueryTool>(false, PinVisibility::Always),
+    ToolSpec::async_tool::<ExplainQueryTool>(false, PinVisibility::Always),
+    ToolSpec::async_tool::<WriteQueryTool>(true, PinVisibility::Always),
+    ToolSpec::async_tool::<DropTableTool>(true, PinVisibility::Always),
 ];
 
 /// `SQLite` file-based database handler.

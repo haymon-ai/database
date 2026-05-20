@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use dbmcp_server::types::{ExplainQueryRequest, QueryResponse};
+use dbmcp_server::types::{PinnedExplainQueryRequest, QueryResponse, UnpinnedExplainQueryRequest};
 use dbmcp_sql::Connection as _;
 use dbmcp_sql::validation::validate_read_only;
 use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
@@ -10,46 +10,82 @@ use rmcp::model::{ErrorData, ToolAnnotations};
 
 use crate::PostgresHandler;
 
-/// Marker type for the `explainQuery` MCP tool.
-pub(crate) struct ExplainQueryTool;
+const NAME: &str = "explainQuery";
+const TITLE: &str = "Explain Query";
+const DESCRIPTION: &str = include_str!("../../assets/tools/explain_query.md");
 
-impl ExplainQueryTool {
-    const NAME: &'static str = "explainQuery";
-    const TITLE: &'static str = "Explain Query";
-    const DESCRIPTION: &'static str = include_str!("../../assets/tools/explain_query.md");
+fn annotations() -> ToolAnnotations {
+    ToolAnnotations::new()
+        .read_only(true)
+        .destructive(false)
+        .idempotent(true)
+        .open_world(true)
 }
 
-impl ToolBase for ExplainQueryTool {
-    type Parameter = ExplainQueryRequest;
+/// Marker type for the `explainQuery` MCP tool (pinned variant — carries `database`).
+pub(crate) struct PinnedExplainQueryTool;
+
+impl ToolBase for PinnedExplainQueryTool {
+    type Parameter = PinnedExplainQueryRequest;
     type Output = QueryResponse;
     type Error = ErrorData;
 
     fn name() -> Cow<'static, str> {
-        Self::NAME.into()
+        NAME.into()
     }
 
     fn title() -> Option<String> {
-        Some(Self::TITLE.into())
+        Some(TITLE.into())
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(Self::DESCRIPTION.into())
+        Some(DESCRIPTION.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {
-        Some(
-            ToolAnnotations::new()
-                .read_only(true)
-                .destructive(false)
-                .idempotent(true)
-                .open_world(true),
-        )
+        Some(annotations())
     }
 }
 
-impl AsyncTool<PostgresHandler> for ExplainQueryTool {
+impl AsyncTool<PostgresHandler> for PinnedExplainQueryTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        handler.explain_query(params).await
+        let PinnedExplainQueryRequest {
+            unpinned: UnpinnedExplainQueryRequest { query, analyze },
+            database,
+        } = params;
+        handler.explain_query(database, query, analyze).await
+    }
+}
+
+/// Marker type for the `explainQuery` MCP tool (unpinned variant — no `database` field).
+pub(crate) struct UnpinnedExplainQueryTool;
+
+impl ToolBase for UnpinnedExplainQueryTool {
+    type Parameter = UnpinnedExplainQueryRequest;
+    type Output = QueryResponse;
+    type Error = ErrorData;
+
+    fn name() -> Cow<'static, str> {
+        NAME.into()
+    }
+
+    fn title() -> Option<String> {
+        Some(TITLE.into())
+    }
+
+    fn description() -> Option<Cow<'static, str>> {
+        Some(DESCRIPTION.into())
+    }
+
+    fn annotations() -> Option<ToolAnnotations> {
+        Some(annotations())
+    }
+}
+
+impl AsyncTool<PostgresHandler> for UnpinnedExplainQueryTool {
+    async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
+        let UnpinnedExplainQueryRequest { query, analyze } = params;
+        handler.explain_query(None, query, analyze).await
     }
 }
 
@@ -66,11 +102,9 @@ impl PostgresHandler {
     /// Returns [`SqlError::Query`] if the backend reports an error.
     pub async fn explain_query(
         &self,
-        ExplainQueryRequest {
-            database,
-            query,
-            analyze,
-        }: ExplainQueryRequest,
+        database: Option<String>,
+        query: String,
+        analyze: bool,
     ) -> Result<QueryResponse, ErrorData> {
         if analyze && self.config.read_only {
             let _ = validate_read_only(&query, &sqlparser::dialect::PostgreSqlDialect {})?;

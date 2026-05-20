@@ -45,20 +45,25 @@ async fn test_server_info_read_only() {
     .await;
 }
 
+// SQLite has no per-request `database` field and no config-level pinning to
+// switch off: the connection always targets the one file in `DB_PATH`. Only
+// the `read_write` / `read_only` axis varies; the matrix's `pinned` /
+// `unpinned` axis collapses to a single dimension here.
+
 #[tokio::test]
-async fn test_list_tools() {
+async fn test_list_tools_read_write_unpinned() {
     common::run_with_client(server(false), |peer| async move {
         let tools = peer.list_all_tools().await.expect("list_all_tools failed");
-        insta::assert_json_snapshot!("list_tools", tools);
+        insta::assert_json_snapshot!("list_tools_read_write_unpinned", tools);
     })
     .await;
 }
 
 #[tokio::test]
-async fn test_list_tools_read_only() {
+async fn test_list_tools_read_only_unpinned() {
     common::run_with_client(server(true), |peer| async move {
         let tools = peer.list_all_tools().await.expect("list_all_tools failed");
-        insta::assert_json_snapshot!("list_tools_read_only", tools);
+        insta::assert_json_snapshot!("list_tools_read_only_unpinned", tools);
     })
     .await;
 }

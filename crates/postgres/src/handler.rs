@@ -7,7 +7,7 @@
 
 use dbmcp_config::{Config, DatabaseConfig};
 use dbmcp_pii::Redactor;
-use dbmcp_server::{Server, ToolRouterExt, ToolSpec, server_info};
+use dbmcp_server::{PinVisibility, Server, ToolRouterExt, ToolSpec, server_info};
 use rmcp::RoleServer;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::tool::ToolCallContext;
@@ -18,9 +18,12 @@ use rmcp::{ErrorData, ServerHandler};
 use crate::connection::PostgresConnection;
 
 use crate::tools::{
-    CreateDatabaseTool, DropDatabaseTool, DropTableTool, ExplainQueryTool, ListDatabasesTool, ListFunctionsTool,
-    ListMaterializedViewsTool, ListProceduresTool, ListTablesTool, ListTriggersTool, ListViewsTool, ReadQueryTool,
-    WriteQueryTool,
+    CreateDatabaseTool, DropDatabaseTool, ListDatabasesTool, PinnedDropTableTool, PinnedExplainQueryTool,
+    PinnedListFunctionsTool, PinnedListMaterializedViewsTool, PinnedListProceduresTool, PinnedListTablesTool,
+    PinnedListTriggersTool, PinnedListViewsTool, PinnedReadQueryTool, PinnedWriteQueryTool, UnpinnedDropTableTool,
+    UnpinnedExplainQueryTool, UnpinnedListFunctionsTool, UnpinnedListMaterializedViewsTool, UnpinnedListProceduresTool,
+    UnpinnedListTablesTool, UnpinnedListTriggersTool, UnpinnedListViewsTool, UnpinnedReadQueryTool,
+    UnpinnedWriteQueryTool,
 };
 
 /// Backend-specific description for `PostgreSQL`.
@@ -38,21 +41,37 @@ const INSTRUCTIONS_PINNED: &str = include_str!("../assets/instructions/default.p
 /// Backend-specific instructions for read-only mode with a pinned database.
 const INSTRUCTIONS_READ_ONLY_PINNED: &str = include_str!("../assets/instructions/read-only.pinned.md");
 
-/// Declarative tool table: `(tool, read_only, pinned)`.
+/// Declarative tool table: `(tool, read_only, pin_visibility)`.
+///
+/// Per-database tools expose a `Pinned*Tool` variant (carries a `database`
+/// field) when the config has no pinned db name, and an `Unpinned*Tool`
+/// variant (no `database` field) when one is pinned. Cross-database tools
+/// (`listDatabases`, `createDatabase`, `dropDatabase`) are hidden in pinned
+/// mode altogether.
 const TOOLS: &[ToolSpec<PostgresHandler>] = &[
-    ToolSpec::async_tool::<ListDatabasesTool>(false, true),
-    ToolSpec::async_tool::<ListTablesTool>(false, false),
-    ToolSpec::async_tool::<ListViewsTool>(false, false),
-    ToolSpec::async_tool::<ListTriggersTool>(false, false),
-    ToolSpec::async_tool::<ListFunctionsTool>(false, false),
-    ToolSpec::async_tool::<ListProceduresTool>(false, false),
-    ToolSpec::async_tool::<ListMaterializedViewsTool>(false, false),
-    ToolSpec::async_tool::<ReadQueryTool>(false, false),
-    ToolSpec::async_tool::<ExplainQueryTool>(false, false),
-    ToolSpec::async_tool::<CreateDatabaseTool>(true, true),
-    ToolSpec::async_tool::<DropDatabaseTool>(true, true),
-    ToolSpec::async_tool::<DropTableTool>(true, false),
-    ToolSpec::async_tool::<WriteQueryTool>(true, false),
+    ToolSpec::async_tool::<ListDatabasesTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<PinnedListTablesTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<UnpinnedListTablesTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<PinnedListViewsTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<UnpinnedListViewsTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<PinnedListTriggersTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<UnpinnedListTriggersTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<PinnedListFunctionsTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<UnpinnedListFunctionsTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<PinnedListProceduresTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<UnpinnedListProceduresTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<PinnedListMaterializedViewsTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<UnpinnedListMaterializedViewsTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<PinnedReadQueryTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<UnpinnedReadQueryTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<PinnedExplainQueryTool>(false, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<UnpinnedExplainQueryTool>(false, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<CreateDatabaseTool>(true, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<DropDatabaseTool>(true, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<PinnedDropTableTool>(true, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<UnpinnedDropTableTool>(true, PinVisibility::OnlyPinned),
+    ToolSpec::async_tool::<PinnedWriteQueryTool>(true, PinVisibility::OnlyUnpinned),
+    ToolSpec::async_tool::<UnpinnedWriteQueryTool>(true, PinVisibility::OnlyPinned),
 ];
 
 /// `PostgreSQL` database handler.

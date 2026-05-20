@@ -2,54 +2,99 @@
 
 use std::borrow::Cow;
 
-use dbmcp_server::pagination::Pager;
+use dbmcp_server::pagination::{Cursor, Pager};
 use dbmcp_sql::Connection as _;
 use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
 use rmcp::model::{ErrorData, ToolAnnotations};
 
 use crate::MysqlHandler;
-use crate::types::{ListProceduresRequest, ListProceduresResponse};
+use crate::types::{ListProceduresResponse, PinnedListProceduresRequest, UnpinnedListProceduresRequest};
 
-/// Marker type for the `listProcedures` MCP tool.
-pub(crate) struct ListProceduresTool;
+const NAME: &str = "listProcedures";
+const TITLE: &str = "List Procedures";
+const DESCRIPTION: &str = include_str!("../../assets/tools/list_procedures.md");
 
-impl ListProceduresTool {
-    const NAME: &'static str = "listProcedures";
-    const TITLE: &'static str = "List Procedures";
-    const DESCRIPTION: &'static str = include_str!("../../assets/tools/list_procedures.md");
+fn annotations() -> ToolAnnotations {
+    ToolAnnotations::new()
+        .read_only(true)
+        .destructive(false)
+        .idempotent(true)
+        .open_world(false)
 }
 
-impl ToolBase for ListProceduresTool {
-    type Parameter = ListProceduresRequest;
+/// Marker type for the `listProcedures` MCP tool (pinned variant — carries `database`).
+pub(crate) struct PinnedListProceduresTool;
+
+impl ToolBase for PinnedListProceduresTool {
+    type Parameter = PinnedListProceduresRequest;
     type Output = ListProceduresResponse;
     type Error = ErrorData;
 
     fn name() -> Cow<'static, str> {
-        Self::NAME.into()
+        NAME.into()
     }
 
     fn title() -> Option<String> {
-        Some(Self::TITLE.into())
+        Some(TITLE.into())
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(Self::DESCRIPTION.into())
+        Some(DESCRIPTION.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {
-        Some(
-            ToolAnnotations::new()
-                .read_only(true)
-                .destructive(false)
-                .idempotent(true)
-                .open_world(false),
-        )
+        Some(annotations())
     }
 }
 
-impl AsyncTool<MysqlHandler> for ListProceduresTool {
+impl AsyncTool<MysqlHandler> for PinnedListProceduresTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        handler.list_procedures(params).await
+        let PinnedListProceduresRequest {
+            unpinned:
+                UnpinnedListProceduresRequest {
+                    cursor,
+                    search,
+                    detailed,
+                },
+            database,
+        } = params;
+        handler.list_procedures(database, cursor, search, detailed).await
+    }
+}
+
+/// Marker type for the `listProcedures` MCP tool (unpinned variant — no `database` field).
+pub(crate) struct UnpinnedListProceduresTool;
+
+impl ToolBase for UnpinnedListProceduresTool {
+    type Parameter = UnpinnedListProceduresRequest;
+    type Output = ListProceduresResponse;
+    type Error = ErrorData;
+
+    fn name() -> Cow<'static, str> {
+        NAME.into()
+    }
+
+    fn title() -> Option<String> {
+        Some(TITLE.into())
+    }
+
+    fn description() -> Option<Cow<'static, str>> {
+        Some(DESCRIPTION.into())
+    }
+
+    fn annotations() -> Option<ToolAnnotations> {
+        Some(annotations())
+    }
+}
+
+impl AsyncTool<MysqlHandler> for UnpinnedListProceduresTool {
+    async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
+        let UnpinnedListProceduresRequest {
+            cursor,
+            search,
+            detailed,
+        } = params;
+        handler.list_procedures(None, cursor, search, detailed).await
     }
 }
 
@@ -180,12 +225,10 @@ impl MysqlHandler {
     /// or the underlying query fails.
     pub async fn list_procedures(
         &self,
-        ListProceduresRequest {
-            database,
-            cursor,
-            search,
-            detailed,
-        }: ListProceduresRequest,
+        database: Option<String>,
+        cursor: Option<Cursor>,
+        search: Option<String>,
+        detailed: bool,
     ) -> Result<ListProceduresResponse, ErrorData> {
         let database = database
             .as_deref()
