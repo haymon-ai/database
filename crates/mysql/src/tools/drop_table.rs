@@ -14,7 +14,8 @@ use crate::types::{PinnedDropTableRequest, UnpinnedDropTableRequest};
 
 const NAME: &str = "dropTable";
 const TITLE: &str = "Drop Table";
-const DESCRIPTION: &str = include_str!("../../assets/tools/drop_table.md");
+const DESCRIPTION_PINNED: &str = include_str!("../../assets/tools/drop_table/pinned.md");
+const DESCRIPTION_UNPINNED: &str = include_str!("../../assets/tools/drop_table/unpinned.md");
 
 fn annotations() -> ToolAnnotations {
     ToolAnnotations::new()
@@ -41,7 +42,7 @@ impl ToolBase for PinnedDropTableTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_UNPINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {
@@ -76,7 +77,7 @@ impl ToolBase for UnpinnedDropTableTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_PINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {

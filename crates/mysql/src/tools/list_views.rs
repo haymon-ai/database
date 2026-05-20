@@ -12,7 +12,8 @@ use crate::types::{ListViewsResponse, PinnedListViewsRequest, UnpinnedListViewsR
 
 const NAME: &str = "listViews";
 const TITLE: &str = "List Views";
-const DESCRIPTION: &str = include_str!("../../assets/tools/list_views.md");
+const DESCRIPTION_PINNED: &str = include_str!("../../assets/tools/list_views/pinned.md");
+const DESCRIPTION_UNPINNED: &str = include_str!("../../assets/tools/list_views/unpinned.md");
 
 fn annotations() -> ToolAnnotations {
     ToolAnnotations::new()
@@ -39,7 +40,7 @@ impl ToolBase for PinnedListViewsTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_UNPINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {
@@ -79,7 +80,7 @@ impl ToolBase for UnpinnedListViewsTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_PINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {

@@ -11,7 +11,8 @@ use crate::PostgresHandler;
 
 const NAME: &str = "writeQuery";
 const TITLE: &str = "Write Query";
-const DESCRIPTION: &str = include_str!("../../assets/tools/write_query.md");
+const DESCRIPTION_PINNED: &str = include_str!("../../assets/tools/write_query/pinned.md");
+const DESCRIPTION_UNPINNED: &str = include_str!("../../assets/tools/write_query/unpinned.md");
 
 fn annotations() -> ToolAnnotations {
     ToolAnnotations::new()
@@ -38,7 +39,7 @@ impl ToolBase for PinnedWriteQueryTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_UNPINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {
@@ -73,7 +74,7 @@ impl ToolBase for UnpinnedWriteQueryTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_PINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {

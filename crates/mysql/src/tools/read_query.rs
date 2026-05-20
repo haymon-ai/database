@@ -15,7 +15,8 @@ use crate::MysqlHandler;
 
 const NAME: &str = "readQuery";
 const TITLE: &str = "Read Query";
-const DESCRIPTION: &str = include_str!("../../assets/tools/read_query.md");
+const DESCRIPTION_PINNED: &str = include_str!("../../assets/tools/read_query/pinned.md");
+const DESCRIPTION_UNPINNED: &str = include_str!("../../assets/tools/read_query/unpinned.md");
 
 fn annotations() -> ToolAnnotations {
     ToolAnnotations::new()
@@ -42,7 +43,7 @@ impl ToolBase for PinnedReadQueryTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_UNPINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {
@@ -77,7 +78,7 @@ impl ToolBase for UnpinnedReadQueryTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_PINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {

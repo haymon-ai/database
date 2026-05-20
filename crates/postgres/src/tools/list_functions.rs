@@ -12,7 +12,8 @@ use crate::types::{ListFunctionsResponse, PinnedListFunctionsRequest, UnpinnedLi
 
 const NAME: &str = "listFunctions";
 const TITLE: &str = "List Functions";
-const DESCRIPTION: &str = include_str!("../../assets/tools/list_functions.md");
+const DESCRIPTION_PINNED: &str = include_str!("../../assets/tools/list_functions/pinned.md");
+const DESCRIPTION_UNPINNED: &str = include_str!("../../assets/tools/list_functions/unpinned.md");
 
 fn annotations() -> ToolAnnotations {
     ToolAnnotations::new()
@@ -39,7 +40,7 @@ impl ToolBase for PinnedListFunctionsTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_UNPINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {
@@ -79,7 +80,7 @@ impl ToolBase for UnpinnedListFunctionsTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_PINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {

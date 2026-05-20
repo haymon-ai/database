@@ -17,7 +17,7 @@ pub(crate) struct DropDatabaseTool;
 impl DropDatabaseTool {
     const NAME: &'static str = "dropDatabase";
     const TITLE: &'static str = "Drop Database";
-    const DESCRIPTION: &'static str = include_str!("../../assets/tools/drop_database.md");
+    const DESCRIPTION_UNPINNED: &'static str = include_str!("../../assets/tools/drop_database/unpinned.md");
 }
 
 impl ToolBase for DropDatabaseTool {
@@ -34,7 +34,7 @@ impl ToolBase for DropDatabaseTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(Self::DESCRIPTION.into())
+        Some(Self::DESCRIPTION_UNPINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {

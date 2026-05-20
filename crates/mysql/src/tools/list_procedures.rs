@@ -12,7 +12,8 @@ use crate::types::{ListProceduresResponse, PinnedListProceduresRequest, Unpinned
 
 const NAME: &str = "listProcedures";
 const TITLE: &str = "List Procedures";
-const DESCRIPTION: &str = include_str!("../../assets/tools/list_procedures.md");
+const DESCRIPTION_PINNED: &str = include_str!("../../assets/tools/list_procedures/pinned.md");
+const DESCRIPTION_UNPINNED: &str = include_str!("../../assets/tools/list_procedures/unpinned.md");
 
 fn annotations() -> ToolAnnotations {
     ToolAnnotations::new()
@@ -39,7 +40,7 @@ impl ToolBase for PinnedListProceduresTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_UNPINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {
@@ -79,7 +80,7 @@ impl ToolBase for UnpinnedListProceduresTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_PINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {

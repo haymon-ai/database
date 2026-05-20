@@ -291,7 +291,8 @@ ORDER BY ti.table_name"#;
 
 const NAME: &str = "listTables";
 const TITLE: &str = "List Tables";
-const DESCRIPTION: &str = include_str!("../../assets/tools/list_tables.md");
+const DESCRIPTION_PINNED: &str = include_str!("../../assets/tools/list_tables/pinned.md");
+const DESCRIPTION_UNPINNED: &str = include_str!("../../assets/tools/list_tables/unpinned.md");
 
 fn annotations() -> ToolAnnotations {
     ToolAnnotations::new()
@@ -318,7 +319,7 @@ impl ToolBase for PinnedListTablesTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_UNPINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {
@@ -358,7 +359,7 @@ impl ToolBase for UnpinnedListTablesTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_PINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {

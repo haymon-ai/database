@@ -12,7 +12,8 @@ use crate::MysqlHandler;
 
 const NAME: &str = "explainQuery";
 const TITLE: &str = "Explain Query";
-const DESCRIPTION: &str = include_str!("../../assets/tools/explain_query.md");
+const DESCRIPTION_PINNED: &str = include_str!("../../assets/tools/explain_query/pinned.md");
+const DESCRIPTION_UNPINNED: &str = include_str!("../../assets/tools/explain_query/unpinned.md");
 
 fn annotations() -> ToolAnnotations {
     ToolAnnotations::new()
@@ -39,7 +40,7 @@ impl ToolBase for PinnedExplainQueryTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_UNPINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {
@@ -74,7 +75,7 @@ impl ToolBase for UnpinnedExplainQueryTool {
     }
 
     fn description() -> Option<Cow<'static, str>> {
-        Some(DESCRIPTION.into())
+        Some(DESCRIPTION_PINNED.into())
     }
 
     fn annotations() -> Option<ToolAnnotations> {
