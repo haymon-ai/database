@@ -60,12 +60,11 @@ impl ListEntries {
 
 /// Response for the `listTables` tool.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ListTablesResponse {
     /// Page of matching tables. Shape depends on the request's `detailed` flag.
     pub tables: ListEntries,
     /// Opaque cursor pointing to the next page. Absent when this is the final page.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
 }
 
@@ -91,7 +90,6 @@ impl ListTablesResponse {
 
 /// Response for tools with no structured return data.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct MessageResponse {
     /// Description of the completed operation.
     pub message: String,
@@ -99,7 +97,6 @@ pub struct MessageResponse {
 
 /// Request for the `listDatabases` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ListDatabasesRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
@@ -108,18 +105,16 @@ pub struct ListDatabasesRequest {
 
 /// Response for the `listDatabases` tool.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ListDatabasesResponse {
     /// Sorted list of database names for this page.
     pub databases: Vec<String>,
     /// Opaque cursor pointing to the next page. Absent when this is the final page.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
 }
 
 /// Request for the `createDatabase` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct CreateDatabaseRequest {
     /// Name of the database to create. Must be non-empty.
     pub database: String,
@@ -127,7 +122,6 @@ pub struct CreateDatabaseRequest {
 
 /// Request for the `dropDatabase` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct DropDatabaseRequest {
     /// Name of the database to drop. Must be non-empty.
     pub database: String,
@@ -135,7 +129,6 @@ pub struct DropDatabaseRequest {
 
 /// Request for the `listViews` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 #[schemars(rename = "ListViewsRequest")]
 pub struct UnpinnedListViewsRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
@@ -145,7 +138,6 @@ pub struct UnpinnedListViewsRequest {
 
 /// Request for the `listViews` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 #[schemars(rename = "ListViewsRequest")]
 pub struct PinnedListViewsRequest {
     #[serde(flatten)]
@@ -157,12 +149,11 @@ pub struct PinnedListViewsRequest {
 
 /// Response for the `listViews` tool.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ListViewsResponse {
     /// Page of matching views. Shape depends on the request's `detailed` flag.
     pub views: ListEntries,
     /// Opaque cursor pointing to the next page. Absent when this is the final page.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
 }
 
@@ -188,7 +179,6 @@ impl ListViewsResponse {
 
 /// Request for the `listTriggers` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 #[schemars(rename = "ListTriggersRequest")]
 pub struct UnpinnedListTriggersRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
@@ -207,7 +197,6 @@ pub struct UnpinnedListTriggersRequest {
 
 /// Request for the `listTriggers` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 #[schemars(rename = "ListTriggersRequest")]
 pub struct PinnedListTriggersRequest {
     #[serde(flatten)]
@@ -219,12 +208,11 @@ pub struct PinnedListTriggersRequest {
 
 /// Response for the `listTriggers` tool.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ListTriggersResponse {
     /// Page of matching triggers. Shape depends on the request's `detailed` flag.
     pub triggers: ListEntries,
     /// Opaque cursor pointing to the next page. Absent when this is the final page.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
 }
 
@@ -250,7 +238,6 @@ impl ListTriggersResponse {
 
 /// Request for the `listFunctions` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 #[schemars(rename = "ListFunctionsRequest")]
 pub struct UnpinnedListFunctionsRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
@@ -260,7 +247,6 @@ pub struct UnpinnedListFunctionsRequest {
 
 /// Request for the `listFunctions` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 #[schemars(rename = "ListFunctionsRequest")]
 pub struct PinnedListFunctionsRequest {
     #[serde(flatten)]
@@ -272,12 +258,11 @@ pub struct PinnedListFunctionsRequest {
 
 /// Response for the `listFunctions` tool.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ListFunctionsResponse {
     /// Page of matching functions. Shape depends on the request's `detailed` flag.
     pub functions: ListEntries,
     /// Opaque cursor pointing to the next page. Absent when this is the final page.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
 }
 
@@ -303,12 +288,11 @@ impl ListFunctionsResponse {
 
 /// Response for the `listProcedures` tool.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ListProceduresResponse {
     /// Page of matching procedures. Shape depends on the request's `detailed` flag.
     pub procedures: ListEntries,
     /// Opaque cursor pointing to the next page. Absent when this is the final page.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
 }
 
@@ -334,7 +318,6 @@ impl ListProceduresResponse {
 
 /// Request for the `writeQuery` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 #[schemars(rename = "QueryRequest")]
 pub struct UnpinnedQueryRequest {
     /// The SQL query to execute.
@@ -343,7 +326,6 @@ pub struct UnpinnedQueryRequest {
 
 /// Request for the `writeQuery` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 #[schemars(rename = "QueryRequest")]
 pub struct PinnedQueryRequest {
     #[serde(flatten)]
@@ -355,7 +337,6 @@ pub struct PinnedQueryRequest {
 
 /// Request for the `readQuery` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 #[schemars(rename = "ReadQueryRequest")]
 pub struct UnpinnedReadQueryRequest {
     /// The SQL query to execute.
@@ -367,7 +348,6 @@ pub struct UnpinnedReadQueryRequest {
 
 /// Request for the `readQuery` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 #[schemars(rename = "ReadQueryRequest")]
 pub struct PinnedReadQueryRequest {
     #[serde(flatten)]
@@ -379,7 +359,6 @@ pub struct PinnedReadQueryRequest {
 
 /// Response for the `writeQuery` and `explainQuery` tools.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct QueryResponse {
     /// Result rows, each a JSON object keyed by a column name.
     pub rows: Vec<Value>,
@@ -387,20 +366,18 @@ pub struct QueryResponse {
 
 /// Response for the `readQuery` tool.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ReadQueryResponse {
     /// Result rows, each a JSON object keyed by a column name.
     pub rows: Vec<Value>,
     /// Opaque cursor pointing to the next page. Absent when this is the final
     /// page, when the result fits in one page, or when the statement is a
     /// non-`SELECT` kind that does not paginate (e.g. `SHOW`, `EXPLAIN`).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<Cursor>,
 }
 
 /// Request for the `explainQuery` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 #[schemars(rename = "ExplainQueryRequest")]
 pub struct UnpinnedExplainQueryRequest {
     /// The SQL query to explain.
@@ -412,7 +389,6 @@ pub struct UnpinnedExplainQueryRequest {
 
 /// Request for the `explainQuery` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
 #[schemars(rename = "ExplainQueryRequest")]
 pub struct PinnedExplainQueryRequest {
     #[serde(flatten)]
