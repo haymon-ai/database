@@ -7,7 +7,7 @@
 
 use dbmcp_config::{Config, DatabaseConfig};
 use dbmcp_pii::Redactor;
-use dbmcp_server::{PinVisibility, Server, ToolRouterExt, ToolSpec, server_info};
+use dbmcp_server::{Server, ToolRouterExt, ToolSpec, server_info};
 use rmcp::RoleServer;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::tool::ToolCallContext;
@@ -29,18 +29,19 @@ const INSTRUCTIONS: &str = include_str!("../assets/instructions/default.md");
 /// Backend-specific instructions for `SQLite` in read-only mode.
 const INSTRUCTIONS_READ_ONLY: &str = include_str!("../assets/instructions/read-only.md");
 
-/// Declarative tool table: `(tool, read_only, pin_visibility)`.
+/// Declarative tool table: `(tool, pinned, read_only)`.
 ///
-/// `SQLite` has no cross-database tools and no `database` request field,
-/// so every tool is `PinVisibility::Always` (visible regardless of pin).
+/// `SQLite` has no cross-database tools and no `database` request field;
+/// its file path is always pinned, so every tool is `pinned = true` and
+/// the handler builds the router with `pinned = true`.
 const TOOLS: &[ToolSpec<SqliteHandler>] = &[
-    ToolSpec::async_tool::<ListTablesTool>(false, PinVisibility::Always),
-    ToolSpec::async_tool::<ListViewsTool>(false, PinVisibility::Always),
-    ToolSpec::async_tool::<ListTriggersTool>(false, PinVisibility::Always),
-    ToolSpec::async_tool::<ReadQueryTool>(false, PinVisibility::Always),
-    ToolSpec::async_tool::<ExplainQueryTool>(false, PinVisibility::Always),
-    ToolSpec::async_tool::<WriteQueryTool>(true, PinVisibility::Always),
-    ToolSpec::async_tool::<DropTableTool>(true, PinVisibility::Always),
+    ToolSpec::async_tool::<ListTablesTool>(true, false),
+    ToolSpec::async_tool::<ListViewsTool>(true, false),
+    ToolSpec::async_tool::<ListTriggersTool>(true, false),
+    ToolSpec::async_tool::<ReadQueryTool>(true, false),
+    ToolSpec::async_tool::<ExplainQueryTool>(true, false),
+    ToolSpec::async_tool::<WriteQueryTool>(true, true),
+    ToolSpec::async_tool::<DropTableTool>(true, true),
 ];
 
 /// `SQLite` file-based database handler.
@@ -76,7 +77,7 @@ impl SqliteHandler {
             config: config.database.clone(),
             connection: SqliteConnection::new(&config.database),
             redactor: Redactor::from_config(&config.pii),
-            tool_router: ToolRouter::from_specs(TOOLS, config.database.read_only, false),
+            tool_router: ToolRouter::from_specs(TOOLS, config.database.read_only, true),
         }
     }
 }

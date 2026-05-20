@@ -11,4 +11,4 @@ pub mod types;
 
 pub use pagination::{Cursor, Pager};
 pub use server::{Server, server_info};
-pub use tool::{PinVisibility, ToolRouterExt, ToolSpec};
+pub use tool::{ToolRouterExt, ToolSpec};
