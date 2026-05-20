@@ -31,10 +31,10 @@ fn server(read_only: bool, pinned: bool) -> Server {
 }
 
 #[tokio::test]
-async fn test_server_info() {
+async fn test_server_info_read_write_pinned() {
     common::run_with_client(server(false, true), |peer| async move {
         let info = peer.peer_info().expect("missing peer_info");
-        insta::assert_json_snapshot!("server_info", info, {
+        insta::assert_json_snapshot!("server_info_read_write_pinned", info, {
             ".serverInfo.version" => "[version]"
         });
     })
@@ -42,10 +42,32 @@ async fn test_server_info() {
 }
 
 #[tokio::test]
-async fn test_server_info_read_only() {
+async fn test_server_info_read_write_unpinned() {
+    common::run_with_client(server(false, false), |peer| async move {
+        let info = peer.peer_info().expect("missing peer_info");
+        insta::assert_json_snapshot!("server_info_read_write_unpinned", info, {
+            ".serverInfo.version" => "[version]"
+        });
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn test_server_info_read_only_pinned() {
     common::run_with_client(server(true, true), |peer| async move {
         let info = peer.peer_info().expect("missing peer_info");
-        insta::assert_json_snapshot!("server_info_read_only", info, {
+        insta::assert_json_snapshot!("server_info_read_only_pinned", info, {
+            ".serverInfo.version" => "[version]"
+        });
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn test_server_info_read_only_unpinned() {
+    common::run_with_client(server(true, false), |peer| async move {
+        let info = peer.peer_info().expect("missing peer_info");
+        insta::assert_json_snapshot!("server_info_read_only_unpinned", info, {
             ".serverInfo.version" => "[version]"
         });
     })
