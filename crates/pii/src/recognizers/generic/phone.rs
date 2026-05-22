@@ -1,14 +1,12 @@
 //! `PHONE_NUMBER` recognizer.
 //!
-//! Intl-anchored candidate regex (a `+` or IDD `00` prefix, then a digit run
-//! interleaved with punctuation), gated by [`Validator::PhoneE164`] length.
-//! Numbers without an international indicator are out of scope, which keeps
-//! bare digit runs (timestamps, IDs, references) from matching.
+//! Matches an E.164 number: a `+` or IDD `00` prefix, a non-zero country code,
+//! then 8–15 significant digits with optional punctuation. The required
+//! international prefix keeps bare digit runs (timestamps, IDs, references) out.
 
 use super::Recognizer;
 use crate::pattern::Pattern;
 use crate::score::Score;
-use crate::validators::Validator;
 use crate::{Category, Entity};
 
 /// Context keywords used by the boost step.
@@ -23,14 +21,13 @@ const CONTEXT: &[&str] = &["phone", "number", "telephone", "cell", "cellphone", 
 pub fn phone_number() -> Recognizer {
     let pattern = Pattern::new(
         "intl-e164",
-        r"(?<![\w+])(?:00|\+)(?:[\s.\-/()\[\]~]*\d){8,15}",
+        r"(?<![\w+])(?:00|\+)[\s.\-/()]*+[1-9](?:[\s.\-/()]*+\d){7,14}",
         Score::from_static(0.4),
     )
     .expect("intl-e164 pattern compiles");
     Recognizer::new(Entity::PhoneNumber, vec![pattern])
         .expect("non-empty pattern list")
         .with_name("PhoneRecognizer")
-        .with_validator(Validator::PhoneE164)
         .with_category(Category::Contact)
         .with_context(CONTEXT)
 }
