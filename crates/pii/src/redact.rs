@@ -283,6 +283,13 @@ fn attach_ner(analyzer: &mut Analyzer, cfg: &dbmcp_config::PiiConfig) -> Result<
     if !cfg.ner_enabled {
         return Ok(());
     }
+    // NER respects the category filter: PERSON needs Personal, LOCATION needs
+    // Contact. An unset subset means all categories apply. When neither target
+    // category is selected, skip loading the model entirely.
+    let (allow_person, allow_location) = ner_category_allowance(cfg);
+    if !allow_person && !allow_location {
+        return Ok(());
+    }
     let Some(model) = cfg.ner_model.as_ref() else {
         // `PiiConfig::validate` rejects this, but stay defensive and fail-closed.
         return Err(RedactorInitError::Ner("model path missing".to_owned()));
@@ -291,9 +298,25 @@ fn attach_ner(analyzer: &mut Analyzer, cfg: &dbmcp_config::PiiConfig) -> Result<
         .ner_threshold
         .and_then(|t| crate::Score::new(t).ok())
         .unwrap_or_else(|| crate::Score::from_static(dbmcp_config::PiiConfig::DEFAULT_NER_THRESHOLD));
-    let engine = crate::ner::NerEngine::load(model, threshold).map_err(|e| RedactorInitError::Ner(e.to_string()))?;
+    let mut engine =
+        crate::ner::NerEngine::load(model, threshold).map_err(|e| RedactorInitError::Ner(e.to_string()))?;
+    engine.set_allowed(allow_person, allow_location);
     analyzer.attach_ner(std::sync::Arc::new(engine));
     Ok(())
+}
+
+/// Resolves whether PERSON/LOCATION are permitted by the category filter.
+///
+/// An unset category subset means all categories apply.
+#[cfg(feature = "ner")]
+fn ner_category_allowance(cfg: &dbmcp_config::PiiConfig) -> (bool, bool) {
+    match cfg.categories.as_ref() {
+        None => (true, true),
+        Some(cats) => (
+            cats.contains(&dbmcp_config::PiiCategory::Personal),
+            cats.contains(&dbmcp_config::PiiCategory::Contact),
+        ),
+    }
 }
 
 /// Merges regex and NER spans for one leaf into a resolved result set.
@@ -945,5 +968,31 @@ mod tests {
         };
         let err = Redactor::from_config(&cfg).expect_err("unreadable model must fail closed");
         assert!(matches!(err, RedactorInitError::Ner(_)));
+    }
+
+    #[cfg(feature = "ner")]
+    #[test]
+    fn ner_allowance_unset_categories_allows_both() {
+        let cfg = dbmcp_config::PiiConfig {
+            ner_enabled: true,
+            ..dbmcp_config::PiiConfig::default()
+        };
+        assert_eq!(ner_category_allowance(&cfg), (true, true));
+    }
+
+    #[cfg(feature = "ner")]
+    #[test]
+    fn ner_allowance_scoped_categories_gate_entities() {
+        let only_personal = dbmcp_config::PiiConfig {
+            categories: Some(vec![dbmcp_config::PiiCategory::Personal]),
+            ..dbmcp_config::PiiConfig::default()
+        };
+        assert_eq!(ner_category_allowance(&only_personal), (true, false));
+
+        let only_financial = dbmcp_config::PiiConfig {
+            categories: Some(vec![dbmcp_config::PiiCategory::Financial]),
+            ..dbmcp_config::PiiConfig::default()
+        };
+        assert_eq!(ner_category_allowance(&only_financial), (false, false));
     }
 }

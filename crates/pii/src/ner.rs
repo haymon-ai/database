@@ -241,6 +241,8 @@ pub struct NerEngine {
     tokenizer: Tokenizer,
     id2label: Vec<String>,
     threshold: Score,
+    allow_person: bool,
+    allow_location: bool,
 }
 
 impl std::fmt::Debug for NerEngine {
@@ -300,7 +302,27 @@ impl NerEngine {
             tokenizer,
             id2label,
             threshold,
+            allow_person: true,
+            allow_location: true,
         })
+    }
+
+    /// Restricts which entities the engine emits (respects `--pii-categories`).
+    ///
+    /// A span whose entity is disallowed is dropped during decoding, so it
+    /// neither redacts nor displaces a regex hit.
+    pub(crate) fn set_allowed(&mut self, person: bool, location: bool) {
+        self.allow_person = person;
+        self.allow_location = location;
+    }
+
+    /// Reports whether a decoded entity is permitted by the category filter.
+    fn entity_allowed(&self, entity: Option<Entity>) -> bool {
+        match entity {
+            Some(Entity::Person) => self.allow_person,
+            Some(Entity::Location) => self.allow_location,
+            _ => true,
+        }
     }
 
     /// Runs NER over each text, returning per-text spans as [`RecognizerResult`]s.
@@ -383,7 +405,10 @@ impl NerEngine {
             let logit_row = token_logits.get(t).map_or(&[][..], Vec::as_slice);
             let (best, prob) = softmax_argmax(logit_row);
             let label = self.id2label.get(best).map_or("O", String::as_str);
-            let (entity, is_begin) = parse_bio(label);
+            let (mut entity, is_begin) = parse_bio(label);
+            if !self.entity_allowed(entity) {
+                entity = None;
+            }
             let (start, end) = offsets.get(t).copied().unwrap_or((0, 0));
             tags.push(TokenTag {
                 entity,
