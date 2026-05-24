@@ -225,17 +225,41 @@ impl TryFrom<&PiiArguments> for PiiConfig {
 /// server to start and respond to protocol messages even when the
 /// database is unreachable. The caller is expected to pass a fully
 /// validated [`Config`].
-#[must_use]
-pub(crate) fn create_server(config: &Config) -> Server {
+/// # Errors
+///
+/// Returns [`crate::error::Error::Init`] when a handler fails to initialise
+/// (e.g. a fail-closed NER model load).
+#[allow(clippy::result_large_err)]
+pub(crate) fn create_server(config: &Config) -> Result<Server, crate::error::Error> {
+    #[cfg(not(feature = "ner"))]
+    if config.pii.ner_enabled {
+        tracing::warn!(
+            "--pii-ner is set but this binary was built without the 'ner' feature; NER redaction is disabled"
+        );
+    }
+
     if config.database.read_only {
         info!("Server running in READ-ONLY mode. Write operations are disabled.");
     }
 
-    match config.database.backend {
-        DatabaseBackend::Sqlite => SqliteHandler::new(config).into(),
-        DatabaseBackend::Postgres => PostgresHandler::new(config).into(),
-        DatabaseBackend::Mysql | DatabaseBackend::Mariadb => MysqlHandler::new(config).into(),
-    }
+    let server = match config.database.backend {
+        DatabaseBackend::Sqlite => init(SqliteHandler::new(config))?,
+        DatabaseBackend::Postgres => init(PostgresHandler::new(config))?,
+        DatabaseBackend::Mysql | DatabaseBackend::Mariadb => init(MysqlHandler::new(config))?,
+    };
+    Ok(server)
+}
+
+/// Maps a handler constructor result into a [`Server`], failing closed.
+#[allow(clippy::result_large_err)]
+fn init<H, E>(handler: Result<H, E>) -> Result<Server, crate::error::Error>
+where
+    H: Into<Server>,
+    E: std::fmt::Display,
+{
+    handler
+        .map(Into::into)
+        .map_err(|e| crate::error::Error::Init(e.to_string()))
 }
 
 #[cfg(test)]

@@ -27,6 +27,11 @@ pub struct AnalyzeOptions {
 #[derive(Debug, Default)]
 pub struct Analyzer {
     recognizers: Vec<Recognizer>,
+    /// Optional ML/NER engine, attached by the redactor when enabled.
+    ///
+    /// Invoked in batch by the redactor, not by [`Analyzer::analyze`].
+    #[cfg(feature = "ner")]
+    ner: Option<std::sync::Arc<crate::ner::NerEngine>>,
 }
 
 impl Analyzer {
@@ -40,6 +45,8 @@ impl Analyzer {
     pub fn with_defaults() -> Self {
         Self {
             recognizers: crate::recognizers::all(),
+            #[cfg(feature = "ner")]
+            ner: None,
         }
     }
 
@@ -119,6 +126,18 @@ impl Analyzer {
                 Self::with_defaults()
             })
     }
+
+    /// Borrows the attached NER engine, if one was loaded.
+    #[cfg(feature = "ner")]
+    pub(crate) fn ner_engine(&self) -> Option<&crate::ner::NerEngine> {
+        self.ner.as_deref()
+    }
+
+    /// Attaches a loaded NER engine for the redactor's batched pass.
+    #[cfg(feature = "ner")]
+    pub(crate) fn attach_ner(&mut self, engine: std::sync::Arc<crate::ner::NerEngine>) {
+        self.ner = Some(engine);
+    }
 }
 
 fn map_category(c: PiiCategory) -> Category {
@@ -175,7 +194,11 @@ impl Builder {
             }
         }
 
-        Ok(Analyzer { recognizers: kept })
+        Ok(Analyzer {
+            recognizers: kept,
+            #[cfg(feature = "ner")]
+            ner: None,
+        })
     }
 }
 

@@ -23,6 +23,8 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use crate::Entity;
+#[cfg(feature = "ner")]
+use crate::result::RecognizerResult;
 use crate::words::push_key_words;
 use crate::{AnalyzeOptions, Analyzer, OperatorConfig, anonymize};
 
@@ -38,6 +40,18 @@ impl From<RedactionError> for rmcp::model::ErrorData {
     fn from(e: RedactionError) -> Self {
         Self::internal_error(e.to_string(), None)
     }
+}
+
+/// Error returned by [`Redactor::from_config`] when initialisation fails.
+///
+/// Always present (never feature-gated) so the startup path has a single error
+/// type regardless of build features. Surfacing this aborts server startup —
+/// the redactor is fail-closed: it never starts in a degraded state.
+#[derive(Debug, thiserror::Error)]
+pub enum RedactorInitError {
+    /// The optional NER engine failed to load; the server must not start.
+    #[error("NER engine initialisation failed: {0}")]
+    Ner(String),
 }
 
 /// Per-request redaction summary returned by [`Redactor::apply`].
@@ -125,12 +139,37 @@ impl Redactor {
     /// `min_score_with_context` floor — so weak-pattern recognizers (CVV,
     /// AWS secret, bank account, …) surface only when a nearby keyword
     /// lifts them.
-    #[must_use]
-    pub fn from_config(cfg: &dbmcp_config::PiiConfig) -> Option<Self> {
+    /// # Errors
+    ///
+    /// Returns [`RedactorInitError`] when the optional NER engine is enabled
+    /// but fails to load. Startup must abort — the redactor is fail-closed and
+    /// never degrades to regex-only when NER was requested.
+    pub fn from_config(cfg: &dbmcp_config::PiiConfig) -> Result<Option<Self>, RedactorInitError> {
         if !cfg.enabled {
-            return None;
+            return Ok(None);
         }
-        Some(Self::new(crate::Analyzer::from_config(cfg), cfg.operator.into()))
+        #[cfg_attr(not(feature = "ner"), allow(unused_mut))]
+        let mut analyzer = crate::Analyzer::from_config(cfg);
+        #[cfg(feature = "ner")]
+        attach_ner(&mut analyzer, cfg)?;
+        Ok(Some(Self::new(analyzer, cfg.operator.into())))
+    }
+
+    /// Reports whether an ML/NER engine is attached.
+    ///
+    /// Always `false` without the `ner` feature. Callers use it to decide
+    /// whether [`Self::apply`] needs offloading to a blocking thread.
+    #[must_use]
+    #[cfg_attr(not(feature = "ner"), allow(clippy::unused_self))]
+    pub fn uses_ner(&self) -> bool {
+        #[cfg(feature = "ner")]
+        {
+            self.analyzer.ner_engine().is_some()
+        }
+        #[cfg(not(feature = "ner"))]
+        {
+            false
+        }
     }
 
     /// Walks every reachable string leaf in `rows` through the analyzer pipeline.
@@ -145,9 +184,22 @@ impl Redactor {
     /// # Errors
     ///
     /// Returns [`RedactionError::Internal`] when the analyzer pipeline
-    /// panics at any depth; the request must be failed without
-    /// returning any row.
+    /// panics at any depth, or [`RedactionError`] when the NER pass fails;
+    /// the request must be failed without returning any row (fail-closed).
     pub fn apply(&self, rows: &mut [Value]) -> Result<RedactionStats, RedactionError> {
+        #[cfg(feature = "ner")]
+        if let Some(engine) = self.analyzer.ner_engine() {
+            let stats = self.apply_with_ner(rows, engine)?;
+            log_redactions(&stats, rows.len());
+            return Ok(stats);
+        }
+        let stats = self.apply_regex_only(rows)?;
+        log_redactions(&stats, rows.len());
+        Ok(stats)
+    }
+
+    /// Single-pass regex/checksum redaction (the default, NER-free path).
+    fn apply_regex_only(&self, rows: &mut [Value]) -> Result<RedactionStats, RedactionError> {
         let mut stats = RedactionStats::default();
         let result = catch_unwind(AssertUnwindSafe(|| {
             // Shared key-path stack. Each `Frame::Visit` carries the tokens
@@ -207,18 +259,151 @@ impl Redactor {
         }));
 
         result.map_err(|_| RedactionError::Internal("analyzer panicked".into()))?;
+        Ok(stats)
+    }
+}
 
-        if stats.total > 0 {
-            tracing::info!(
-                target: "dbmcp::pii",
-                redactions = stats.total,
-                by_entity = ?stats.by_entity,
-                rows = rows.len(),
-                string_leaves_scanned = stats.string_leaves_scanned,
-                "pii.redacted"
-            );
+/// Emits one `tracing::info!` event when at least one span was rewritten.
+fn log_redactions(stats: &RedactionStats, row_count: usize) {
+    if stats.total > 0 {
+        tracing::info!(
+            target: "dbmcp::pii",
+            redactions = stats.total,
+            by_entity = ?stats.by_entity,
+            rows = row_count,
+            string_leaves_scanned = stats.string_leaves_scanned,
+            "pii.redacted"
+        );
+    }
+}
+
+/// Loads the NER engine and attaches it, failing closed on any load error.
+#[cfg(feature = "ner")]
+fn attach_ner(analyzer: &mut Analyzer, cfg: &dbmcp_config::PiiConfig) -> Result<(), RedactorInitError> {
+    if !cfg.ner_enabled {
+        return Ok(());
+    }
+    let Some(model) = cfg.ner_model.as_ref() else {
+        // `PiiConfig::validate` rejects this, but stay defensive and fail-closed.
+        return Err(RedactorInitError::Ner("model path missing".to_owned()));
+    };
+    let threshold = cfg
+        .ner_threshold
+        .and_then(|t| crate::Score::new(t).ok())
+        .unwrap_or_else(|| crate::Score::from_static(dbmcp_config::PiiConfig::DEFAULT_NER_THRESHOLD));
+    let engine = crate::ner::NerEngine::load(model, threshold).map_err(|e| RedactorInitError::Ner(e.to_string()))?;
+    analyzer.attach_ner(std::sync::Arc::new(engine));
+    Ok(())
+}
+
+/// Merges regex and NER spans for one leaf into a resolved result set.
+///
+/// NER spans below `min_score` are dropped first; the combined set is then
+/// overlap-resolved so higher-confidence spans win on collisions.
+#[cfg(feature = "ner")]
+fn merge_spans(
+    mut regex: Vec<RecognizerResult>,
+    mut ner: Vec<RecognizerResult>,
+    min_score: crate::Score,
+) -> Vec<RecognizerResult> {
+    ner.retain(|r| r.score >= min_score);
+    regex.append(&mut ner);
+    crate::overlap::resolve(regex)
+}
+
+#[cfg(feature = "ner")]
+impl Redactor {
+    /// Two-phase redaction layering a batched NER pass over the regex pass.
+    ///
+    /// Phase A walks every string leaf once, running the regex/boost analysis
+    /// and collecting each leaf. Phase B runs one batched NER pass over all
+    /// leaves, merges per leaf via [`merge_spans`], anonymizes, and writes
+    /// back. An NER inference failure fails the whole request (fail-closed) —
+    /// it never falls back to regex-only.
+    fn apply_with_ner(
+        &self,
+        rows: &mut [Value],
+        engine: &crate::ner::NerEngine,
+    ) -> Result<RedactionStats, RedactionError> {
+        let mut stats = RedactionStats::default();
+        let mut infer_err: Option<String> = None;
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            // Phase A: collect every string leaf with its regex hits. Owned
+            // text copies feed both the NER batch and the anonymizer, leaving
+            // the `&mut String` slots free for write-back.
+            let mut slots: Vec<&mut String> = Vec::new();
+            let mut texts: Vec<String> = Vec::new();
+            let mut regex_hits: Vec<Vec<RecognizerResult>> = Vec::new();
+            let mut path: Vec<String> = Vec::new();
+            let mut stack: Vec<Frame<'_>> = rows.iter_mut().rev().map(Frame::Root).collect();
+            while let Some(frame) = stack.pop() {
+                let v = match frame {
+                    Frame::Pop(n) => {
+                        path.truncate(path.len() - n);
+                        continue;
+                    }
+                    Frame::Root(v) => v,
+                    Frame::KeyedChild(v, key) => {
+                        let n = push_key_words(&mut path, key);
+                        stack.push(Frame::Pop(n));
+                        v
+                    }
+                };
+                match v {
+                    Value::String(s) => {
+                        stats.string_leaves_scanned += 1;
+                        let hits = self.analyzer.analyze_with_context(s, &path, &self.opts);
+                        texts.push(s.clone());
+                        regex_hits.push(hits);
+                        slots.push(s);
+                    }
+                    Value::Object(map) => {
+                        for (key, child) in map.iter_mut() {
+                            stack.push(Frame::KeyedChild(child, key));
+                        }
+                    }
+                    Value::Array(arr) => {
+                        for child in arr.iter_mut() {
+                            stack.push(Frame::Root(child));
+                        }
+                    }
+                    Value::Number(_) | Value::Bool(_) | Value::Null => {}
+                }
+            }
+
+            // Phase B: one batched NER pass; fail-closed on inference error.
+            let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
+            let ner = match engine.analyze_batch(&refs) {
+                Ok(per_leaf) => per_leaf,
+                Err(e) => {
+                    infer_err = Some(e.to_string());
+                    return;
+                }
+            };
+
+            for (i, slot) in slots.into_iter().enumerate() {
+                let regex = std::mem::take(&mut regex_hits[i]);
+                let ner_hits = ner.get(i).cloned().unwrap_or_default();
+                let merged = merge_spans(regex, ner_hits, self.opts.min_score);
+                if merged.is_empty() {
+                    continue;
+                }
+                let anon = anonymize(&texts[i], merged, &self.operator);
+                if anon.operations.is_empty() {
+                    continue;
+                }
+                for op in &anon.operations {
+                    stats.total += 1;
+                    *stats.by_entity.entry(op.entity_type).or_insert(0) += 1;
+                }
+                *slot = anon.text;
+            }
+        }));
+
+        result.map_err(|_| RedactionError::Internal("analyzer panicked".into()))?;
+        if let Some(e) = infer_err {
+            return Err(RedactionError::Internal(format!("NER inference failed: {e}")));
         }
-
         Ok(stats)
     }
 }
@@ -691,5 +876,74 @@ mod tests {
         let stats = r.apply(&mut rows).expect("apply ok");
         assert_eq!(rows[0]["reference"], "900000000");
         assert_eq!(stats.total, 0);
+    }
+
+    #[test]
+    fn from_config_disabled_is_none() {
+        let cfg = dbmcp_config::PiiConfig::default();
+        assert!(Redactor::from_config(&cfg).expect("ok").is_none());
+    }
+
+    #[cfg(feature = "ner")]
+    fn rr(entity: Entity, start: usize, end: usize, score: f32) -> RecognizerResult {
+        use crate::result::AnalysisExplanation;
+        use crate::validation::ValidationOutcome;
+        use std::borrow::Cow;
+        let s = Score::from_static(score);
+        RecognizerResult {
+            entity_type: entity,
+            start,
+            end,
+            score: s,
+            explanation: AnalysisExplanation {
+                recognizer_name: Cow::Borrowed("test"),
+                pattern_name: None,
+                original_score: s,
+                validation: ValidationOutcome::Unknown,
+                final_score: s,
+                supportive_keyword: None,
+            },
+        }
+    }
+
+    #[cfg(feature = "ner")]
+    #[test]
+    fn merge_spans_drops_ner_below_min_score() {
+        let ner = vec![rr(Entity::Person, 0, 4, 0.3)];
+        let out = merge_spans(Vec::new(), ner, Score::from_static(0.5));
+        assert!(out.is_empty(), "sub-threshold NER span must be dropped");
+    }
+
+    #[cfg(feature = "ner")]
+    #[test]
+    fn merge_spans_keeps_disjoint_regex_and_ner() {
+        let regex = vec![rr(Entity::EmailAddress, 10, 25, 1.0)];
+        let ner = vec![rr(Entity::Person, 0, 5, 0.9)];
+        let out = merge_spans(regex, ner, Score::from_static(0.4));
+        assert_eq!(out.len(), 2);
+    }
+
+    #[cfg(feature = "ner")]
+    #[test]
+    fn merge_spans_overlap_higher_score_wins() {
+        // A checksum-strong regex hit (1.0) overlaps a weaker NER person guess.
+        let regex = vec![rr(Entity::EmailAddress, 0, 16, 1.0)];
+        let ner = vec![rr(Entity::Person, 0, 10, 0.6)];
+        let out = merge_spans(regex, ner, Score::from_static(0.4));
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].entity_type, Entity::EmailAddress);
+    }
+
+    #[cfg(feature = "ner")]
+    #[test]
+    fn from_config_bad_model_path_fails_closed() {
+        let cfg = dbmcp_config::PiiConfig {
+            enabled: true,
+            ner_enabled: true,
+            ner_model: Some(std::path::PathBuf::from("/nonexistent/model/dir")),
+            ..dbmcp_config::PiiConfig::default()
+        };
+        let err = Redactor::from_config(&cfg).expect_err("unreadable model must fail closed");
+        assert!(matches!(err, RedactorInitError::Ner(_)));
     }
 }

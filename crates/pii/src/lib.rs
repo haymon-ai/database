@@ -48,7 +48,7 @@ pub use crate::entity::{Entity, ParseEntityError};
 #[cfg(feature = "ner")]
 pub use crate::ner::{NerEngine, NerError};
 pub use crate::operators::{ChunkCount, HashAlgorithm, Operator};
-pub use crate::redact::{RedactionError, RedactionStats, Redactor};
+pub use crate::redact::{RedactionError, RedactionStats, Redactor, RedactorInitError};
 pub use crate::result::{AnalysisExplanation, RecognizerResult};
 pub use crate::score::{MAX_SCORE, Score};
 pub use crate::validation::ValidationOutcome;
