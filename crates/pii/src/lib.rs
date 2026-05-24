@@ -2,8 +2,10 @@
 //!
 //! Library-only crate. Regex/pattern recognition with optional checksum
 //! validation, plus four built-in operators (`Replace`, `Mask`, `Redact`,
-//! `Hash`). No NLP, no LLM, no network. Wired into the MCP server's query
-//! tool output via [`Redactor`] behind `PiiConfig`.
+//! `Hash`). An optional ML/NER pass (person & location) lives behind the
+//! `ner` cargo feature; the default build stays regex-only with no network.
+//! Wired into the MCP server's query tool output via [`Redactor`] behind
+//! `PiiConfig`.
 //!
 //! # Quickstart
 //!
@@ -25,6 +27,8 @@ pub mod category;
 pub mod context;
 pub mod entity;
 pub mod error;
+#[cfg(feature = "ner")]
+pub mod ner;
 pub mod operators;
 pub mod overlap;
 pub mod pattern;
@@ -41,6 +45,8 @@ pub use crate::anonymizer::{OperatorConfig, anonymize};
 pub use crate::category::{Category, ParseCategoryError};
 pub use crate::context::ContextSettings;
 pub use crate::entity::{Entity, ParseEntityError};
+#[cfg(feature = "ner")]
+pub use crate::ner::{NerEngine, NerError};
 pub use crate::operators::{ChunkCount, HashAlgorithm, Operator};
 pub use crate::redact::{RedactionError, RedactionStats, Redactor};
 pub use crate::result::{AnalysisExplanation, RecognizerResult};

@@ -8,10 +8,17 @@ license.workspace = true
 repository.workspace = true
 autobenches = false
 
+[features]
+# Opt-in ML/NER pass: pure-Rust BERT token-classification via candle + tokenizers.
+ner = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
+
 [dependencies]
 base64 = { workspace = true }
 bech32 = { workspace = true }
 bs58 = { workspace = true }
+candle-core = { workspace = true, optional = true }
+candle-nn = { workspace = true, optional = true }
+candle-transformers = { workspace = true, optional = true }
 dbmcp-config = { workspace = true }
 fancy-regex = { workspace = true }
 rmcp = { workspace = true }
@@ -19,6 +26,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
+tokenizers = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

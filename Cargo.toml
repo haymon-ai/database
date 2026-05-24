@@ -9,6 +9,10 @@ repository.workspace = true
 keywords = ["mcp", "database", "mysql", "postgresql", "sqlite"]
 categories = ["database", "command-line-utilities"]
 
+[features]
+# Opt-in ML/NER PII pass; forwards to every backend handler crate.
+ner = ["dbmcp-mysql/ner", "dbmcp-postgres/ner", "dbmcp-sqlite/ner"]
+
 [workspace]
 members = [".", "crates/*"]
 
@@ -34,6 +38,13 @@ sqlx-json = { path = "crates/sqlx-json", version = "0.12.1" }
 # External dependencies
 axum = "0.8"
 base64 = "0.22"
+# Optional ML/NER backend (behind the `ner` feature; off by default).
+# Pure-Rust CPU inference — no native runtime library, keeps the single-binary
+# promise. tokenizers uses the fancy-regex backend (not the C `onig` default).
+candle-core = { version = "0.10", default-features = false }
+candle-nn = { version = "0.10", default-features = false }
+candle-transformers = { version = "0.10", default-features = false }
+tokenizers = { version = "0.21", default-features = false, features = ["fancy-regex"] }
 bech32 = "0.11"
 bigdecimal = "0.4"
 bs58 = { version = "0.5", features = ["check"] }

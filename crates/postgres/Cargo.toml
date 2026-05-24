@@ -7,6 +7,10 @@ homepage.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+# Forwards the optional ML/NER pass to dbmcp-pii.
+ner = ["dbmcp-pii/ner"]
+
 [dependencies]
 dbmcp-config = { workspace = true }
 dbmcp-pii = { workspace = true }
