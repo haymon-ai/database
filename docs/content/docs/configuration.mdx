@@ -125,10 +125,9 @@ An empty list is rejected at startup. If the selected categories produce an empt
 
 The regex/checksum recognisers cannot catch free-form **person names** or **place names** — those have no fixed pattern. An optional machine-learning Named Entity Recognition (NER) pass adds `PERSON` and `LOCATION` detection on top of the regex layer.
 
-It is **opt-in twice**: the binary must be built with the `ner` cargo feature, *and* `--pii-ner` must be enabled at runtime. The default binary contains no ML code and pulls no ML dependencies.
+It is **opt-in at runtime**: the ML/NER code is always built into the binary, but stays inactive until both `--pii` and `--pii-ner` are enabled and a model directory is supplied.
 
 ```bash
-cargo build --release --features ner
 dbmcp stdio --db-backend sqlite --db-name app.db \
   --pii true --pii-ner true --pii-ner-model ./models/bert-ner
 ```
@@ -145,7 +144,6 @@ Behaviour notes:
 
 - **Fail-closed.** If `--pii-ner` is set but the model cannot be loaded, the server refuses to start. If inference fails mid-request, that request errors — it never silently falls back to regex-only.
 - **Category-aware.** The NER pass respects `--pii-categories`: `PERSON` is emitted only when `personal` is selected and `LOCATION` only when `contact` is. With no subset (the default), both apply.
-- **Feature not built.** If `--pii-ner` is set on a binary built without the `ner` feature, a warning is logged and NER stays inactive.
 
 > **Default**: redaction is off. Setting `PII_ENABLE=true` (or `--pii true`) is the only way to activate the redactor — `PII_OPERATOR`, `PII_CATEGORIES`, and the `PII_NER_*` flags alone have no effect.
 

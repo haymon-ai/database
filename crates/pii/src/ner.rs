@@ -1,6 +1,6 @@
 //! Optional ML/NER recognizer pass: pure-Rust BERT token-classification.
 //!
-//! Behind the `ner` cargo feature. Loads a user-provided model directory
+//! Loads a user-provided model directory
 //! (`tokenizer.json`, `config.json`, `model.safetensors`) and detects person
 //! and location spans via `candle` + `tokenizers`. Emitted [`RecognizerResult`]s
 //! carry byte offsets, so they merge with the regex recognizers through

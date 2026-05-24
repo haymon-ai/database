@@ -1,9 +1,8 @@
 //! Opt-in NER integration test exercising a real safetensors model.
 //!
 //! Skips unless `PII_NER_TEST_MODEL` points at a model directory
-//! (`tokenizer.json`, `config.json`, `model.safetensors`). Requires the `ner`
-//! feature. The candle backend needs no external runtime library.
-#![cfg(feature = "ner")]
+//! (`tokenizer.json`, `config.json`, `model.safetensors`). The candle
+//! backend needs no external runtime library.
 
 use std::path::PathBuf;
 

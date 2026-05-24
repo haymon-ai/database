@@ -23,7 +23,6 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use crate::Entity;
-#[cfg(feature = "ner")]
 use crate::result::RecognizerResult;
 use crate::words::push_key_words;
 use crate::{AnalyzeOptions, Analyzer, OperatorConfig, anonymize};
@@ -44,9 +43,8 @@ impl From<RedactionError> for rmcp::model::ErrorData {
 
 /// Error returned by [`Redactor::from_config`] when initialisation fails.
 ///
-/// Always present (never feature-gated) so the startup path has a single error
-/// type regardless of build features. Surfacing this aborts server startup —
-/// the redactor is fail-closed: it never starts in a degraded state.
+/// Surfacing this aborts server startup — the redactor is fail-closed: it
+/// never starts in a degraded state.
 #[derive(Debug, thiserror::Error)]
 pub enum RedactorInitError {
     /// The optional NER engine failed to load; the server must not start.
@@ -148,28 +146,18 @@ impl Redactor {
         if !cfg.enabled {
             return Ok(None);
         }
-        #[cfg_attr(not(feature = "ner"), allow(unused_mut))]
         let mut analyzer = crate::Analyzer::from_config(cfg);
-        #[cfg(feature = "ner")]
         attach_ner(&mut analyzer, cfg)?;
         Ok(Some(Self::new(analyzer, cfg.operator.into())))
     }
 
     /// Reports whether an ML/NER engine is attached.
     ///
-    /// Always `false` without the `ner` feature. Callers use it to decide
-    /// whether [`Self::apply`] needs offloading to a blocking thread.
+    /// Callers use it to decide whether [`Self::apply`] needs offloading to
+    /// a blocking thread.
     #[must_use]
-    #[cfg_attr(not(feature = "ner"), allow(clippy::unused_self))]
     pub fn uses_ner(&self) -> bool {
-        #[cfg(feature = "ner")]
-        {
-            self.analyzer.ner_engine().is_some()
-        }
-        #[cfg(not(feature = "ner"))]
-        {
-            false
-        }
+        self.analyzer.ner_engine().is_some()
     }
 
     /// Walks every reachable string leaf in `rows` through the analyzer pipeline.
@@ -190,7 +178,6 @@ impl Redactor {
     /// failed without returning any row (fail-closed).
     pub fn apply(&self, rows: &mut [Value]) -> Result<RedactionStats, RedactionError> {
         let mut stats = RedactionStats::default();
-        #[cfg(feature = "ner")]
         let mut infer_err: Option<String> = None;
         let result = catch_unwind(AssertUnwindSafe(|| {
             // Shared key-path stack. Each `Frame::KeyedChild` carries the tokens
@@ -218,11 +205,7 @@ impl Redactor {
                 match v {
                     Value::String(s) => {
                         stats.string_leaves_scanned += 1;
-                        #[cfg_attr(not(feature = "ner"), allow(unused_mut))]
                         let mut results = self.analyzer.analyze_with_context(s, &path, &self.opts);
-                        // Layer the NER pass over the regex hits for this leaf,
-                        // failing the whole request closed on inference error.
-                        #[cfg(feature = "ner")]
                         if let Some(engine) = self.analyzer.ner_engine() {
                             match engine.analyze(s) {
                                 Ok(ner) => results = merge_spans(results, ner, self.opts.min_score),
@@ -263,7 +246,6 @@ impl Redactor {
         }));
 
         result.map_err(|_| RedactionError::Internal("analyzer panicked".into()))?;
-        #[cfg(feature = "ner")]
         if let Some(e) = infer_err {
             return Err(RedactionError::Internal(format!("NER inference failed: {e}")));
         }
@@ -311,7 +293,6 @@ fn log_redactions(stats: &RedactionStats, row_count: usize) {
 }
 
 /// Loads the NER engine and attaches it, failing closed on any load error.
-#[cfg(feature = "ner")]
 fn attach_ner(analyzer: &mut Analyzer, cfg: &dbmcp_config::PiiConfig) -> Result<(), RedactorInitError> {
     if !cfg.ner_enabled {
         return Ok(());
@@ -341,7 +322,6 @@ fn attach_ner(analyzer: &mut Analyzer, cfg: &dbmcp_config::PiiConfig) -> Result<
 /// Resolves whether PERSON/LOCATION are permitted by the category filter.
 ///
 /// An unset category subset means all categories apply.
-#[cfg(feature = "ner")]
 fn ner_category_allowance(cfg: &dbmcp_config::PiiConfig) -> (bool, bool) {
     match cfg.categories.as_ref() {
         None => (true, true),
@@ -356,7 +336,6 @@ fn ner_category_allowance(cfg: &dbmcp_config::PiiConfig) -> (bool, bool) {
 ///
 /// NER spans below `min_score` are dropped first; the combined set is then
 /// overlap-resolved so higher-confidence spans win on collisions.
-#[cfg(feature = "ner")]
 fn merge_spans(
     mut regex: Vec<RecognizerResult>,
     mut ner: Vec<RecognizerResult>,
@@ -843,7 +822,6 @@ mod tests {
         assert!(Redactor::from_config(&cfg).expect("ok").is_none());
     }
 
-    #[cfg(feature = "ner")]
     fn rr(entity: Entity, start: usize, end: usize, score: f32) -> RecognizerResult {
         use crate::result::AnalysisExplanation;
         use crate::validation::ValidationOutcome;
@@ -865,7 +843,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "ner")]
     #[test]
     fn merge_spans_drops_ner_below_min_score() {
         let ner = vec![rr(Entity::Person, 0, 4, 0.3)];
@@ -873,7 +850,6 @@ mod tests {
         assert!(out.is_empty(), "sub-threshold NER span must be dropped");
     }
 
-    #[cfg(feature = "ner")]
     #[test]
     fn merge_spans_keeps_disjoint_regex_and_ner() {
         let regex = vec![rr(Entity::EmailAddress, 10, 25, 1.0)];
@@ -882,7 +858,6 @@ mod tests {
         assert_eq!(out.len(), 2);
     }
 
-    #[cfg(feature = "ner")]
     #[test]
     fn merge_spans_overlap_higher_score_wins() {
         // A checksum-strong regex hit (1.0) overlaps a weaker NER person guess.
@@ -893,7 +868,6 @@ mod tests {
         assert_eq!(out[0].entity_type, Entity::EmailAddress);
     }
 
-    #[cfg(feature = "ner")]
     #[test]
     fn from_config_bad_model_path_fails_closed() {
         let cfg = dbmcp_config::PiiConfig {
@@ -906,7 +880,6 @@ mod tests {
         assert!(matches!(err, RedactorInitError::Ner(_)));
     }
 
-    #[cfg(feature = "ner")]
     #[test]
     fn ner_allowance_unset_categories_allows_both() {
         let cfg = dbmcp_config::PiiConfig {
@@ -916,7 +889,6 @@ mod tests {
         assert_eq!(ner_category_allowance(&cfg), (true, true));
     }
 
-    #[cfg(feature = "ner")]
     #[test]
     fn ner_allowance_scoped_categories_gate_entities() {
         let only_personal = dbmcp_config::PiiConfig {

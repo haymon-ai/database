@@ -79,8 +79,7 @@ pub struct PiiConfig {
     pub categories: Option<Vec<PiiCategory>>,
     /// Whether the optional ML/NER pass (person & location) runs.
     ///
-    /// Requires a build with the `ner` feature and a model path; ignored
-    /// otherwise. Off by default.
+    /// Requires a model path; ignored otherwise. Off by default.
     pub ner_enabled: bool,
     /// Filesystem path to the NER model directory; required when
     /// [`Self::ner_enabled`] is set.

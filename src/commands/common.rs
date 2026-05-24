@@ -231,13 +231,6 @@ impl TryFrom<&PiiArguments> for PiiConfig {
 /// (e.g. a fail-closed NER model load).
 #[allow(clippy::result_large_err)]
 pub(crate) fn create_server(config: &Config) -> Result<Server, crate::error::Error> {
-    #[cfg(not(feature = "ner"))]
-    if config.pii.ner_enabled {
-        tracing::warn!(
-            "--pii-ner is set but this binary was built without the 'ner' feature; NER redaction is disabled"
-        );
-    }
-
     if config.database.read_only {
         info!("Server running in READ-ONLY mode. Write operations are disabled.");
     }
