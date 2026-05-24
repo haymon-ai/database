@@ -1,0 +1,63 @@
+//! Opt-in NER integration test exercising a real safetensors model.
+//!
+//! Skips unless `PII_NER_TEST_MODEL` points at a model directory
+//! (`tokenizer.json`, `config.json`, `model.safetensors`). Requires the `ner`
+//! feature. The candle backend needs no external runtime library.
+#![cfg(feature = "ner")]
+
+use std::path::PathBuf;
+
+use dbmcp_pii::{Entity, NerEngine, Score};
+
+/// Returns the configured model directory, or `None` to skip the test.
+fn model_dir() -> Option<PathBuf> {
+    std::env::var_os("PII_NER_TEST_MODEL").map(PathBuf::from)
+}
+
+#[test]
+fn detects_person_span() {
+    let Some(dir) = model_dir() else {
+        eprintln!("PII_NER_TEST_MODEL unset; skipping NER integration test");
+        return;
+    };
+    let engine = NerEngine::load(&dir, Score::from_static(0.5)).expect("model loads");
+    let out = engine
+        .analyze_batch(&["My name is Alice Johnson"])
+        .expect("inference succeeds");
+    assert_eq!(out.len(), 1, "one input -> one result vector");
+    assert!(
+        out[0].iter().any(|r| r.entity_type == Entity::Person),
+        "expected a PERSON span, got {:?}",
+        out[0]
+    );
+}
+
+#[test]
+fn detects_location_span() {
+    let Some(dir) = model_dir() else {
+        eprintln!("PII_NER_TEST_MODEL unset; skipping NER integration test");
+        return;
+    };
+    let engine = NerEngine::load(&dir, Score::from_static(0.5)).expect("model loads");
+    let out = engine
+        .analyze_batch(&["She flew to Berlin last week"])
+        .expect("inference succeeds");
+    assert!(
+        out[0].iter().any(|r| r.entity_type == Entity::Location),
+        "expected a LOCATION span, got {:?}",
+        out[0]
+    );
+}
+
+#[test]
+fn clean_text_yields_no_spans() {
+    let Some(dir) = model_dir() else {
+        eprintln!("PII_NER_TEST_MODEL unset; skipping NER integration test");
+        return;
+    };
+    let engine = NerEngine::load(&dir, Score::from_static(0.5)).expect("model loads");
+    let out = engine
+        .analyze_batch(&["the invoice total was forty two dollars"])
+        .expect("inference succeeds");
+    assert!(out[0].is_empty(), "no entities expected, got {:?}", out[0]);
+}
