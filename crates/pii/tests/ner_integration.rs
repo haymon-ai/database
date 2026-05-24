@@ -21,14 +21,10 @@ fn detects_person_span() {
         return;
     };
     let engine = NerEngine::load(&dir, Score::from_static(0.5)).expect("model loads");
-    let out = engine
-        .analyze_batch(&["My name is Alice Johnson"])
-        .expect("inference succeeds");
-    assert_eq!(out.len(), 1, "one input -> one result vector");
+    let out = engine.analyze("My name is Alice Johnson").expect("inference succeeds");
     assert!(
-        out[0].iter().any(|r| r.entity_type == Entity::Person),
-        "expected a PERSON span, got {:?}",
-        out[0]
+        out.iter().any(|r| r.entity_type == Entity::Person),
+        "expected a PERSON span, got {out:?}",
     );
 }
 
@@ -40,12 +36,11 @@ fn detects_location_span() {
     };
     let engine = NerEngine::load(&dir, Score::from_static(0.5)).expect("model loads");
     let out = engine
-        .analyze_batch(&["She flew to Berlin last week"])
+        .analyze("She flew to Berlin last week")
         .expect("inference succeeds");
     assert!(
-        out[0].iter().any(|r| r.entity_type == Entity::Location),
-        "expected a LOCATION span, got {:?}",
-        out[0]
+        out.iter().any(|r| r.entity_type == Entity::Location),
+        "expected a LOCATION span, got {out:?}",
     );
 }
 
@@ -57,7 +52,7 @@ fn clean_text_yields_no_spans() {
     };
     let engine = NerEngine::load(&dir, Score::from_static(0.5)).expect("model loads");
     let out = engine
-        .analyze_batch(&["the invoice total was forty two dollars"])
+        .analyze("the invoice total was forty two dollars")
         .expect("inference succeeds");
-    assert!(out[0].is_empty(), "no entities expected, got {:?}", out[0]);
+    assert!(out.is_empty(), "no entities expected, got {out:?}");
 }

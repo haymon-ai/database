@@ -2,7 +2,6 @@
 
 use std::borrow::Cow;
 
-use dbmcp_pii::Redactor;
 use dbmcp_server::pagination::{Cursor, Pager};
 use dbmcp_server::types::{PinnedReadQueryRequest, ReadQueryResponse, UnpinnedReadQueryRequest};
 use dbmcp_sql::Connection as _;
@@ -11,7 +10,6 @@ use dbmcp_sql::pagination::with_limit_offset;
 use dbmcp_sql::validation::validate_read_only;
 use rmcp::handler::server::router::tool::{AsyncTool, ToolBase};
 use rmcp::model::{ErrorData, ToolAnnotations};
-use serde_json::Value;
 
 use crate::PostgresHandler;
 
@@ -122,7 +120,7 @@ impl PostgresHandler {
                 let rows = self.connection.fetch_json(wrapped.as_str(), database).await?;
                 let (rows, next_cursor) = pager.paginate(rows);
                 let rows = match &self.redactor {
-                    Some(r) => redact_rows(r, rows).await?,
+                    Some(r) => r.redact_rows(rows).await?,
                     None => rows,
                 };
                 Ok(ReadQueryResponse { rows, next_cursor })
@@ -130,7 +128,7 @@ impl PostgresHandler {
             StatementKind::NonSelect => {
                 let rows = self.connection.fetch_json(query.as_str(), database).await?;
                 let rows = match &self.redactor {
-                    Some(r) => redact_rows(r, rows).await?,
+                    Some(r) => r.redact_rows(rows).await?,
                     None => rows,
                 };
                 Ok(ReadQueryResponse {
@@ -139,27 +137,5 @@ impl PostgresHandler {
                 })
             }
         }
-    }
-}
-
-/// Applies PII redaction, offloading the heavier NER pass to a blocking thread.
-///
-/// Regex-only redaction runs inline; when an NER engine is attached the
-/// CPU-bound inference is moved off the async runtime via
-/// [`tokio::task::spawn_blocking`].
-async fn redact_rows(redactor: &Redactor, mut rows: Vec<Value>) -> Result<Vec<Value>, ErrorData> {
-    if redactor.uses_ner() {
-        let redactor = redactor.clone();
-        let (rows, result) = tokio::task::spawn_blocking(move || {
-            let result = redactor.apply(&mut rows);
-            (rows, result)
-        })
-        .await
-        .map_err(|e| ErrorData::internal_error(format!("redaction task failed: {e}"), None))?;
-        result?;
-        Ok(rows)
-    } else {
-        redactor.apply(&mut rows)?;
-        Ok(rows)
     }
 }

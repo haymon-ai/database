@@ -242,12 +242,11 @@ pub(crate) fn create_server(config: &Config) -> Result<Server, crate::error::Err
         info!("Server running in READ-ONLY mode. Write operations are disabled.");
     }
 
-    let server = match config.database.backend {
-        DatabaseBackend::Sqlite => init(SqliteHandler::new(config))?,
-        DatabaseBackend::Postgres => init(PostgresHandler::new(config))?,
-        DatabaseBackend::Mysql | DatabaseBackend::Mariadb => init(MysqlHandler::new(config))?,
-    };
-    Ok(server)
+    match config.database.backend {
+        DatabaseBackend::Sqlite => init(SqliteHandler::new(config)),
+        DatabaseBackend::Postgres => init(PostgresHandler::new(config)),
+        DatabaseBackend::Mysql | DatabaseBackend::Mariadb => init(MysqlHandler::new(config)),
+    }
 }
 
 /// Maps a handler constructor result into a [`Server`], failing closed.

@@ -29,7 +29,7 @@ pub struct Analyzer {
     recognizers: Vec<Recognizer>,
     /// Optional ML/NER engine, attached by the redactor when enabled.
     ///
-    /// Invoked in batch by the redactor, not by [`Analyzer::analyze`].
+    /// Invoked per leaf by the redactor, not by [`Analyzer::analyze`].
     #[cfg(feature = "ner")]
     ner: Option<std::sync::Arc<crate::ner::NerEngine>>,
 }
@@ -133,7 +133,7 @@ impl Analyzer {
         self.ner.as_deref()
     }
 
-    /// Attaches a loaded NER engine for the redactor's batched pass.
+    /// Attaches a loaded NER engine for the redactor's per-leaf pass.
     #[cfg(feature = "ner")]
     pub(crate) fn attach_ner(&mut self, engine: std::sync::Arc<crate::ner::NerEngine>) {
         self.ner = Some(engine);

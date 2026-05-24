@@ -178,31 +178,22 @@ impl Redactor {
     /// and [`Value::Array`] elements at any depth using an iterative
     /// heap stack — call-stack depth does not scale with payload depth.
     /// Object keys are never inspected or modified; non-string scalars
-    /// pass through unchanged. Emits one `tracing::info!` event per
-    /// call when at least one span was rewritten.
+    /// pass through unchanged. When an NER engine is attached, each leaf is
+    /// also run through it and its spans merged with the regex hits. Emits
+    /// one `tracing::info!` event per call when at least one span was
+    /// rewritten.
     ///
     /// # Errors
     ///
     /// Returns [`RedactionError::Internal`] when the analyzer pipeline
-    /// panics at any depth, or [`RedactionError`] when the NER pass fails;
-    /// the request must be failed without returning any row (fail-closed).
+    /// panics at any depth, or when the NER pass fails; the request must be
+    /// failed without returning any row (fail-closed).
     pub fn apply(&self, rows: &mut [Value]) -> Result<RedactionStats, RedactionError> {
-        #[cfg(feature = "ner")]
-        if let Some(engine) = self.analyzer.ner_engine() {
-            let stats = self.apply_with_ner(rows, engine)?;
-            log_redactions(&stats, rows.len());
-            return Ok(stats);
-        }
-        let stats = self.apply_regex_only(rows)?;
-        log_redactions(&stats, rows.len());
-        Ok(stats)
-    }
-
-    /// Single-pass regex/checksum redaction (the default, NER-free path).
-    fn apply_regex_only(&self, rows: &mut [Value]) -> Result<RedactionStats, RedactionError> {
         let mut stats = RedactionStats::default();
+        #[cfg(feature = "ner")]
+        let mut infer_err: Option<String> = None;
         let result = catch_unwind(AssertUnwindSafe(|| {
-            // Shared key-path stack. Each `Frame::Visit` carries the tokens
+            // Shared key-path stack. Each `Frame::KeyedChild` carries the tokens
             // to push when entered; a `Frame::Pop` queued before its children
             // restores the path after the subtree is done. This keeps path
             // mutations O(depth) instead of O(depth²) per leaf (no per-child
@@ -227,7 +218,20 @@ impl Redactor {
                 match v {
                     Value::String(s) => {
                         stats.string_leaves_scanned += 1;
-                        let results = self.analyzer.analyze_with_context(s, &path, &self.opts);
+                        #[cfg_attr(not(feature = "ner"), allow(unused_mut))]
+                        let mut results = self.analyzer.analyze_with_context(s, &path, &self.opts);
+                        // Layer the NER pass over the regex hits for this leaf,
+                        // failing the whole request closed on inference error.
+                        #[cfg(feature = "ner")]
+                        if let Some(engine) = self.analyzer.ner_engine() {
+                            match engine.analyze(s) {
+                                Ok(ner) => results = merge_spans(results, ner, self.opts.min_score),
+                                Err(e) => {
+                                    infer_err = Some(e.to_string());
+                                    return;
+                                }
+                            }
+                        }
                         if results.is_empty() {
                             continue;
                         }
@@ -259,7 +263,36 @@ impl Redactor {
         }));
 
         result.map_err(|_| RedactionError::Internal("analyzer panicked".into()))?;
+        #[cfg(feature = "ner")]
+        if let Some(e) = infer_err {
+            return Err(RedactionError::Internal(format!("NER inference failed: {e}")));
+        }
+        log_redactions(&stats, rows.len());
         Ok(stats)
+    }
+
+    /// Redacts `rows`, keeping the heavier NER pass off the async runtime.
+    ///
+    /// Regex-only redaction runs inline on the caller's task; when an NER
+    /// engine is attached the CPU-bound inference is moved to a blocking
+    /// thread via [`tokio::task::spawn_blocking`] so it never stalls the
+    /// async executor. Returns the (possibly rewritten) rows.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RedactionError`] when the analyzer pipeline fails at any
+    /// depth or the offloaded task panics; the request must be failed
+    /// without returning any row (fail-closed).
+    pub async fn redact_rows(&self, mut rows: Vec<Value>) -> Result<Vec<Value>, RedactionError> {
+        if self.uses_ner() {
+            let redactor = self.clone();
+            tokio::task::spawn_blocking(move || redactor.apply(&mut rows).map(|_| rows))
+                .await
+                .map_err(|e| RedactionError::Internal(format!("redaction task panicked: {e}")))?
+        } else {
+            self.apply(&mut rows)?;
+            Ok(rows)
+        }
     }
 }
 
@@ -332,103 +365,6 @@ fn merge_spans(
     ner.retain(|r| r.score >= min_score);
     regex.append(&mut ner);
     crate::overlap::resolve(regex)
-}
-
-#[cfg(feature = "ner")]
-impl Redactor {
-    /// Two-phase redaction layering a batched NER pass over the regex pass.
-    ///
-    /// Phase A walks every string leaf once, running the regex/boost analysis
-    /// and collecting each leaf. Phase B runs one batched NER pass over all
-    /// leaves, merges per leaf via [`merge_spans`], anonymizes, and writes
-    /// back. An NER inference failure fails the whole request (fail-closed) —
-    /// it never falls back to regex-only.
-    fn apply_with_ner(
-        &self,
-        rows: &mut [Value],
-        engine: &crate::ner::NerEngine,
-    ) -> Result<RedactionStats, RedactionError> {
-        let mut stats = RedactionStats::default();
-        let mut infer_err: Option<String> = None;
-        let result = catch_unwind(AssertUnwindSafe(|| {
-            // Phase A: collect every string leaf with its regex hits. Owned
-            // text copies feed both the NER batch and the anonymizer, leaving
-            // the `&mut String` slots free for write-back.
-            let mut slots: Vec<&mut String> = Vec::new();
-            let mut texts: Vec<String> = Vec::new();
-            let mut regex_hits: Vec<Vec<RecognizerResult>> = Vec::new();
-            let mut path: Vec<String> = Vec::new();
-            let mut stack: Vec<Frame<'_>> = rows.iter_mut().rev().map(Frame::Root).collect();
-            while let Some(frame) = stack.pop() {
-                let v = match frame {
-                    Frame::Pop(n) => {
-                        path.truncate(path.len() - n);
-                        continue;
-                    }
-                    Frame::Root(v) => v,
-                    Frame::KeyedChild(v, key) => {
-                        let n = push_key_words(&mut path, key);
-                        stack.push(Frame::Pop(n));
-                        v
-                    }
-                };
-                match v {
-                    Value::String(s) => {
-                        stats.string_leaves_scanned += 1;
-                        let hits = self.analyzer.analyze_with_context(s, &path, &self.opts);
-                        texts.push(s.clone());
-                        regex_hits.push(hits);
-                        slots.push(s);
-                    }
-                    Value::Object(map) => {
-                        for (key, child) in map.iter_mut() {
-                            stack.push(Frame::KeyedChild(child, key));
-                        }
-                    }
-                    Value::Array(arr) => {
-                        for child in arr.iter_mut() {
-                            stack.push(Frame::Root(child));
-                        }
-                    }
-                    Value::Number(_) | Value::Bool(_) | Value::Null => {}
-                }
-            }
-
-            // Phase B: one batched NER pass; fail-closed on inference error.
-            let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
-            let ner = match engine.analyze_batch(&refs) {
-                Ok(per_leaf) => per_leaf,
-                Err(e) => {
-                    infer_err = Some(e.to_string());
-                    return;
-                }
-            };
-
-            for (i, slot) in slots.into_iter().enumerate() {
-                let regex = std::mem::take(&mut regex_hits[i]);
-                let ner_hits = ner.get(i).cloned().unwrap_or_default();
-                let merged = merge_spans(regex, ner_hits, self.opts.min_score);
-                if merged.is_empty() {
-                    continue;
-                }
-                let anon = anonymize(&texts[i], merged, &self.operator);
-                if anon.operations.is_empty() {
-                    continue;
-                }
-                for op in &anon.operations {
-                    stats.total += 1;
-                    *stats.by_entity.entry(op.entity_type).or_insert(0) += 1;
-                }
-                *slot = anon.text;
-            }
-        }));
-
-        result.map_err(|_| RedactionError::Internal("analyzer panicked".into()))?;
-        if let Some(e) = infer_err {
-            return Err(RedactionError::Internal(format!("NER inference failed: {e}")));
-        }
-        Ok(stats)
-    }
 }
 
 #[cfg(test)]

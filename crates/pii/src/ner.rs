@@ -74,14 +74,12 @@ fn parse_id2label(raw: &str) -> Result<Vec<String>, NerError> {
     Ok(labels)
 }
 
-/// Reports whether any label maps to a person or location entity.
+/// Reports whether any BIO label maps to a person or location entity.
 ///
-/// Used at load to reject models that emit neither target entity.
+/// Shares [`parse_bio`] with decoding, so the load gate accepts exactly the
+/// models `run_window` can decode — rejecting one that emits no target label.
 fn has_person_or_location(labels: &[String]) -> bool {
-    labels.iter().any(|label| {
-        let (entity, _) = parse_bio(label);
-        entity.is_some() || entity_for_core(label).is_some()
-    })
+    labels.iter().any(|label| parse_bio(label).0.is_some())
 }
 
 /// Maps a label core (without the `B-`/`I-` prefix) to a built-in entity.
@@ -158,6 +156,16 @@ struct Span {
     score: Score,
 }
 
+/// A span being accumulated across contiguous BIO tags of one entity.
+#[derive(Clone, Copy)]
+struct OpenSpan {
+    entity: Entity,
+    start: usize,
+    end: usize,
+    /// Highest token probability seen so far (max-aggregation, see below).
+    max_score: f32,
+}
+
 /// Merges contiguous BIO tags into spans, keeping those at or above `threshold`.
 ///
 /// Subword token scores aggregate with the **maximum** strategy: a span's score
@@ -165,23 +173,25 @@ struct Span {
 /// an otherwise confident entity.
 fn decode_spans(tags: &[TokenTag], threshold: Score) -> Vec<Span> {
     let mut spans = Vec::new();
-    // (entity, start, end, max_score)
-    let mut open: Option<(Entity, usize, usize, f32)> = None;
+    let mut open: Option<OpenSpan> = None;
 
     for tag in tags {
         match tag.entity {
-            Some(ent) => {
-                let continues = !tag.is_begin && open.as_ref().is_some_and(|(cur, ..)| *cur == ent);
+            Some(entity) => {
+                let continues = !tag.is_begin && open.as_ref().is_some_and(|o| o.entity == entity);
                 if continues {
-                    if let Some((_, _, end, max)) = open.as_mut() {
-                        *end = tag.end;
-                        if tag.score > *max {
-                            *max = tag.score;
-                        }
+                    if let Some(o) = open.as_mut() {
+                        o.end = tag.end;
+                        o.max_score = o.max_score.max(tag.score);
                     }
                 } else {
                     flush(&mut spans, open.take(), threshold);
-                    open = Some((ent, tag.start, tag.end, tag.score));
+                    open = Some(OpenSpan {
+                        entity,
+                        start: tag.start,
+                        end: tag.end,
+                        max_score: tag.score,
+                    });
                 }
             }
             None => flush(&mut spans, open.take(), threshold),
@@ -192,14 +202,20 @@ fn decode_spans(tags: &[TokenTag], threshold: Score) -> Vec<Span> {
 }
 
 /// Pushes an open span onto `spans` when it is non-empty and meets `threshold`.
-fn flush(spans: &mut Vec<Span>, open: Option<(Entity, usize, usize, f32)>, threshold: Score) {
-    let Some((entity, start, end, max)) = open else {
+fn flush(spans: &mut Vec<Span>, open: Option<OpenSpan>, threshold: Score) {
+    let Some(OpenSpan {
+        entity,
+        start,
+        end,
+        max_score,
+    }) = open
+    else {
         return;
     };
     if end <= start {
         return;
     }
-    let Ok(score) = Score::new(max) else {
+    let Ok(score) = Score::new(max_score) else {
         return;
     };
     if score >= threshold {
@@ -325,26 +341,16 @@ impl NerEngine {
         }
     }
 
-    /// Runs NER over each text, returning per-text spans as [`RecognizerResult`]s.
+    /// Runs NER over one text, returning its spans as [`RecognizerResult`]s.
     ///
-    /// The result vectors align positionally with `texts`; byte offsets index
-    /// into the corresponding input string. Over-long inputs are split into
+    /// Byte offsets index into `text`. Over-long inputs are split into
     /// overlapping windows whose spans merge via `crate::overlap::resolve`.
     ///
     /// # Errors
     ///
     /// Returns [`NerError::Inference`] on a tokenization or forward-pass
     /// failure. Never panics.
-    pub fn analyze_batch(&self, texts: &[&str]) -> Result<Vec<Vec<RecognizerResult>>, NerError> {
-        let mut out = Vec::with_capacity(texts.len());
-        for &text in texts {
-            out.push(self.analyze_one(text)?);
-        }
-        Ok(out)
-    }
-
-    /// Tokenizes, windows, runs the model, and decodes one text into spans.
-    fn analyze_one(&self, text: &str) -> Result<Vec<RecognizerResult>, NerError> {
+    pub fn analyze(&self, text: &str) -> Result<Vec<RecognizerResult>, NerError> {
         if text.is_empty() {
             return Ok(Vec::new());
         }
