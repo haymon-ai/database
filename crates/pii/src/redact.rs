@@ -16,7 +16,7 @@
 //! `dbmcp::pii` is emitted per [`Redactor::apply`] call when at least
 //! one span was rewritten.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 
@@ -307,15 +307,10 @@ fn attach_ner(analyzer: &mut Analyzer, cfg: &dbmcp_config::PiiConfig) -> Result<
         // `PiiConfig::validate` rejects this, but stay defensive and fail-closed.
         return Err(RedactorInitError::Ner("model path missing".to_owned()));
     };
-    let threshold = cfg
-        .ner_threshold
-        .and_then(|t| crate::Score::new(t).ok())
-        .unwrap_or_else(|| crate::Score::from_static(dbmcp_config::PiiConfig::DEFAULT_NER_THRESHOLD));
-    let entity_thresholds = resolve_entity_thresholds(cfg)?;
+    let threshold = crate::Score::from_static(dbmcp_config::PiiConfig::DEFAULT_NER_THRESHOLD);
     let mut engine =
         crate::ner::NerEngine::load(model, threshold).map_err(|e| RedactorInitError::Ner(e.to_string()))?;
     engine.set_allowed(allowed);
-    engine.set_entity_thresholds(entity_thresholds);
     analyzer.attach_ner(std::sync::Arc::new(engine));
     Ok(())
 }
@@ -343,38 +338,6 @@ fn allowed_ner_entities(cfg: &dbmcp_config::PiiConfig) -> HashSet<Entity> {
                 .is_some_and(|c| cats.iter().any(|&pc| crate::analyzer::map_category(pc) == c)),
         })
         .collect()
-}
-
-/// Resolves per-entity NER threshold overrides, failing closed on bad names.
-///
-/// # Errors
-///
-/// Returns [`RedactorInitError::Ner`] when an override names an unknown entity,
-/// an entity the NER pass never emits, or a value outside `[0.0, 1.0]`.
-fn resolve_entity_thresholds(
-    cfg: &dbmcp_config::PiiConfig,
-) -> Result<HashMap<Entity, crate::Score>, RedactorInitError> {
-    let mut map = HashMap::new();
-    let Some(overrides) = cfg.ner_entity_thresholds.as_ref() else {
-        return Ok(map);
-    };
-    for (name, value) in overrides {
-        let entity: Entity = name.parse().map_err(|_| {
-            RedactorInitError::Ner(format!("--pii-ner-entity-threshold names an unknown entity: {name}"))
-        })?;
-        if ner_entity_category(entity).is_none() {
-            return Err(RedactorInitError::Ner(format!(
-                "--pii-ner-entity-threshold entity {name} is not produced by the NER pass"
-            )));
-        }
-        let score = crate::Score::new(*value).map_err(|_| {
-            RedactorInitError::Ner(format!(
-                "--pii-ner-entity-threshold for {name} is out of range: {value}"
-            ))
-        })?;
-        map.insert(entity, score);
-    }
-    Ok(map)
 }
 
 /// Merges regex and NER spans for one leaf into a resolved result set.
@@ -982,45 +945,5 @@ mod tests {
             allowed_ner_entities(&cfg).is_empty(),
             "a non-NER category must allow no NER entities (model not loaded)"
         );
-    }
-
-    #[test]
-    fn entity_thresholds_unset_resolve_empty() {
-        let cfg = dbmcp_config::PiiConfig::default();
-        assert!(resolve_entity_thresholds(&cfg).expect("no overrides").is_empty());
-    }
-
-    #[test]
-    fn entity_thresholds_valid_name_resolves() {
-        let cfg = dbmcp_config::PiiConfig {
-            ner_entity_thresholds: Some(vec![("ORGANIZATION".to_owned(), 0.85)]),
-            ..dbmcp_config::PiiConfig::default()
-        };
-        let map = resolve_entity_thresholds(&cfg).expect("valid override resolves");
-        assert!((map[&Entity::Organization].as_f32() - 0.85).abs() < 1e-6);
-    }
-
-    #[test]
-    fn entity_thresholds_unknown_name_fails_closed() {
-        let cfg = dbmcp_config::PiiConfig {
-            ner_entity_thresholds: Some(vec![("NOT_A_THING".to_owned(), 0.5)]),
-            ..dbmcp_config::PiiConfig::default()
-        };
-        assert!(matches!(
-            resolve_entity_thresholds(&cfg),
-            Err(RedactorInitError::Ner(_))
-        ));
-    }
-
-    #[test]
-    fn entity_thresholds_non_ner_entity_fails_closed() {
-        let cfg = dbmcp_config::PiiConfig {
-            ner_entity_thresholds: Some(vec![("EMAIL_ADDRESS".to_owned(), 0.5)]),
-            ..dbmcp_config::PiiConfig::default()
-        };
-        assert!(matches!(
-            resolve_entity_thresholds(&cfg),
-            Err(RedactorInitError::Ner(_))
-        ));
     }
 }

@@ -36,14 +36,6 @@ pub enum ConfigError {
     /// `--pii-ner` was enabled without a `--pii-ner-model` path.
     #[error("PII_NER_MODEL (model directory) is required when PII_NER_ENABLE is set")]
     PiiNerModelMissing,
-
-    /// `--pii-ner-threshold` was outside the inclusive `[0.0, 1.0]` range.
-    #[error("PII_NER_THRESHOLD must be within [0.0, 1.0], got {0}")]
-    PiiNerThresholdRange(f32),
-
-    /// A `--pii-ner-entity-threshold` override was outside `[0.0, 1.0]`.
-    #[error("PII_NER_ENTITY_THRESHOLDS value for {0} must be within [0.0, 1.0], got {1}")]
-    PiiNerEntityThresholdRange(String, f32),
 }
 
 /// Non-empty collection of [`ConfigError`]s preserving insertion order.

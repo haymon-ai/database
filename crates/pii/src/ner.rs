@@ -10,7 +10,7 @@
 //! aggregation, scoring, label mapping); the engine wiring lives alongside.
 
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::Path;
 
 use candle_core::{Device, Tensor};
@@ -182,14 +182,12 @@ struct OpenSpan {
     max_score: f32,
 }
 
-/// Merges contiguous BIO tags into spans, keeping those at or above threshold.
+/// Merges contiguous BIO tags into spans, keeping those at or above `threshold`.
 ///
-/// `threshold` resolves the minimum score per entity, so a noisy entity (e.g.
-/// `ORGANIZATION`) can carry a higher floor than the global default. Subword
-/// token scores aggregate with the **maximum** strategy: a span's score is the
-/// highest token probability it contains, so one weak subword cannot sink an
-/// otherwise confident entity.
-fn decode_spans<F: Fn(Entity) -> Score>(tags: &[TokenTag], threshold: F) -> Vec<Span> {
+/// Subword token scores aggregate with the **maximum** strategy: a span's score
+/// is the highest token probability it contains, so one weak subword cannot sink
+/// an otherwise confident entity.
+fn decode_spans(tags: &[TokenTag], threshold: Score) -> Vec<Span> {
     let mut spans = Vec::new();
     let mut open: Option<OpenSpan> = None;
 
@@ -203,7 +201,7 @@ fn decode_spans<F: Fn(Entity) -> Score>(tags: &[TokenTag], threshold: F) -> Vec<
                         o.max_score = o.max_score.max(tag.score);
                     }
                 } else {
-                    flush(&mut spans, open.take(), &threshold);
+                    flush(&mut spans, open.take(), threshold);
                     open = Some(OpenSpan {
                         entity,
                         start: tag.start,
@@ -212,15 +210,15 @@ fn decode_spans<F: Fn(Entity) -> Score>(tags: &[TokenTag], threshold: F) -> Vec<
                     });
                 }
             }
-            None => flush(&mut spans, open.take(), &threshold),
+            None => flush(&mut spans, open.take(), threshold),
         }
     }
-    flush(&mut spans, open, &threshold);
+    flush(&mut spans, open, threshold);
     spans
 }
 
-/// Pushes an open span onto `spans` when it is non-empty and meets its threshold.
-fn flush<F: Fn(Entity) -> Score>(spans: &mut Vec<Span>, open: Option<OpenSpan>, threshold: &F) {
+/// Pushes an open span onto `spans` when it is non-empty and meets `threshold`.
+fn flush(spans: &mut Vec<Span>, open: Option<OpenSpan>, threshold: Score) {
     let Some(OpenSpan {
         entity,
         start,
@@ -236,7 +234,7 @@ fn flush<F: Fn(Entity) -> Score>(spans: &mut Vec<Span>, open: Option<OpenSpan>, 
     let Ok(score) = Score::new(max_score) else {
         return;
     };
-    if score >= threshold(entity) {
+    if score >= threshold {
         spans.push(Span {
             entity,
             start,
@@ -276,7 +274,6 @@ pub struct NerEngine {
     id2label: Vec<String>,
     threshold: Score,
     allowed: HashSet<Entity>,
-    entity_thresholds: HashMap<Entity, Score>,
 }
 
 impl std::fmt::Debug for NerEngine {
@@ -337,7 +334,6 @@ impl NerEngine {
             id2label,
             threshold,
             allowed: NER_ENTITIES.iter().copied().collect(),
-            entity_thresholds: HashMap::new(),
         })
     }
 
@@ -347,16 +343,6 @@ impl NerEngine {
     /// neither redacts nor displaces a regex hit.
     pub(crate) fn set_allowed(&mut self, entities: impl IntoIterator<Item = Entity>) {
         self.allowed = entities.into_iter().collect();
-    }
-
-    /// Sets per-entity confidence overrides; each replaces the global floor.
-    pub(crate) fn set_entity_thresholds(&mut self, thresholds: HashMap<Entity, Score>) {
-        self.entity_thresholds = thresholds;
-    }
-
-    /// Resolves the minimum score for `entity` (override, else the global floor).
-    fn threshold_for(&self, entity: Entity) -> Score {
-        self.entity_thresholds.get(&entity).copied().unwrap_or(self.threshold)
     }
 
     /// Reports whether a decoded entity is permitted by the category filter.
@@ -453,11 +439,7 @@ impl NerEngine {
             });
         }
 
-        results.extend(
-            decode_spans(&tags, |entity| self.threshold_for(entity))
-                .into_iter()
-                .map(span_to_result),
-        );
+        results.extend(decode_spans(&tags, self.threshold).into_iter().map(span_to_result));
         Ok(())
     }
 }
@@ -519,7 +501,7 @@ mod tests {
             tag(Some(Entity::Person), true, 0.9, 0, 5),
             tag(Some(Entity::Person), false, 0.3, 6, 11),
         ];
-        let spans = decode_spans(&tags, |_| Score::from_static(0.5));
+        let spans = decode_spans(&tags, Score::from_static(0.5));
         assert_eq!(spans.len(), 1);
         assert_eq!(spans[0].entity, Entity::Person);
         assert_eq!((spans[0].start, spans[0].end), (0, 11));
@@ -534,7 +516,7 @@ mod tests {
             tag(Some(Entity::Person), true, 0.9, 0, 5),
             tag(Some(Entity::Person), false, 0.3, 6, 11),
         ];
-        let spans = decode_spans(&tags, |_| Score::from_static(0.7));
+        let spans = decode_spans(&tags, Score::from_static(0.7));
         assert_eq!(spans.len(), 1, "max aggregation must keep this span");
     }
 
@@ -544,7 +526,7 @@ mod tests {
             tag(Some(Entity::Person), true, 0.9, 0, 3),
             tag(Some(Entity::Person), true, 0.9, 4, 7),
         ];
-        let spans = decode_spans(&tags, |_| Score::from_static(0.5));
+        let spans = decode_spans(&tags, Score::from_static(0.5));
         assert_eq!(spans.len(), 2);
     }
 
@@ -555,7 +537,7 @@ mod tests {
             TokenTag::outside(),
             tag(Some(Entity::Location), true, 0.9, 10, 16),
         ];
-        let spans = decode_spans(&tags, |_| Score::from_static(0.5));
+        let spans = decode_spans(&tags, Score::from_static(0.5));
         assert_eq!(spans.len(), 2);
         assert_eq!(spans[0].entity, Entity::Location);
     }
@@ -563,14 +545,14 @@ mod tests {
     #[test]
     fn decode_drops_below_threshold() {
         let tags = [tag(Some(Entity::Person), true, 0.3, 0, 5)];
-        let spans = decode_spans(&tags, |_| Score::from_static(0.5));
+        let spans = decode_spans(&tags, Score::from_static(0.5));
         assert!(spans.is_empty());
     }
 
     #[test]
     fn decode_skips_zero_length_span() {
         let tags = [tag(Some(Entity::Person), true, 0.9, 4, 4)];
-        let spans = decode_spans(&tags, |_| Score::from_static(0.5));
+        let spans = decode_spans(&tags, Score::from_static(0.5));
         assert!(spans.is_empty());
     }
 
@@ -620,30 +602,10 @@ mod tests {
     fn decode_emits_organization_nrp_facility() {
         for entity in [Entity::Organization, Entity::Nrp, Entity::Facility] {
             let tags = [tag(Some(entity), true, 0.9, 0, 5)];
-            let spans = decode_spans(&tags, |_| Score::from_static(0.5));
+            let spans = decode_spans(&tags, Score::from_static(0.5));
             assert_eq!(spans.len(), 1, "{entity} span must decode");
             assert_eq!(spans[0].entity, entity);
         }
-    }
-
-    #[test]
-    fn decode_per_entity_threshold_raises_bar_for_one_entity() {
-        // Both at 0.6: global floor 0.5 keeps both, but a 0.8 ORGANIZATION
-        // override drops the org span while leaving the person span.
-        let tags = [
-            tag(Some(Entity::Organization), true, 0.6, 0, 5),
-            tag(Some(Entity::Person), true, 0.6, 6, 11),
-        ];
-        let resolver = |e: Entity| {
-            if e == Entity::Organization {
-                Score::from_static(0.8)
-            } else {
-                Score::from_static(0.5)
-            }
-        };
-        let spans = decode_spans(&tags, resolver);
-        assert_eq!(spans.len(), 1, "raised org floor must drop the org span");
-        assert_eq!(spans[0].entity, Entity::Person);
     }
 
     #[test]

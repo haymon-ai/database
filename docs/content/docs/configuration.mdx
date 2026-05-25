@@ -96,8 +96,6 @@ Database MCP can rewrite detected PII spans inside query tool output. The featur
 | `--pii-categories` | `PII_CATEGORIES` | *unset (all built-ins)* | Comma-separated category subset for the analyzer registry |
 | `--pii-ner` | `PII_NER_ENABLE` | `false` | Enable the optional ML/NER pass (person, location, organization, NRP & facility detection) |
 | `--pii-ner-model` | `PII_NER_MODEL` | *unset* | Path to the NER model directory (required with `--pii-ner`) |
-| `--pii-ner-threshold` | `PII_NER_THRESHOLD` | `0.5` | Minimum NER span confidence, in `[0.0, 1.0]` |
-| `--pii-ner-entity-threshold` | `PII_NER_ENTITY_THRESHOLDS` | *unset* | Per-entity confidence overrides, e.g. `ORGANIZATION=0.85,FACILITY=0.7` |
 
 ### Operator Values
 
@@ -145,7 +143,6 @@ Behaviour notes:
 
 - **Fail-closed.** If `--pii-ner` is set but the model cannot be loaded, the server refuses to start. If inference fails mid-request, that request errors — it never silently falls back to regex-only.
 - **Category-aware.** The NER pass respects `--pii-categories`: `PERSON`, `ORGANIZATION`, and `NATIONALITY_RELIGION_POLITICS` are emitted only when `personal` is selected; `LOCATION` and `FACILITY` only when `contact` is. With no subset (the default), all apply. When the subset selects neither category, the model is not loaded at all.
-- **Tunable per entity.** `--pii-ner-entity-threshold` / `PII_NER_ENTITY_THRESHOLDS` overrides the global confidence floor for individual entities (e.g. `ORGANIZATION=0.85`) — the recommended lever for curbing the noisier `ORGANIZATION` class without disabling it. An unknown or non-NER entity name fails closed at startup.
 
 > **Default**: redaction is off. Setting `PII_ENABLE=true` (or `--pii true`) is the only way to activate the redactor — `PII_OPERATOR`, `PII_CATEGORIES`, and the `PII_NER_*` flags alone have no effect.
 
