@@ -136,7 +136,8 @@ impl Analyzer {
     }
 }
 
-fn map_category(c: PiiCategory) -> Category {
+/// Maps a config-mirror [`PiiCategory`] to the canonical [`Category`].
+pub(crate) fn map_category(c: PiiCategory) -> Category {
     match c {
         PiiCategory::Personal => Category::Personal,
         PiiCategory::Financial => Category::Financial,

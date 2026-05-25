@@ -16,16 +16,16 @@
 //! `dbmcp::pii` is emitted per [`Redactor::apply`] call when at least
 //! one span was rewritten.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::Entity;
 use crate::result::RecognizerResult;
 use crate::words::push_key_words;
 use crate::{AnalyzeOptions, Analyzer, OperatorConfig, anonymize};
+use crate::{Category, Entity};
 
 /// Errors produced by [`Redactor::apply`].
 #[derive(Debug, thiserror::Error)]
@@ -297,11 +297,10 @@ fn attach_ner(analyzer: &mut Analyzer, cfg: &dbmcp_config::PiiConfig) -> Result<
     if !cfg.ner_enabled {
         return Ok(());
     }
-    // NER respects the category filter: PERSON needs Personal, LOCATION needs
-    // Contact. An unset subset means all categories apply. When neither target
-    // category is selected, skip loading the model entirely.
-    let (allow_person, allow_location) = ner_category_allowance(cfg);
-    if !allow_person && !allow_location {
+    // NER respects the category filter via each entity's category. When the
+    // category subset selects none of the NER entities, skip loading entirely.
+    let allowed = allowed_ner_entities(cfg);
+    if allowed.is_empty() {
         return Ok(());
     }
     let Some(model) = cfg.ner_model.as_ref() else {
@@ -312,24 +311,70 @@ fn attach_ner(analyzer: &mut Analyzer, cfg: &dbmcp_config::PiiConfig) -> Result<
         .ner_threshold
         .and_then(|t| crate::Score::new(t).ok())
         .unwrap_or_else(|| crate::Score::from_static(dbmcp_config::PiiConfig::DEFAULT_NER_THRESHOLD));
+    let entity_thresholds = resolve_entity_thresholds(cfg)?;
     let mut engine =
         crate::ner::NerEngine::load(model, threshold).map_err(|e| RedactorInitError::Ner(e.to_string()))?;
-    engine.set_allowed(allow_person, allow_location);
+    engine.set_allowed(allowed);
+    engine.set_entity_thresholds(entity_thresholds);
     analyzer.attach_ner(std::sync::Arc::new(engine));
     Ok(())
 }
 
-/// Resolves whether PERSON/LOCATION are permitted by the category filter.
-///
-/// An unset category subset means all categories apply.
-fn ner_category_allowance(cfg: &dbmcp_config::PiiConfig) -> (bool, bool) {
-    match cfg.categories.as_ref() {
-        None => (true, true),
-        Some(cats) => (
-            cats.contains(&dbmcp_config::PiiCategory::Personal),
-            cats.contains(&dbmcp_config::PiiCategory::Contact),
-        ),
+/// Category of each NER-emitted entity; `None` for entities NER never emits.
+fn ner_entity_category(entity: Entity) -> Option<Category> {
+    match entity {
+        Entity::Person | Entity::Organization | Entity::Nrp => Some(Category::Personal),
+        Entity::Location | Entity::Facility => Some(Category::Contact),
+        _ => None,
     }
+}
+
+/// Resolves the NER entities permitted by the category filter.
+///
+/// An unset category subset means all NER entities apply.
+fn allowed_ner_entities(cfg: &dbmcp_config::PiiConfig) -> HashSet<Entity> {
+    let selected = cfg.categories.as_ref();
+    crate::ner::NER_ENTITIES
+        .iter()
+        .copied()
+        .filter(|&entity| match selected {
+            None => true,
+            Some(cats) => ner_entity_category(entity)
+                .is_some_and(|c| cats.iter().any(|&pc| crate::analyzer::map_category(pc) == c)),
+        })
+        .collect()
+}
+
+/// Resolves per-entity NER threshold overrides, failing closed on bad names.
+///
+/// # Errors
+///
+/// Returns [`RedactorInitError::Ner`] when an override names an unknown entity,
+/// an entity the NER pass never emits, or a value outside `[0.0, 1.0]`.
+fn resolve_entity_thresholds(
+    cfg: &dbmcp_config::PiiConfig,
+) -> Result<HashMap<Entity, crate::Score>, RedactorInitError> {
+    let mut map = HashMap::new();
+    let Some(overrides) = cfg.ner_entity_thresholds.as_ref() else {
+        return Ok(map);
+    };
+    for (name, value) in overrides {
+        let entity: Entity = name.parse().map_err(|_| {
+            RedactorInitError::Ner(format!("--pii-ner-entity-threshold names an unknown entity: {name}"))
+        })?;
+        if ner_entity_category(entity).is_none() {
+            return Err(RedactorInitError::Ner(format!(
+                "--pii-ner-entity-threshold entity {name} is not produced by the NER pass"
+            )));
+        }
+        let score = crate::Score::new(*value).map_err(|_| {
+            RedactorInitError::Ner(format!(
+                "--pii-ner-entity-threshold for {name} is out of range: {value}"
+            ))
+        })?;
+        map.insert(entity, score);
+    }
+    Ok(map)
 }
 
 /// Merges regex and NER spans for one leaf into a resolved result set.
@@ -881,26 +926,101 @@ mod tests {
     }
 
     #[test]
-    fn ner_allowance_unset_categories_allows_both() {
+    fn ner_allowance_unset_categories_allows_all() {
         let cfg = dbmcp_config::PiiConfig {
             ner_enabled: true,
             ..dbmcp_config::PiiConfig::default()
         };
-        assert_eq!(ner_category_allowance(&cfg), (true, true));
+        let allowed = allowed_ner_entities(&cfg);
+        assert_eq!(allowed.len(), 5, "unset categories must allow every NER entity");
+        for entity in [
+            Entity::Person,
+            Entity::Location,
+            Entity::Organization,
+            Entity::Nrp,
+            Entity::Facility,
+        ] {
+            assert!(allowed.contains(&entity), "{entity} must be allowed");
+        }
     }
 
     #[test]
-    fn ner_allowance_scoped_categories_gate_entities() {
-        let only_personal = dbmcp_config::PiiConfig {
+    fn ner_allowance_personal_only_gates_to_personal_entities() {
+        let cfg = dbmcp_config::PiiConfig {
             categories: Some(vec![dbmcp_config::PiiCategory::Personal]),
             ..dbmcp_config::PiiConfig::default()
         };
-        assert_eq!(ner_category_allowance(&only_personal), (true, false));
+        let allowed = allowed_ner_entities(&cfg);
+        assert!(allowed.contains(&Entity::Person));
+        assert!(allowed.contains(&Entity::Organization));
+        assert!(allowed.contains(&Entity::Nrp));
+        assert!(!allowed.contains(&Entity::Location));
+        assert!(!allowed.contains(&Entity::Facility));
+    }
 
-        let only_financial = dbmcp_config::PiiConfig {
+    #[test]
+    fn ner_allowance_contact_only_gates_to_contact_entities() {
+        let cfg = dbmcp_config::PiiConfig {
+            categories: Some(vec![dbmcp_config::PiiCategory::Contact]),
+            ..dbmcp_config::PiiConfig::default()
+        };
+        let allowed = allowed_ner_entities(&cfg);
+        assert!(allowed.contains(&Entity::Location));
+        assert!(allowed.contains(&Entity::Facility));
+        assert!(!allowed.contains(&Entity::Person));
+        assert!(!allowed.contains(&Entity::Organization));
+        assert!(!allowed.contains(&Entity::Nrp));
+    }
+
+    #[test]
+    fn ner_allowance_unrelated_category_is_empty() {
+        let cfg = dbmcp_config::PiiConfig {
             categories: Some(vec![dbmcp_config::PiiCategory::Financial]),
             ..dbmcp_config::PiiConfig::default()
         };
-        assert_eq!(ner_category_allowance(&only_financial), (false, false));
+        assert!(
+            allowed_ner_entities(&cfg).is_empty(),
+            "a non-NER category must allow no NER entities (model not loaded)"
+        );
+    }
+
+    #[test]
+    fn entity_thresholds_unset_resolve_empty() {
+        let cfg = dbmcp_config::PiiConfig::default();
+        assert!(resolve_entity_thresholds(&cfg).expect("no overrides").is_empty());
+    }
+
+    #[test]
+    fn entity_thresholds_valid_name_resolves() {
+        let cfg = dbmcp_config::PiiConfig {
+            ner_entity_thresholds: Some(vec![("ORGANIZATION".to_owned(), 0.85)]),
+            ..dbmcp_config::PiiConfig::default()
+        };
+        let map = resolve_entity_thresholds(&cfg).expect("valid override resolves");
+        assert!((map[&Entity::Organization].as_f32() - 0.85).abs() < 1e-6);
+    }
+
+    #[test]
+    fn entity_thresholds_unknown_name_fails_closed() {
+        let cfg = dbmcp_config::PiiConfig {
+            ner_entity_thresholds: Some(vec![("NOT_A_THING".to_owned(), 0.5)]),
+            ..dbmcp_config::PiiConfig::default()
+        };
+        assert!(matches!(
+            resolve_entity_thresholds(&cfg),
+            Err(RedactorInitError::Ner(_))
+        ));
+    }
+
+    #[test]
+    fn entity_thresholds_non_ner_entity_fails_closed() {
+        let cfg = dbmcp_config::PiiConfig {
+            ner_entity_thresholds: Some(vec![("EMAIL_ADDRESS".to_owned(), 0.5)]),
+            ..dbmcp_config::PiiConfig::default()
+        };
+        assert!(matches!(
+            resolve_entity_thresholds(&cfg),
+            Err(RedactorInitError::Ner(_))
+        ));
     }
 }

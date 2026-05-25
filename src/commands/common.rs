@@ -199,6 +199,33 @@ pub(crate) struct PiiArguments {
     /// Minimum NER confidence in [0.0, 1.0] (default: 0.5)
     #[arg(long = "pii-ner-threshold", env = "PII_NER_THRESHOLD")]
     pub(crate) ner_threshold: Option<f32>,
+
+    /// Per-entity NER confidence overrides, e.g. ORGANIZATION=0.85,FACILITY=0.7
+    #[arg(
+        long = "pii-ner-entity-threshold",
+        env = "PII_NER_ENTITY_THRESHOLDS",
+        value_delimiter = ',',
+        num_args = 1..,
+        value_parser = parse_entity_threshold,
+    )]
+    pub(crate) ner_entity_thresholds: Option<Vec<(String, f32)>>,
+}
+
+/// Parses one `ENTITY=FLOAT` per-entity NER threshold token.
+///
+/// # Errors
+///
+/// Returns an error string when the token lacks `=` or the value is not a
+/// finite number; clap surfaces it. Range and entity-name validity are
+/// checked later (config and `dbmcp-pii` respectively).
+fn parse_entity_threshold(raw: &str) -> Result<(String, f32), String> {
+    let (name, value) = raw
+        .split_once('=')
+        .ok_or_else(|| format!("expected ENTITY=FLOAT, got '{raw}'"))?;
+    let parsed: f32 = value
+        .parse()
+        .map_err(|_| format!("invalid threshold number in '{raw}'"))?;
+    Ok((name.trim().to_owned(), parsed))
 }
 
 impl TryFrom<&PiiArguments> for PiiConfig {
@@ -212,6 +239,7 @@ impl TryFrom<&PiiArguments> for PiiConfig {
             ner_enabled: args.ner_enabled,
             ner_model: args.ner_model.clone(),
             ner_threshold: args.ner_threshold,
+            ner_entity_thresholds: args.ner_entity_thresholds.clone(),
         };
         candidate.validate()?;
         Ok(candidate)
@@ -327,7 +355,31 @@ mod tests {
             std::env::remove_var("PII_NER_ENABLE");
             std::env::remove_var("PII_NER_MODEL");
             std::env::remove_var("PII_NER_THRESHOLD");
+            std::env::remove_var("PII_NER_ENTITY_THRESHOLDS");
         }
+    }
+
+    #[test]
+    fn clap_pii_ner_entity_threshold_parses_pairs() {
+        clear_pii_env();
+        let cli = TestCli::try_parse_from(["--pii-ner-entity-threshold", "ORGANIZATION=0.85,FACILITY=0.7"])
+            .expect("valid pairs parse");
+        let pairs = cli.pii.ner_entity_thresholds.expect("pairs present");
+        assert_eq!(
+            pairs,
+            vec![("ORGANIZATION".to_owned(), 0.85), ("FACILITY".to_owned(), 0.7)]
+        );
+    }
+
+    #[test]
+    fn clap_pii_ner_entity_threshold_rejects_malformed_token() {
+        clear_pii_env();
+        let err = TestCli::try_parse_from(["--pii-ner-entity-threshold", "ORGANIZATION"])
+            .expect_err("token without '=' must be rejected");
+        assert!(
+            err.to_string().contains("ORGANIZATION"),
+            "error must name the bad token"
+        );
     }
 
     #[test]
