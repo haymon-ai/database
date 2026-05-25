@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use dbmcp_server::pagination::Pager;
-use dbmcp_server::types::ListViewsResponse;
+use dbmcp_server::types::ListEntriesResponse;
 
 use rmcp::model::JsonObject;
 
@@ -19,7 +19,7 @@ pub(crate) struct ListViewsTool;
 
 impl ToolBase for ListViewsTool {
     type Parameter = ListViewsRequest;
-    type Output = ListViewsResponse;
+    type Output = ListEntriesResponse;
     type Error = ErrorData;
 
     fn name() -> Cow<'static, str> {
@@ -65,7 +65,7 @@ impl SqliteHandler {
     pub async fn list_views(
         &self,
         ListViewsRequest { cursor }: ListViewsRequest,
-    ) -> Result<ListViewsResponse, ErrorData> {
+    ) -> Result<ListEntriesResponse, ErrorData> {
         let pager = Pager::new(cursor, self.config.page_size);
         let query = format!(
             r"
@@ -81,6 +81,6 @@ impl SqliteHandler {
         let rows: Vec<String> = self.connection.fetch_scalar(query.as_str(), None).await?;
         let (views, next_cursor) = pager.paginate(rows);
 
-        Ok(ListViewsResponse::brief(views, next_cursor))
+        Ok(ListEntriesResponse::brief(views, next_cursor))
     }
 }

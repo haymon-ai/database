@@ -1,6 +1,5 @@
 ---
 source: tests/approval/postgres.rs
-assertion_line: 82
 expression: tools
 ---
 [
@@ -147,15 +146,15 @@ expression: tools
               "type": "object"
             }
           ],
-          "description": "Two-shape listing payload: bare names in brief mode, name-keyed metadata in detailed mode.\n\nShared by [`ListTablesResponse`] and [`ListTriggersResponse`]. Serialises untagged:\nbrief mode → JSON array of strings, detailed mode → JSON object whose keys are\nentity names and whose values are the per-entity metadata."
+          "description": "Two-shape listing payload: bare names in brief mode, name-keyed metadata in detailed mode.\n\nWrapped by [`ListEntriesResponse`]. Serialises untagged:\nbrief mode → JSON array of strings, detailed mode → JSON object whose keys are\nentity names and whose values are the per-entity metadata."
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "Response for the `listFunctions` tool.",
+      "description": "Response for any listing tool: a page of entries plus an optional cursor.",
       "properties": {
-        "functions": {
+        "entries": {
           "$ref": "#/$defs/ListEntries",
-          "description": "Page of matching functions. Shape depends on the request's `detailed` flag."
+          "description": "Page of matching entries. Shape depends on the request's `detailed` flag."
         },
         "nextCursor": {
           "description": "Opaque cursor pointing to the next page. Absent when this is the final page.",
@@ -166,9 +165,9 @@ expression: tools
         }
       },
       "required": [
-        "functions"
+        "entries"
       ],
-      "title": "ListFunctionsResponse",
+      "title": "ListEntriesResponse",
       "type": "object"
     },
     "annotations": {
@@ -228,15 +227,15 @@ expression: tools
               "type": "object"
             }
           ],
-          "description": "Two-shape listing payload: bare names in brief mode, name-keyed metadata in detailed mode.\n\nShared by [`ListTablesResponse`] and [`ListTriggersResponse`]. Serialises untagged:\nbrief mode → JSON array of strings, detailed mode → JSON object whose keys are\nentity names and whose values are the per-entity metadata."
+          "description": "Two-shape listing payload: bare names in brief mode, name-keyed metadata in detailed mode.\n\nWrapped by [`ListEntriesResponse`]. Serialises untagged:\nbrief mode → JSON array of strings, detailed mode → JSON object whose keys are\nentity names and whose values are the per-entity metadata."
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "Response for the `listMaterializedViews` tool.",
+      "description": "Response for any listing tool: a page of entries plus an optional cursor.",
       "properties": {
-        "materializedViews": {
+        "entries": {
           "$ref": "#/$defs/ListEntries",
-          "description": "Page of matching materialized views. Shape depends on the request's `detailed` flag."
+          "description": "Page of matching entries. Shape depends on the request's `detailed` flag."
         },
         "nextCursor": {
           "description": "Opaque cursor pointing to the next page. Absent when this is the final page.",
@@ -247,9 +246,9 @@ expression: tools
         }
       },
       "required": [
-        "materializedViews"
+        "entries"
       ],
-      "title": "ListMaterializedViewsResponse",
+      "title": "ListEntriesResponse",
       "type": "object"
     },
     "annotations": {
@@ -309,28 +308,28 @@ expression: tools
               "type": "object"
             }
           ],
-          "description": "Two-shape listing payload: bare names in brief mode, name-keyed metadata in detailed mode.\n\nShared by [`ListTablesResponse`] and [`ListTriggersResponse`]. Serialises untagged:\nbrief mode → JSON array of strings, detailed mode → JSON object whose keys are\nentity names and whose values are the per-entity metadata."
+          "description": "Two-shape listing payload: bare names in brief mode, name-keyed metadata in detailed mode.\n\nWrapped by [`ListEntriesResponse`]. Serialises untagged:\nbrief mode → JSON array of strings, detailed mode → JSON object whose keys are\nentity names and whose values are the per-entity metadata."
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "Response for the `listProcedures` tool.",
+      "description": "Response for any listing tool: a page of entries plus an optional cursor.",
       "properties": {
+        "entries": {
+          "$ref": "#/$defs/ListEntries",
+          "description": "Page of matching entries. Shape depends on the request's `detailed` flag."
+        },
         "nextCursor": {
           "description": "Opaque cursor pointing to the next page. Absent when this is the final page.",
           "type": [
             "string",
             "null"
           ]
-        },
-        "procedures": {
-          "$ref": "#/$defs/ListEntries",
-          "description": "Page of matching procedures. Shape depends on the request's `detailed` flag."
         }
       },
       "required": [
-        "procedures"
+        "entries"
       ],
-      "title": "ListProceduresResponse",
+      "title": "ListEntriesResponse",
       "type": "object"
     },
     "annotations": {
@@ -390,28 +389,28 @@ expression: tools
               "type": "object"
             }
           ],
-          "description": "Two-shape listing payload: bare names in brief mode, name-keyed metadata in detailed mode.\n\nShared by [`ListTablesResponse`] and [`ListTriggersResponse`]. Serialises untagged:\nbrief mode → JSON array of strings, detailed mode → JSON object whose keys are\nentity names and whose values are the per-entity metadata."
+          "description": "Two-shape listing payload: bare names in brief mode, name-keyed metadata in detailed mode.\n\nWrapped by [`ListEntriesResponse`]. Serialises untagged:\nbrief mode → JSON array of strings, detailed mode → JSON object whose keys are\nentity names and whose values are the per-entity metadata."
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "Response for the `listTables` tool.",
+      "description": "Response for any listing tool: a page of entries plus an optional cursor.",
       "properties": {
+        "entries": {
+          "$ref": "#/$defs/ListEntries",
+          "description": "Page of matching entries. Shape depends on the request's `detailed` flag."
+        },
         "nextCursor": {
           "description": "Opaque cursor pointing to the next page. Absent when this is the final page.",
           "type": [
             "string",
             "null"
           ]
-        },
-        "tables": {
-          "$ref": "#/$defs/ListEntries",
-          "description": "Page of matching tables. Shape depends on the request's `detailed` flag."
         }
       },
       "required": [
-        "tables"
+        "entries"
       ],
-      "title": "ListTablesResponse",
+      "title": "ListEntriesResponse",
       "type": "object"
     },
     "annotations": {
@@ -471,28 +470,28 @@ expression: tools
               "type": "object"
             }
           ],
-          "description": "Two-shape listing payload: bare names in brief mode, name-keyed metadata in detailed mode.\n\nShared by [`ListTablesResponse`] and [`ListTriggersResponse`]. Serialises untagged:\nbrief mode → JSON array of strings, detailed mode → JSON object whose keys are\nentity names and whose values are the per-entity metadata."
+          "description": "Two-shape listing payload: bare names in brief mode, name-keyed metadata in detailed mode.\n\nWrapped by [`ListEntriesResponse`]. Serialises untagged:\nbrief mode → JSON array of strings, detailed mode → JSON object whose keys are\nentity names and whose values are the per-entity metadata."
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "Response for the `listTriggers` tool.",
+      "description": "Response for any listing tool: a page of entries plus an optional cursor.",
       "properties": {
+        "entries": {
+          "$ref": "#/$defs/ListEntries",
+          "description": "Page of matching entries. Shape depends on the request's `detailed` flag."
+        },
         "nextCursor": {
           "description": "Opaque cursor pointing to the next page. Absent when this is the final page.",
           "type": [
             "string",
             "null"
           ]
-        },
-        "triggers": {
-          "$ref": "#/$defs/ListEntries",
-          "description": "Page of matching triggers. Shape depends on the request's `detailed` flag."
         }
       },
       "required": [
-        "triggers"
+        "entries"
       ],
-      "title": "ListTriggersResponse",
+      "title": "ListEntriesResponse",
       "type": "object"
     },
     "annotations": {
@@ -552,28 +551,28 @@ expression: tools
               "type": "object"
             }
           ],
-          "description": "Two-shape listing payload: bare names in brief mode, name-keyed metadata in detailed mode.\n\nShared by [`ListTablesResponse`] and [`ListTriggersResponse`]. Serialises untagged:\nbrief mode → JSON array of strings, detailed mode → JSON object whose keys are\nentity names and whose values are the per-entity metadata."
+          "description": "Two-shape listing payload: bare names in brief mode, name-keyed metadata in detailed mode.\n\nWrapped by [`ListEntriesResponse`]. Serialises untagged:\nbrief mode → JSON array of strings, detailed mode → JSON object whose keys are\nentity names and whose values are the per-entity metadata."
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "Response for the `listViews` tool.",
+      "description": "Response for any listing tool: a page of entries plus an optional cursor.",
       "properties": {
+        "entries": {
+          "$ref": "#/$defs/ListEntries",
+          "description": "Page of matching entries. Shape depends on the request's `detailed` flag."
+        },
         "nextCursor": {
           "description": "Opaque cursor pointing to the next page. Absent when this is the final page.",
           "type": [
             "string",
             "null"
           ]
-        },
-        "views": {
-          "$ref": "#/$defs/ListEntries",
-          "description": "Page of matching views. Shape depends on the request's `detailed` flag."
         }
       },
       "required": [
-        "views"
+        "entries"
       ],
-      "title": "ListViewsResponse",
+      "title": "ListEntriesResponse",
       "type": "object"
     },
     "annotations": {
