@@ -10,7 +10,6 @@
 //! aggregation, scoring, label mapping); the engine wiring lives alongside.
 
 use std::borrow::Cow;
-use std::collections::HashSet;
 use std::path::Path;
 
 use candle_core::{Device, Tensor};
@@ -273,7 +272,7 @@ pub struct NerEngine {
     tokenizer: Tokenizer,
     id2label: Vec<String>,
     threshold: Score,
-    allowed: HashSet<Entity>,
+    allowed: Vec<Entity>,
 }
 
 impl std::fmt::Debug for NerEngine {
@@ -293,7 +292,7 @@ impl NerEngine {
     /// # Errors
     ///
     /// Returns [`NerError::Load`] when any artifact is missing or unreadable,
-    /// `config.json` lacks a usable `id2label` exposing a person/location
+    /// `config.json` lacks a usable `id2label` exposing a supported NER
     /// label, or the weights fail to load.
     pub fn load(model_dir: &Path, threshold: Score) -> Result<Self, NerError> {
         let device = Device::Cpu;
@@ -333,7 +332,7 @@ impl NerEngine {
             tokenizer,
             id2label,
             threshold,
-            allowed: NER_ENTITIES.iter().copied().collect(),
+            allowed: NER_ENTITIES.to_vec(),
         })
     }
 
@@ -349,10 +348,7 @@ impl NerEngine {
     ///
     /// Non-entity tags (`None`) are never filtered here.
     fn entity_allowed(&self, entity: Option<Entity>) -> bool {
-        match entity {
-            Some(e) => self.allowed.contains(&e),
-            None => true,
-        }
+        entity.is_none_or(|e| self.allowed.contains(&e))
     }
 
     /// Runs NER over one text, returning its spans as [`RecognizerResult`]s.

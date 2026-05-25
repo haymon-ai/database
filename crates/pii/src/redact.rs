@@ -16,16 +16,17 @@
 //! `dbmcp::pii` is emitted per [`Redactor::apply`] call when at least
 //! one span was rewritten.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 
+use dbmcp_config::PiiCategory;
 use serde_json::Value;
 
+use crate::Entity;
 use crate::result::RecognizerResult;
 use crate::words::push_key_words;
 use crate::{AnalyzeOptions, Analyzer, OperatorConfig, anonymize};
-use crate::{Category, Entity};
 
 /// Errors produced by [`Redactor::apply`].
 #[derive(Debug, thiserror::Error)]
@@ -315,11 +316,11 @@ fn attach_ner(analyzer: &mut Analyzer, cfg: &dbmcp_config::PiiConfig) -> Result<
     Ok(())
 }
 
-/// Category of each NER-emitted entity; `None` for entities NER never emits.
-fn ner_entity_category(entity: Entity) -> Option<Category> {
+/// Category each NER-emitted entity belongs to; `None` for ones NER never emits.
+fn ner_entity_category(entity: Entity) -> Option<PiiCategory> {
     match entity {
-        Entity::Person | Entity::Organization | Entity::Nrp => Some(Category::Personal),
-        Entity::Location | Entity::Facility => Some(Category::Contact),
+        Entity::Person | Entity::Organization | Entity::Nrp => Some(PiiCategory::Personal),
+        Entity::Location | Entity::Facility => Some(PiiCategory::Contact),
         _ => None,
     }
 }
@@ -327,15 +328,14 @@ fn ner_entity_category(entity: Entity) -> Option<Category> {
 /// Resolves the NER entities permitted by the category filter.
 ///
 /// An unset category subset means all NER entities apply.
-fn allowed_ner_entities(cfg: &dbmcp_config::PiiConfig) -> HashSet<Entity> {
+fn allowed_ner_entities(cfg: &dbmcp_config::PiiConfig) -> Vec<Entity> {
     let selected = cfg.categories.as_ref();
     crate::ner::NER_ENTITIES
         .iter()
         .copied()
         .filter(|&entity| match selected {
             None => true,
-            Some(cats) => ner_entity_category(entity)
-                .is_some_and(|c| cats.iter().any(|&pc| crate::analyzer::map_category(pc) == c)),
+            Some(cats) => ner_entity_category(entity).is_some_and(|c| cats.contains(&c)),
         })
         .collect()
 }
