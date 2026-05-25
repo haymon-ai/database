@@ -78,6 +78,16 @@ enum Frame<'a> {
     Pop(usize),
 }
 
+/// One string leaf deferred to the batched NER pass.
+///
+/// Holds a write-back handle to the leaf, an owned copy of its text (the batch
+/// input, kept independent of `slot`), and the already-computed regex spans.
+struct LeafSlot<'a> {
+    slot: &'a mut String,
+    text: String,
+    regex: Vec<RecognizerResult>,
+}
+
 /// Redacts PII from query tool response rows.
 ///
 /// Holds an [`Arc<Analyzer>`] so handlers stay cheap to clone.
@@ -181,6 +191,12 @@ impl Redactor {
         let mut stats = RedactionStats::default();
         let mut infer_err: Option<String> = None;
         let result = catch_unwind(AssertUnwindSafe(|| {
+            // When NER is attached, defer inference: collect every leaf during the
+            // walk and run one batched forward pass afterwards, instead of one pass
+            // per leaf. Without NER, anonymize inline (regex-only, no leaf clones).
+            let ner_engine = self.analyzer.ner_engine();
+            let mut slots: Vec<LeafSlot<'_>> = Vec::new();
+
             // Shared key-path stack. Each `Frame::KeyedChild` carries the tokens
             // to push when entered; a `Frame::Pop` queued before its children
             // restores the path after the subtree is done. This keeps path
@@ -206,28 +222,15 @@ impl Redactor {
                 match v {
                     Value::String(s) => {
                         stats.string_leaves_scanned += 1;
-                        let mut results = self.analyzer.analyze_with_context(s, &path, &self.opts);
-                        if let Some(engine) = self.analyzer.ner_engine() {
-                            match engine.analyze(s) {
-                                Ok(ner) => results = merge_spans(results, ner, self.opts.min_score),
-                                Err(e) => {
-                                    infer_err = Some(e.to_string());
-                                    return;
-                                }
-                            }
+                        let regex = self.analyzer.analyze_with_context(s, &path, &self.opts);
+                        if ner_engine.is_some() {
+                            // Clone the leaf as batch input; keep `s` as the
+                            // write-back handle for the merge pass below.
+                            let text = s.clone();
+                            slots.push(LeafSlot { slot: s, text, regex });
+                        } else if !regex.is_empty() {
+                            apply_spans(s, regex, &self.operator, &mut stats);
                         }
-                        if results.is_empty() {
-                            continue;
-                        }
-                        let anon = anonymize(s, results, &self.operator);
-                        if anon.operations.is_empty() {
-                            continue;
-                        }
-                        for op in &anon.operations {
-                            stats.total += 1;
-                            *stats.by_entity.entry(op.entity_type).or_insert(0) += 1;
-                        }
-                        *s = anon.text;
                     }
                     Value::Object(map) => {
                         for (key, child) in map.iter_mut() {
@@ -242,6 +245,28 @@ impl Redactor {
                         }
                     }
                     Value::Number(_) | Value::Bool(_) | Value::Null => {}
+                }
+            }
+
+            // Batched NER pass: one forward pass over every collected leaf, then
+            // merge each leaf's regex + NER spans and rewrite it in place. On
+            // failure, record the error and rewrite nothing — `apply` fails closed
+            // and the caller discards the rows, so partial state never leaks.
+            if let Some(engine) = ner_engine
+                && !slots.is_empty()
+            {
+                let texts: Vec<&str> = slots.iter().map(|l| l.text.as_str()).collect();
+                match engine.analyze_batch(&texts) {
+                    Ok(per_leaf) => {
+                        for (leaf, ner) in slots.into_iter().zip(per_leaf) {
+                            let results = merge_spans(leaf.regex, ner, self.opts.min_score);
+                            if results.is_empty() {
+                                continue;
+                            }
+                            apply_spans(leaf.slot, results, &self.operator, &mut stats);
+                        }
+                    }
+                    Err(e) => infer_err = Some(e.to_string()),
                 }
             }
         }));
@@ -275,6 +300,29 @@ impl Redactor {
         } else {
             self.apply(&mut rows)?;
             Ok(rows)
+        }
+    }
+}
+
+/// Redaction over the `Option<Redactor>` field every query handler holds.
+///
+/// Centralizes the "redact when enabled, pass through when not" branch so
+/// each query tool calls one method instead of matching on the option.
+#[allow(async_fn_in_trait)]
+pub trait MaybeRedact {
+    /// Redacts `rows` when a redactor is present, else returns them unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`RedactionError`] from [`Redactor::redact_rows`].
+    async fn redact_rows(&self, rows: Vec<Value>) -> Result<Vec<Value>, RedactionError>;
+}
+
+impl MaybeRedact for Option<Redactor> {
+    async fn redact_rows(&self, rows: Vec<Value>) -> Result<Vec<Value>, RedactionError> {
+        match self {
+            Some(r) => r.redact_rows(rows).await,
+            None => Ok(rows),
         }
     }
 }
@@ -338,6 +386,22 @@ fn allowed_ner_entities(cfg: &dbmcp_config::PiiConfig) -> Vec<Entity> {
             Some(cats) => ner_entity_category(entity).is_some_and(|c| cats.contains(&c)),
         })
         .collect()
+}
+
+/// Anonymizes one leaf string in place, folding its operations into `stats`.
+///
+/// No-op when the resolved spans produce no operations. Shared by the inline
+/// regex-only path and the batched NER merge pass.
+fn apply_spans(s: &mut String, results: Vec<RecognizerResult>, operator: &OperatorConfig, stats: &mut RedactionStats) {
+    let anon = anonymize(s, results, operator);
+    if anon.operations.is_empty() {
+        return;
+    }
+    for op in &anon.operations {
+        stats.total += 1;
+        *stats.by_entity.entry(op.entity_type).or_insert(0) += 1;
+    }
+    *s = anon.text;
 }
 
 /// Merges regex and NER spans for one leaf into a resolved result set.
@@ -945,5 +1009,20 @@ mod tests {
             allowed_ner_entities(&cfg).is_empty(),
             "a non-NER category must allow no NER entities (model not loaded)"
         );
+    }
+
+    #[tokio::test]
+    async fn maybe_redact_none_passes_rows_through_unchanged() {
+        let redactor: Option<Redactor> = None;
+        let rows = vec![email_row()];
+        let out = redactor.redact_rows(rows.clone()).await.expect("none passes through");
+        assert_eq!(out, rows);
+    }
+
+    #[tokio::test]
+    async fn maybe_redact_some_redacts_like_the_inner_redactor() {
+        let redactor = Some(Redactor::with_defaults());
+        let out = redactor.redact_rows(vec![email_row()]).await.expect("some redacts");
+        assert_eq!(out[0]["msg"], "ping me at <EMAIL_ADDRESS>");
     }
 }
