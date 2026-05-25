@@ -6,10 +6,46 @@
 
 use crate::SqlError;
 use serde_json::Value;
-use sqlx::{Decode, Execute, Executor, FromRow, Row, Type};
+use sqlx::{AssertSqlSafe, Decode, Execute, Executor, FromRow, Row, SqlSafeStr, SqlStr, Type};
 use sqlx_json::{QueryResult as _, RowExt};
 
 use crate::timeout::execute_with_timeout;
+
+/// Splits a query into its SQL text and bound arguments for safe execution.
+///
+/// Lets [`Connection`] query methods accept either a bindless `&str` — wrapped
+/// as [`sqlx::AssertSqlSafe`] and run through the unprepared text protocol — or a
+/// parameterized `sqlx::query(..).bind(..)` value, without callers writing the
+/// wrapper at every call site. Callers remain responsible for ensuring bindless
+/// strings carry no injection (via read-only validation and identifier quoting).
+///
+/// The returned [`SqlStr`] owns its text, so no input borrow escapes; a `None`
+/// argument set routes through the unprepared text protocol, `Some` through a
+/// prepared statement.
+pub trait IntoSafeQuery<DB: sqlx::Database> {
+    /// Returns the SQL text and the bound arguments, if any.
+    ///
+    /// # Errors
+    ///
+    /// [`SqlError::Query`] — extracting bound arguments failed.
+    fn into_sql_and_args(self) -> Result<(SqlStr, Option<DB::Arguments>), SqlError>;
+}
+
+impl<DB: sqlx::Database> IntoSafeQuery<DB> for &str {
+    fn into_sql_and_args(self) -> Result<(SqlStr, Option<DB::Arguments>), SqlError> {
+        Ok((AssertSqlSafe(self).into_sql_str(), None))
+    }
+}
+
+impl<DB: sqlx::Database, A> IntoSafeQuery<DB> for sqlx::query::Query<'_, DB, A>
+where
+    A: Send + sqlx::IntoArguments<DB>,
+{
+    fn into_sql_and_args(mut self) -> Result<(SqlStr, Option<DB::Arguments>), SqlError> {
+        let arguments = self.take_arguments().map_err(|e| SqlError::Query(e.to_string()))?;
+        Ok((self.sql(), arguments))
+    }
+}
 
 /// Unified query surface every backend tool handler uses.
 ///
@@ -17,10 +53,10 @@ use crate::timeout::execute_with_timeout;
 /// [`pool`](Connection::pool), and [`query_timeout`](Connection::query_timeout)
 /// — and receive default implementations for query execution.
 ///
-/// Query methods accept any [`sqlx::Execute`] value: a plain `&str` for
-/// bindless statements (which routes through sqlx's unprepared text
-/// protocol, required for statements like `MySQL` `USE`), or an
-/// `sqlx::query(sql).bind(...)` value for parameterized statements.
+/// Query methods accept any [`IntoSafeQuery`] value: a bindless `&str` (run
+/// through the unprepared text protocol, required for statements like `MySQL`
+/// `USE`) or a parameterized `sqlx::query(sql).bind(...)` value (run as a
+/// prepared statement).
 ///
 /// # Errors
 ///
@@ -36,6 +72,7 @@ where
     usize: sqlx::ColumnIndex<<Self::DB as sqlx::Database>::Row>,
     <Self::DB as sqlx::Database>::Row: RowExt,
     <Self::DB as sqlx::Database>::QueryResult: sqlx_json::QueryResult,
+    <Self::DB as sqlx::Database>::Arguments: sqlx::IntoArguments<Self::DB>,
 {
     /// The sqlx database driver type (e.g. `sqlx::MySql`).
     type DB: sqlx::Database;
@@ -55,14 +92,19 @@ where
     /// # Errors
     ///
     /// See trait-level documentation.
-    async fn execute<'q, E>(&self, query: E, database: Option<&str>) -> Result<u64, SqlError>
+    async fn execute<Q>(&self, query: Q, database: Option<&str>) -> Result<u64, SqlError>
     where
-        E: 'q + Execute<'q, Self::DB>,
+        Q: IntoSafeQuery<Self::DB>,
     {
-        let sql = query.sql().to_owned();
+        let (sql, arguments) = query.into_sql_and_args()?;
+        let sql_log = sql.as_str().to_owned();
         let pool = self.pool(database).await?;
-        execute_with_timeout(self.query_timeout(), &sql, async move {
-            Ok(pool.execute(query).await?.rows_affected())
+        execute_with_timeout(self.query_timeout(), &sql_log, async move {
+            let result = match arguments {
+                None => pool.execute(sql).await?,
+                Some(args) => pool.execute(sqlx::query_with(sql, args)).await?,
+            };
+            Ok(result.rows_affected())
         })
         .await
     }
@@ -72,14 +114,19 @@ where
     /// # Errors
     ///
     /// See trait-level documentation.
-    async fn fetch_json<'q, E>(&self, query: E, database: Option<&str>) -> Result<Vec<Value>, SqlError>
+    async fn fetch_json<Q>(&self, query: Q, database: Option<&str>) -> Result<Vec<Value>, SqlError>
     where
-        E: 'q + Execute<'q, Self::DB>,
+        Q: IntoSafeQuery<Self::DB>,
     {
-        let sql = query.sql().to_owned();
+        let (sql, arguments) = query.into_sql_and_args()?;
+        let sql_log = sql.as_str().to_owned();
         let pool = self.pool(database).await?;
-        execute_with_timeout(self.query_timeout(), &sql, async move {
-            Ok(pool.fetch_all(query).await?.iter().map(RowExt::to_json).collect())
+        execute_with_timeout(self.query_timeout(), &sql_log, async move {
+            let rows = match arguments {
+                None => pool.fetch_all(sql).await?,
+                Some(args) => pool.fetch_all(sqlx::query_with(sql, args)).await?,
+            };
+            Ok(rows.iter().map(RowExt::to_json).collect())
         })
         .await
     }
@@ -92,15 +139,20 @@ where
     /// # Errors
     ///
     /// See trait-level documentation.
-    async fn fetch_optional<'q, E, T>(&self, query: E, database: Option<&str>) -> Result<Option<T>, SqlError>
+    async fn fetch_optional<Q, T>(&self, query: Q, database: Option<&str>) -> Result<Option<T>, SqlError>
     where
-        E: 'q + Execute<'q, Self::DB>,
+        Q: IntoSafeQuery<Self::DB>,
         T: for<'r> Decode<'r, Self::DB> + Type<Self::DB> + Send + Unpin,
     {
-        let sql = query.sql().to_owned();
+        let (sql, arguments) = query.into_sql_and_args()?;
+        let sql_log = sql.as_str().to_owned();
         let pool = self.pool(database).await?;
-        execute_with_timeout(self.query_timeout(), &sql, async move {
-            Ok(pool.fetch_optional(query).await?.and_then(|r| r.try_get(0usize).ok()))
+        execute_with_timeout(self.query_timeout(), &sql_log, async move {
+            let row = match arguments {
+                None => pool.fetch_optional(sql).await?,
+                Some(args) => pool.fetch_optional(sqlx::query_with(sql, args)).await?,
+            };
+            Ok(row.and_then(|r| r.try_get(0usize).ok()))
         })
         .await
     }
@@ -110,15 +162,19 @@ where
     /// # Errors
     ///
     /// See trait-level documentation.
-    async fn fetch_scalar<'q, E, T>(&self, query: E, database: Option<&str>) -> Result<Vec<T>, SqlError>
+    async fn fetch_scalar<Q, T>(&self, query: Q, database: Option<&str>) -> Result<Vec<T>, SqlError>
     where
-        E: 'q + Execute<'q, Self::DB>,
+        Q: IntoSafeQuery<Self::DB>,
         T: for<'r> Decode<'r, Self::DB> + Type<Self::DB> + Send + Unpin,
     {
-        let sql = query.sql().to_owned();
+        let (sql, arguments) = query.into_sql_and_args()?;
+        let sql_log = sql.as_str().to_owned();
         let pool = self.pool(database).await?;
-        execute_with_timeout(self.query_timeout(), &sql, async move {
-            let rows = pool.fetch_all(query).await?;
+        execute_with_timeout(self.query_timeout(), &sql_log, async move {
+            let rows = match arguments {
+                None => pool.fetch_all(sql).await?,
+                Some(args) => pool.fetch_all(sqlx::query_with(sql, args)).await?,
+            };
             rows.iter().map(|r| r.try_get(0usize)).collect()
         })
         .await
@@ -131,15 +187,19 @@ where
     /// See trait-level documentation. Row decode failures (column type
     /// mismatch, malformed JSON inside a [`sqlx::types::Json`] column, etc.)
     /// surface as [`SqlError::Query`].
-    async fn fetch<'q, E, T>(&self, query: E, database: Option<&str>) -> Result<Vec<T>, SqlError>
+    async fn fetch<Q, T>(&self, query: Q, database: Option<&str>) -> Result<Vec<T>, SqlError>
     where
-        E: 'q + Execute<'q, Self::DB>,
+        Q: IntoSafeQuery<Self::DB>,
         T: for<'r> FromRow<'r, <Self::DB as sqlx::Database>::Row> + Send + Unpin,
     {
-        let sql = query.sql().to_owned();
+        let (sql, arguments) = query.into_sql_and_args()?;
+        let sql_log = sql.as_str().to_owned();
         let pool = self.pool(database).await?;
-        execute_with_timeout(self.query_timeout(), &sql, async move {
-            let rows = pool.fetch_all(query).await?;
+        execute_with_timeout(self.query_timeout(), &sql_log, async move {
+            let rows = match arguments {
+                None => pool.fetch_all(sql).await?,
+                Some(args) => pool.fetch_all(sqlx::query_with(sql, args)).await?,
+            };
             rows.iter().map(T::from_row).collect()
         })
         .await
