@@ -45,31 +45,26 @@ pub enum NerError {
     Inference(String),
 }
 
+#[derive(serde::Deserialize)]
+struct HfLabelConfig {
+    id2label: std::collections::BTreeMap<usize, String>,
+}
+
 /// Parses a Hugging Face `config.json` `id2label` object into an indexed list.
 ///
 /// # Errors
 ///
-/// Returns [`NerError::Load`] when the field is absent, has a non-numeric key,
-/// a non-string value, or an index outside the map's length.
+/// Returns [`NerError::Load`] when the field is absent, a key is non-numeric, a
+/// value is not a string, or the indices are not the contiguous range `0..len`.
 fn parse_id2label(raw: &str) -> Result<Vec<String>, NerError> {
-    let cfg: serde_json::Value =
+    let cfg: HfLabelConfig =
         serde_json::from_str(raw).map_err(|e| NerError::Load(format!("config.json parse: {e}")))?;
-    let map = cfg
-        .get("id2label")
-        .and_then(serde_json::Value::as_object)
-        .ok_or_else(|| NerError::Load("config.json missing id2label object".to_owned()))?;
-    let mut labels = vec![String::new(); map.len()];
-    for (key, value) in map {
-        let idx: usize = key
-            .parse()
-            .map_err(|_| NerError::Load(format!("non-numeric id2label key: {key}")))?;
-        let label = value
-            .as_str()
-            .ok_or_else(|| NerError::Load(format!("id2label[{key}] is not a string")))?;
-        let slot = labels
-            .get_mut(idx)
-            .ok_or_else(|| NerError::Load(format!("id2label index {idx} out of range")))?;
-        label.clone_into(slot);
+    let mut labels = Vec::with_capacity(cfg.id2label.len());
+    for (expected, (idx, label)) in cfg.id2label.into_iter().enumerate() {
+        if idx != expected {
+            return Err(NerError::Load(format!("id2label index {idx} out of range")));
+        }
+        labels.push(label);
     }
     Ok(labels)
 }
