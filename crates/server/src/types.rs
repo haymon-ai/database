@@ -127,6 +127,35 @@ pub struct DropDatabaseRequest {
     pub database: String,
 }
 
+/// Request for the `listTables` tool.
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[schemars(rename = "ListTablesRequest")]
+pub struct PinnedListTablesRequest {
+    /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
+    #[serde(default)]
+    pub cursor: Option<Cursor>,
+    /// Optional case-insensitive filter on table names. The input is used within a `LIKE`
+    /// clause: `%` matches any sequence of characters and `_` matches any single character.
+    #[serde(default)]
+    pub search: Option<String>,
+    /// When `true`, each returned entry is a full metadata object (columns, constraints,
+    /// indexes, triggers, plus backend-specific fields); when `false` or omitted, each
+    /// entry is the bare table-name string.
+    #[serde(default)]
+    pub detailed: bool,
+}
+
+/// Request for the `listTables` tool.
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[schemars(rename = "ListTablesRequest")]
+pub struct UnpinnedListTablesRequest {
+    #[serde(flatten)]
+    pub inner: PinnedListTablesRequest,
+    /// Database to list tables from. Defaults to the active database.
+    #[serde(default)]
+    pub database: Option<String>,
+}
+
 /// Request for the `listViews` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[schemars(rename = "ListViewsRequest")]
@@ -134,6 +163,15 @@ pub struct PinnedListViewsRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
+    /// Optional case-insensitive filter on view names. The input is used within a `LIKE`
+    /// clause: `%` matches any sequence of characters and `_` matches any single character.
+    #[serde(default)]
+    pub search: Option<String>,
+    /// When `true`, each returned entry is a full metadata object (definition, plus
+    /// backend-specific fields); when `false` or omitted, each entry is the bare
+    /// view-name string.
+    #[serde(default)]
+    pub detailed: bool,
 }
 
 /// Request for the `listViews` tool.
@@ -183,6 +221,15 @@ pub struct PinnedListFunctionsRequest {
     /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
     #[serde(default)]
     pub cursor: Option<Cursor>,
+    /// Optional case-insensitive filter on function names. The input is used within a `LIKE`
+    /// clause: `%` matches any sequence of characters and `_` matches any single character.
+    #[serde(default)]
+    pub search: Option<String>,
+    /// When `true`, each returned entry is a full metadata object (language, arguments,
+    /// returnType, definition, plus backend-specific fields); when `false` or omitted,
+    /// each entry is the bare function-name string.
+    #[serde(default)]
+    pub detailed: bool,
 }
 
 /// Request for the `listFunctions` tool.
@@ -192,6 +239,35 @@ pub struct UnpinnedListFunctionsRequest {
     #[serde(flatten)]
     pub inner: PinnedListFunctionsRequest,
     /// Database to list functions from. Defaults to the active database.
+    #[serde(default)]
+    pub database: Option<String>,
+}
+
+/// Request for the `listProcedures` tool.
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[schemars(rename = "ListProceduresRequest")]
+pub struct PinnedListProceduresRequest {
+    /// Opaque cursor from a prior response's `nextCursor`; omit for the first page.
+    #[serde(default)]
+    pub cursor: Option<Cursor>,
+    /// Optional case-insensitive filter on procedure names. The input is used within a `LIKE`
+    /// clause: `%` matches any sequence of characters and `_` matches any single character.
+    #[serde(default)]
+    pub search: Option<String>,
+    /// When `true`, each returned entry is a full metadata object (language, arguments,
+    /// definition, plus backend-specific fields); when `false` or omitted, each entry is
+    /// the bare procedure-name string.
+    #[serde(default)]
+    pub detailed: bool,
+}
+
+/// Request for the `listProcedures` tool.
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[schemars(rename = "ListProceduresRequest")]
+pub struct UnpinnedListProceduresRequest {
+    #[serde(flatten)]
+    pub inner: PinnedListProceduresRequest,
+    /// Database to list procedures from. Defaults to the active database.
     #[serde(default)]
     pub database: Option<String>,
 }
@@ -280,7 +356,12 @@ pub struct UnpinnedExplainQueryRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::{IndexMap, ListEntries, ListEntriesResponse, PinnedListTriggersRequest, UnpinnedListTriggersRequest};
+    use super::{
+        IndexMap, ListEntries, ListEntriesResponse, PinnedListFunctionsRequest, PinnedListProceduresRequest,
+        PinnedListTablesRequest, PinnedListTriggersRequest, PinnedListViewsRequest, UnpinnedListFunctionsRequest,
+        UnpinnedListProceduresRequest, UnpinnedListTablesRequest, UnpinnedListTriggersRequest,
+        UnpinnedListViewsRequest,
+    };
     use serde_json::{Value, json};
 
     #[test]
@@ -304,6 +385,70 @@ mod tests {
             serde_json::from_str(r#"{"database": "mydb", "search": "audit", "detailed": true}"#).expect("parse");
         assert_eq!(req.database.as_deref(), Some("mydb"));
         assert_eq!(req.inner.search.as_deref(), Some("audit"));
+        assert!(req.inner.detailed);
+    }
+
+    #[test]
+    fn list_tables_request_defaults_to_brief_mode_without_search() {
+        let req: PinnedListTablesRequest = serde_json::from_str("{}").expect("empty object should parse");
+        assert!(req.search.is_none());
+        assert!(!req.detailed, "detailed must default to false");
+    }
+
+    #[test]
+    fn unpinned_list_tables_request_accepts_database_and_inner_fields() {
+        let req: UnpinnedListTablesRequest =
+            serde_json::from_str(r#"{"database": "mydb", "search": "order", "detailed": true}"#).expect("parse");
+        assert_eq!(req.database.as_deref(), Some("mydb"));
+        assert_eq!(req.inner.search.as_deref(), Some("order"));
+        assert!(req.inner.detailed);
+    }
+
+    #[test]
+    fn list_views_request_defaults_to_brief_mode_without_search() {
+        let req: PinnedListViewsRequest = serde_json::from_str("{}").expect("empty object should parse");
+        assert!(req.search.is_none());
+        assert!(!req.detailed, "detailed must default to false");
+    }
+
+    #[test]
+    fn unpinned_list_views_request_accepts_database_and_inner_fields() {
+        let req: UnpinnedListViewsRequest =
+            serde_json::from_str(r#"{"database": "mydb", "search": "active", "detailed": true}"#).expect("parse");
+        assert_eq!(req.database.as_deref(), Some("mydb"));
+        assert_eq!(req.inner.search.as_deref(), Some("active"));
+        assert!(req.inner.detailed);
+    }
+
+    #[test]
+    fn list_functions_request_defaults_to_brief_mode_without_search() {
+        let req: PinnedListFunctionsRequest = serde_json::from_str("{}").expect("empty object should parse");
+        assert!(req.search.is_none());
+        assert!(!req.detailed, "detailed must default to false");
+    }
+
+    #[test]
+    fn unpinned_list_functions_request_accepts_database_and_inner_fields() {
+        let req: UnpinnedListFunctionsRequest =
+            serde_json::from_str(r#"{"database": "mydb", "search": "calc", "detailed": true}"#).expect("parse");
+        assert_eq!(req.database.as_deref(), Some("mydb"));
+        assert_eq!(req.inner.search.as_deref(), Some("calc"));
+        assert!(req.inner.detailed);
+    }
+
+    #[test]
+    fn list_procedures_request_defaults_to_brief_mode_without_search() {
+        let req: PinnedListProceduresRequest = serde_json::from_str("{}").expect("empty object should parse");
+        assert!(req.search.is_none());
+        assert!(!req.detailed, "detailed must default to false");
+    }
+
+    #[test]
+    fn unpinned_list_procedures_request_accepts_database_and_inner_fields() {
+        let req: UnpinnedListProceduresRequest =
+            serde_json::from_str(r#"{"database": "mydb", "search": "archive", "detailed": true}"#).expect("parse");
+        assert_eq!(req.database.as_deref(), Some("mydb"));
+        assert_eq!(req.inner.search.as_deref(), Some("archive"));
         assert!(req.inner.detailed);
     }
 

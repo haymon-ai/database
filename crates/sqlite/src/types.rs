@@ -1,17 +1,22 @@
 //! SQLite-specific MCP tool request types.
 //!
-//! Unlike `MySQL` and `PostgreSQL`, `SQLite` operates on a single file and
-//! has no database selection, so these types omit the `database` field
-//! present in the shared server types. `ListEntries` and the general
-//! `ListEntriesResponse` live in the shared `dbmcp-server` crate; they are
-//! re-exported here so call sites can keep importing them from
-//! `crate::types`.
+//! Unlike `MySQL` and `PostgreSQL`, `SQLite` operates on a single file and has no
+//! database selection. The shared `Pinned*` request types carry no `database` field,
+//! so `SQLite` reuses them directly (re-exported under the unprefixed names) for
+//! `listTables`, `listTriggers`, `writeQuery`, and `readQuery`. The brief/detailed
+//! payload (`ListEntries`) and the general `ListEntriesResponse` are likewise shared.
+//! The `listViews` (cursor-only), `explainQuery` (no `analyze`), and `dropTable`
+//! (no `cascade`) requests have SQLite-specific shapes and remain defined here.
 
 use dbmcp_server::pagination::Cursor;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-pub use dbmcp_server::types::{ListEntries, ListEntriesResponse};
+pub use dbmcp_server::types::{
+    ListEntries, ListEntriesResponse, PinnedListTablesRequest as ListTablesRequest,
+    PinnedListTriggersRequest as ListTriggersRequest, PinnedQueryRequest as QueryRequest,
+    PinnedReadQueryRequest as ReadQueryRequest,
+};
 
 /// Request for the `dropTable` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
@@ -20,70 +25,12 @@ pub struct DropTableRequest {
     pub table: String,
 }
 
-/// Request for the `SQLite` `listTables` tool — supports optional search filter and detailed mode.
-#[derive(Debug, Default, Deserialize, JsonSchema)]
-pub struct ListTablesRequest {
-    /// Opaque pagination cursor. Omit (or pass `null`) for the first page.
-    /// On subsequent calls, pass the `nextCursor` returned by the previous
-    /// response verbatim. Cursors are opaque — do not parse, modify, or persist.
-    #[serde(default)]
-    pub cursor: Option<Cursor>,
-    /// Optional case-insensitive filter on table names. The input is used within a `LIKE`
-    /// clause: `%` matches any sequence of characters and `_` matches any single character.
-    #[serde(default)]
-    pub search: Option<String>,
-    /// When `true`, each returned entry is a full metadata object (columns,
-    /// constraints, indexes, triggers); when `false` or omitted, each entry
-    /// is the bare table-name string.
-    #[serde(default)]
-    pub detailed: bool,
-}
-
 /// Request for the `listViews` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 pub struct ListViewsRequest {
     /// Opaque pagination cursor. Omit (or pass `null`) for the first page.
     /// On subsequent calls, pass the `nextCursor` returned by the previous
     /// response verbatim. Cursors are opaque — do not parse, modify, or persist.
-    #[serde(default)]
-    pub cursor: Option<Cursor>,
-}
-
-/// Request for the `SQLite` `listTriggers` tool — supports optional search filter and detailed mode.
-#[derive(Debug, Default, Deserialize, JsonSchema)]
-pub struct ListTriggersRequest {
-    /// Opaque pagination cursor. Omit (or pass `null`) for the first page.
-    /// On subsequent calls, pass the `nextCursor` returned by the previous
-    /// response verbatim. Cursors are opaque — do not parse, modify, or persist.
-    #[serde(default)]
-    pub cursor: Option<Cursor>,
-    /// Optional case-insensitive filter on trigger names. The input is used within a `LIKE`
-    /// clause: `%` matches any sequence of characters and `_` matches any single character.
-    #[serde(default)]
-    pub search: Option<String>,
-    /// When `true`, each returned entry is a full metadata object (schema,
-    /// table, definition); when `false` or omitted, each entry is the bare
-    /// trigger-name string.
-    #[serde(default)]
-    pub detailed: bool,
-}
-
-/// Request for the `writeQuery` tool.
-#[derive(Debug, Default, Deserialize, JsonSchema)]
-pub struct QueryRequest {
-    /// The SQL query to execute.
-    pub query: String,
-}
-
-/// Request for the `readQuery` tool.
-#[derive(Debug, Default, Deserialize, JsonSchema)]
-pub struct ReadQueryRequest {
-    /// The SQL query to execute.
-    pub query: String,
-    /// Opaque pagination cursor. Omit (or pass `null`) for the first page.
-    /// On subsequent calls, pass the `nextCursor` returned by the previous
-    /// response verbatim. Cursors are opaque — do not parse, modify, or persist.
-    /// Ignored for `EXPLAIN` statements.
     #[serde(default)]
     pub cursor: Option<Cursor>,
 }
