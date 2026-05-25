@@ -181,6 +181,42 @@ struct OpenSpan {
     max_score: f32,
 }
 
+/// Collapses subword tags into one tag per word (HF "first" strategy).
+///
+/// Tokens sharing a `word_id` fold into a single tag: the label comes from the
+/// word's first subword, the score is the max over its subwords, and the span
+/// runs from the first subword's start to the last subword's end. Tokens with no
+/// word id (special tokens) pass through unchanged, closing any open word.
+fn aggregate_words(tags: &[TokenTag], word_ids: &[Option<u32>]) -> Vec<TokenTag> {
+    let mut out: Vec<TokenTag> = Vec::with_capacity(tags.len());
+    let mut current: Option<u32> = None;
+    for (tag, &wid) in tags.iter().zip(word_ids) {
+        match wid {
+            Some(id) if current == Some(id) => {
+                if let Some(last) = out.last_mut() {
+                    last.end = tag.end;
+                    last.score = last.score.max(tag.score);
+                }
+            }
+            Some(id) => {
+                current = Some(id);
+                out.push(TokenTag {
+                    entity: tag.entity,
+                    is_begin: tag.is_begin,
+                    score: tag.score,
+                    start: tag.start,
+                    end: tag.end,
+                });
+            }
+            None => {
+                current = None;
+                out.push(TokenTag::outside());
+            }
+        }
+    }
+    out
+}
+
 /// Merges contiguous BIO tags into spans, keeping those at or above `threshold`.
 ///
 /// Subword token scores aggregate with the **maximum** strategy: a span's score
@@ -271,6 +307,8 @@ pub struct NerEngine {
     id2label: Vec<String>,
     threshold: Score,
     allowed: Vec<Entity>,
+    /// Whether the graph declares a `token_type_ids` input (`DistilBERT` omits it).
+    needs_token_type_ids: bool,
 }
 
 impl std::fmt::Debug for NerEngine {
@@ -314,6 +352,7 @@ impl NerEngine {
             .map_err(|e| NerError::Load(format!("session builder: {e}")))?
             .commit_from_file(model_dir.join("model.onnx"))
             .map_err(|e| NerError::Load(format!("model.onnx: {e}")))?;
+        let needs_token_type_ids = session.inputs.iter().any(|i| i.name == "token_type_ids");
 
         Ok(Self {
             session: Mutex::new(session),
@@ -321,6 +360,7 @@ impl NerEngine {
             id2label,
             threshold,
             allowed: NER_ENTITIES.to_vec(),
+            needs_token_type_ids,
         })
     }
 
@@ -375,16 +415,23 @@ impl NerEngine {
         }
 
         let len = i64::try_from(seq).map_err(|_| NerError::Inference("sequence too long".to_owned()))?;
-        let shape = vec![1_i64, len];
-        let ids_v: Vec<i64> = ids.iter().map(|&v| i64::from(v)).collect();
-        let mask_v: Vec<i64> = enc.get_attention_mask().iter().map(|&v| i64::from(v)).collect();
-        let types_v: Vec<i64> = enc.get_type_ids().iter().map(|&v| i64::from(v)).collect();
-
-        let inputs = ort::inputs![
-            "input_ids" => Tensor::from_array((shape.clone(), ids_v)).map_err(|e| NerError::Inference(format!("input_ids: {e}")))?,
-            "attention_mask" => Tensor::from_array((shape.clone(), mask_v)).map_err(|e| NerError::Inference(format!("attention_mask: {e}")))?,
-            "token_type_ids" => Tensor::from_array((shape, types_v)).map_err(|e| NerError::Inference(format!("token_type_ids: {e}")))?,
+        let shape = [1_i64, len];
+        // BERT ONNX exports take int64 inputs; build one `[1, seq]` tensor per field.
+        let tensor = |name: &str, data: &[u32]| -> Result<Tensor<i64>, NerError> {
+            let row: Vec<i64> = data.iter().map(|&v| i64::from(v)).collect();
+            Tensor::from_array((shape, row)).map_err(|e| NerError::Inference(format!("{name}: {e}")))
+        };
+        let mut inputs = ort::inputs![
+            "input_ids" => tensor("input_ids", ids)?,
+            "attention_mask" => tensor("attention_mask", enc.get_attention_mask())?,
         ];
+        // DistilBERT-style models omit token_type_ids; only send it when declared.
+        if self.needs_token_type_ids {
+            inputs.push((
+                "token_type_ids".into(),
+                tensor("token_type_ids", enc.get_type_ids())?.into(),
+            ));
+        }
         let mut session = self
             .session
             .lock()
@@ -392,7 +439,12 @@ impl NerEngine {
         let outputs = session
             .run(inputs)
             .map_err(|e| NerError::Inference(format!("run: {e}")))?;
-        let (_logits_shape, logits) = outputs[0]
+        // First graph output holds the logits; guard rather than index so an
+        // output-less model fails the request, never panics (release aborts).
+        let Some(output) = outputs.values().next() else {
+            return Ok(());
+        };
+        let (_logits_shape, logits) = output
             .try_extract_tensor::<f32>()
             .map_err(|e| NerError::Inference(format!("extract logits: {e}")))?;
 
@@ -421,7 +473,8 @@ impl NerEngine {
             });
         }
 
-        results.extend(decode_spans(&tags, self.threshold).into_iter().map(span_to_result));
+        let words = aggregate_words(&tags, enc.get_word_ids());
+        results.extend(decode_spans(&words, self.threshold).into_iter().map(span_to_result));
         Ok(())
     }
 }
@@ -604,6 +657,58 @@ mod tests {
             };
             assert_eq!(entity_for_core(core), Some(entity));
         }
+    }
+
+    #[test]
+    fn aggregate_folds_subwords_keeping_first_label_and_full_span() {
+        let tags = [
+            tag(Some(Entity::Organization), true, 0.6, 0, 2),
+            tag(None, false, 0.9, 2, 3),
+        ];
+        let words = aggregate_words(&tags, &[Some(0), Some(0)]);
+        assert_eq!(words.len(), 1);
+        assert_eq!(words[0].entity, Some(Entity::Organization));
+        assert_eq!((words[0].start, words[0].end), (0, 3), "span covers the whole word");
+        assert!((words[0].score - 0.9).abs() < 1e-6, "score lifts to the max subword");
+    }
+
+    #[test]
+    fn aggregate_first_label_suppresses_later_entity_subword() {
+        let tags = [
+            tag(None, false, 0.3, 0, 2),
+            tag(Some(Entity::Organization), true, 0.95, 2, 4),
+        ];
+        let words = aggregate_words(&tags, &[Some(0), Some(0)]);
+        assert_eq!(words.len(), 1);
+        assert_eq!(words[0].entity, None);
+        assert_eq!((words[0].start, words[0].end), (0, 4));
+    }
+
+    #[test]
+    fn aggregate_passes_special_tokens_through_as_outside() {
+        let tags = [
+            TokenTag::outside(),
+            tag(Some(Entity::Person), true, 0.9, 0, 4),
+            TokenTag::outside(),
+        ];
+        let words = aggregate_words(&tags, &[None, Some(0), None]);
+        assert_eq!(words.len(), 3);
+        assert!(words[0].entity.is_none());
+        assert_eq!(words[1].entity, Some(Entity::Person));
+        assert!(words[2].entity.is_none());
+    }
+
+    #[test]
+    fn aggregate_keeps_distinct_words_separate_for_bio_merge() {
+        let tags = [
+            tag(Some(Entity::Location), true, 0.9, 0, 3),
+            tag(Some(Entity::Location), false, 0.8, 4, 13),
+        ];
+        let words = aggregate_words(&tags, &[Some(0), Some(1)]);
+        assert_eq!(words.len(), 2, "distinct word ids must not fold together");
+        let spans = decode_spans(&words, Score::from_static(0.5));
+        assert_eq!(spans.len(), 1, "I- continuation merges the two words");
+        assert_eq!((spans[0].start, spans[0].end), (0, 13));
     }
 
     #[test]
