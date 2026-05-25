@@ -45,11 +45,6 @@ pub enum NerError {
     Inference(String),
 }
 
-#[derive(serde::Deserialize)]
-struct HfLabelConfig {
-    id2label: std::collections::BTreeMap<usize, String>,
-}
-
 /// Parses a Hugging Face `config.json` `id2label` object into an indexed list.
 ///
 /// # Errors
@@ -57,8 +52,12 @@ struct HfLabelConfig {
 /// Returns [`NerError::Load`] when the field is absent, a key is non-numeric, a
 /// value is not a string, or the indices are not the contiguous range `0..len`.
 fn parse_id2label(raw: &str) -> Result<Vec<String>, NerError> {
-    let cfg: HfLabelConfig =
-        serde_json::from_str(raw).map_err(|e| NerError::Load(format!("config.json parse: {e}")))?;
+    #[derive(serde::Deserialize)]
+    struct Config {
+        id2label: std::collections::BTreeMap<usize, String>,
+    }
+
+    let cfg: Config = serde_json::from_str(raw).map_err(|e| NerError::Load(format!("config.json parse: {e}")))?;
     let mut labels = Vec::with_capacity(cfg.id2label.len());
     for (expected, (idx, label)) in cfg.id2label.into_iter().enumerate() {
         if idx != expected {
@@ -427,48 +426,58 @@ impl NerEngine {
                 tensor("token_type_ids", enc.get_type_ids())?.into(),
             ));
         }
-        let mut session = self
-            .session
-            .lock()
-            .map_err(|_| NerError::Inference("session lock poisoned".to_owned()))?;
-        let outputs = session
-            .run(inputs)
-            .map_err(|e| NerError::Inference(format!("run: {e}")))?;
-        // First graph output holds the logits; guard rather than index so an
-        // output-less model fails the request, never panics (release aborts).
-        let Some(output) = outputs.values().next() else {
-            return Ok(());
-        };
-        let (_logits_shape, logits) = output
-            .try_extract_tensor::<f32>()
-            .map_err(|e| NerError::Inference(format!("extract logits: {e}")))?;
-
         let offsets = enc.get_offsets();
-        let special = enc.get_special_tokens_mask();
-        let mut tags = Vec::with_capacity(seq);
-        for t in 0..seq {
-            if special.get(t).copied() == Some(1) {
-                tags.push(TokenTag::outside());
-                continue;
-            }
-            let logit_row = logits.get(t * num_labels..(t + 1) * num_labels).unwrap_or(&[]);
-            let (best, prob) = softmax_argmax(logit_row);
-            let label = self.id2label.get(best).map_or("O", String::as_str);
-            let (mut entity, is_begin) = parse_bio(label);
-            if !self.entity_allowed(entity) {
-                entity = None;
-            }
-            let (start, end) = offsets.get(t).copied().unwrap_or((0, 0));
-            tags.push(TokenTag {
-                entity,
-                is_begin,
-                score: prob,
-                start,
-                end,
-            });
-        }
+        let word_ids = enc.get_word_ids();
 
-        let words = aggregate_words(&tags, enc.get_word_ids());
+        // Hold the session lock for inference and reading logits only. The guard
+        // (and the `logits` slice borrowed from it) drop at the end of this block,
+        // releasing the Mutex before the pure-CPU aggregation/decoding below.
+        let tags = {
+            let mut session = self
+                .session
+                .lock()
+                .map_err(|_| NerError::Inference("session lock poisoned".to_owned()))?;
+            let outputs = session
+                .run(inputs)
+                .map_err(|e| NerError::Inference(format!("run: {e}")))?;
+            // First graph output holds the logits; guard rather than index so an
+            // output-less model fails the request, never panics (release aborts).
+            let Some(output) = outputs.values().next() else {
+                return Ok(());
+            };
+            let (_logits_shape, logits) = output
+                .try_extract_tensor::<f32>()
+                .map_err(|e| NerError::Inference(format!("extract logits: {e}")))?;
+
+            let mut tags = Vec::with_capacity(seq);
+            for t in 0..seq {
+                // Special tokens ([CLS]/[SEP]) carry no word id; emit a closing "O".
+                // This is the same signal `aggregate_words` folds on, so one lookup
+                // gates both the skip here and the word grouping below.
+                if word_ids.get(t).copied().flatten().is_none() {
+                    tags.push(TokenTag::outside());
+                    continue;
+                }
+                let logit_row = logits.get(t * num_labels..(t + 1) * num_labels).unwrap_or(&[]);
+                let (best, prob) = softmax_argmax(logit_row);
+                let label = self.id2label.get(best).map_or("O", String::as_str);
+                let (mut entity, is_begin) = parse_bio(label);
+                if !self.entity_allowed(entity) {
+                    entity = None;
+                }
+                let (start, end) = offsets.get(t).copied().unwrap_or((0, 0));
+                tags.push(TokenTag {
+                    entity,
+                    is_begin,
+                    score: prob,
+                    start,
+                    end,
+                });
+            }
+            tags
+        };
+
+        let words = aggregate_words(&tags, word_ids);
         results.extend(decode_spans(&words, self.threshold).into_iter().map(span_to_result));
         Ok(())
     }
