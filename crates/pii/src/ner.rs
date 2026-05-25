@@ -1,8 +1,8 @@
-//! Optional ML/NER recognizer pass: pure-Rust BERT token-classification.
+//! Optional ML/NER recognizer pass: ONNX BERT token-classification.
 //!
 //! Loads a user-provided model directory
-//! (`tokenizer.json`, `config.json`, `model.safetensors`) and detects person
-//! and location spans via `candle` + `tokenizers`. Emitted [`RecognizerResult`]s
+//! (`tokenizer.json`, `config.json`, `model.onnx`) and detects person and
+//! location spans via `ort` + `tokenizers`. Emitted [`RecognizerResult`]s
 //! carry byte offsets, so they merge with the regex recognizers through
 //! `crate::overlap::resolve` exactly like any pattern hit.
 //!
@@ -11,10 +11,10 @@
 
 use std::borrow::Cow;
 use std::path::Path;
+use std::sync::Mutex;
 
-use candle_core::{Device, Tensor};
-use candle_nn::{Linear, Module, VarBuilder};
-use candle_transformers::models::bert::{self, BertModel};
+use ort::session::Session;
+use ort::value::Tensor;
 use tokenizers::{Tokenizer, TruncationParams};
 
 use crate::entity::Entity;
@@ -261,14 +261,12 @@ fn span_to_result(span: Span) -> RecognizerResult {
     }
 }
 
-/// Loaded token-classification model plus its tokenizer and label map.
+/// Loaded token-classification session plus its tokenizer and label map.
 ///
-/// Cheap to share behind an `Arc`. candle's `forward` takes `&self`, so
-/// concurrent requests run inference without a lock.
+/// Cheap to share behind an `Arc`. `ort` runs inference through `&mut Session`,
+/// so the session sits behind a `Mutex` and concurrent requests serialize on it.
 pub struct NerEngine {
-    model: BertModel,
-    classifier: Linear,
-    device: Device,
+    session: Mutex<Session>,
     tokenizer: Tokenizer,
     id2label: Vec<String>,
     threshold: Score,
@@ -285,7 +283,7 @@ impl std::fmt::Debug for NerEngine {
 }
 
 impl NerEngine {
-    /// Loads a model from `model_dir` (`config.json`, `tokenizer.json`, `model.safetensors`).
+    /// Loads a model from `model_dir` (`config.json`, `tokenizer.json`, `model.onnx`).
     ///
     /// `threshold` is the minimum aggregated span confidence to emit.
     ///
@@ -293,18 +291,14 @@ impl NerEngine {
     ///
     /// Returns [`NerError::Load`] when any artifact is missing or unreadable,
     /// `config.json` lacks a usable `id2label` exposing a supported NER
-    /// label, or the weights fail to load.
+    /// label, or the ONNX session fails to initialise.
     pub fn load(model_dir: &Path, threshold: Score) -> Result<Self, NerError> {
-        let device = Device::Cpu;
-
         let raw = std::fs::read_to_string(model_dir.join("config.json"))
             .map_err(|e| NerError::Load(format!("config.json: {e}")))?;
         let id2label = parse_id2label(&raw)?;
         if !has_supported_entity(&id2label) {
             return Err(NerError::Load("model exposes no supported NER label".to_owned()));
         }
-        let config: bert::Config =
-            serde_json::from_str(&raw).map_err(|e| NerError::Load(format!("config.json fields: {e}")))?;
 
         let mut tokenizer = Tokenizer::from_file(model_dir.join("tokenizer.json"))
             .map_err(|e| NerError::Load(format!("tokenizer.json: {e}")))?;
@@ -316,19 +310,13 @@ impl NerEngine {
             }))
             .map_err(|e| NerError::Load(format!("truncation config: {e}")))?;
 
-        let weights = model_dir.join("model.safetensors");
-        // SAFETY: the weights file is mmaped read-only for the engine's lifetime.
-        let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[weights], bert::DTYPE, &device) }
-            .map_err(|e| NerError::Load(format!("model.safetensors: {e}")))?;
-
-        let model = BertModel::load(vb.clone(), &config).map_err(|e| NerError::Load(format!("bert weights: {e}")))?;
-        let classifier = candle_nn::linear(config.hidden_size, id2label.len(), vb.pp("classifier"))
-            .map_err(|e| NerError::Load(format!("classifier weights: {e}")))?;
+        let session = Session::builder()
+            .map_err(|e| NerError::Load(format!("session builder: {e}")))?
+            .commit_from_file(model_dir.join("model.onnx"))
+            .map_err(|e| NerError::Load(format!("model.onnx: {e}")))?;
 
         Ok(Self {
-            model,
-            classifier,
-            device,
+            session: Mutex::new(session),
             tokenizer,
             id2label,
             threshold,
@@ -381,34 +369,32 @@ impl NerEngine {
     fn run_window(&self, enc: &tokenizers::Encoding, results: &mut Vec<RecognizerResult>) -> Result<(), NerError> {
         let ids = enc.get_ids();
         let seq = ids.len();
-        if seq == 0 {
+        let num_labels = self.id2label.len();
+        if seq == 0 || num_labels == 0 {
             return Ok(());
         }
 
-        let ids_t = Tensor::new(ids, &self.device)
-            .and_then(|t| t.unsqueeze(0))
-            .map_err(|e| NerError::Inference(format!("input_ids: {e}")))?;
-        let mask_t = Tensor::new(enc.get_attention_mask(), &self.device)
-            .and_then(|t| t.unsqueeze(0))
-            .map_err(|e| NerError::Inference(format!("attention_mask: {e}")))?;
-        let types_t = Tensor::new(enc.get_type_ids(), &self.device)
-            .and_then(|t| t.unsqueeze(0))
-            .map_err(|e| NerError::Inference(format!("token_type_ids: {e}")))?;
+        let len = i64::try_from(seq).map_err(|_| NerError::Inference("sequence too long".to_owned()))?;
+        let shape = vec![1_i64, len];
+        let ids_v: Vec<i64> = ids.iter().map(|&v| i64::from(v)).collect();
+        let mask_v: Vec<i64> = enc.get_attention_mask().iter().map(|&v| i64::from(v)).collect();
+        let types_v: Vec<i64> = enc.get_type_ids().iter().map(|&v| i64::from(v)).collect();
 
-        let sequence = self
-            .model
-            .forward(&ids_t, &types_t, Some(&mask_t))
-            .map_err(|e| NerError::Inference(format!("forward: {e}")))?;
-        let logits = self
-            .classifier
-            .forward(&sequence)
-            .map_err(|e| NerError::Inference(format!("classifier: {e}")))?;
-        let per_token = logits
-            .to_vec3::<f32>()
+        let inputs = ort::inputs![
+            "input_ids" => Tensor::from_array((shape.clone(), ids_v)).map_err(|e| NerError::Inference(format!("input_ids: {e}")))?,
+            "attention_mask" => Tensor::from_array((shape.clone(), mask_v)).map_err(|e| NerError::Inference(format!("attention_mask: {e}")))?,
+            "token_type_ids" => Tensor::from_array((shape, types_v)).map_err(|e| NerError::Inference(format!("token_type_ids: {e}")))?,
+        ];
+        let mut session = self
+            .session
+            .lock()
+            .map_err(|_| NerError::Inference("session lock poisoned".to_owned()))?;
+        let outputs = session
+            .run(inputs)
+            .map_err(|e| NerError::Inference(format!("run: {e}")))?;
+        let (_logits_shape, logits) = outputs[0]
+            .try_extract_tensor::<f32>()
             .map_err(|e| NerError::Inference(format!("extract logits: {e}")))?;
-        let Some(token_logits) = per_token.first() else {
-            return Ok(());
-        };
 
         let offsets = enc.get_offsets();
         let special = enc.get_special_tokens_mask();
@@ -418,7 +404,7 @@ impl NerEngine {
                 tags.push(TokenTag::outside());
                 continue;
             }
-            let logit_row = token_logits.get(t).map_or(&[][..], Vec::as_slice);
+            let logit_row = logits.get(t * num_labels..(t + 1) * num_labels).unwrap_or(&[]);
             let (best, prob) = softmax_argmax(logit_row);
             let label = self.id2label.get(best).map_or("O", String::as_str);
             let (mut entity, is_begin) = parse_bio(label);
