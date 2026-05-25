@@ -409,8 +409,6 @@ impl NerEngine {
     /// Returns [`NerError::Inference`] on a tokenization or forward-pass
     /// failure. Never panics.
     pub fn analyze(&self, text: &str) -> Result<Vec<RecognizerResult>, NerError> {
-        // `analyze_batch` returns one vec per input, so a one-text batch yields
-        // exactly one; `unwrap_or_default` keeps the impossible empty case panic-free.
         Ok(self.analyze_batch(&[text])?.into_iter().next().unwrap_or_default())
     }
 
@@ -433,23 +431,18 @@ impl NerEngine {
             return Ok(results);
         }
 
-        // Flatten every window across every text into one list tagged by source.
         let mut windows: Vec<Window> = Vec::with_capacity(texts.len());
         for (i, text) in texts.iter().enumerate() {
             if text.is_empty() {
                 continue;
             }
-            let encoding = self
+            let mut encoding = self
                 .tokenizer
                 .encode(*text, true)
                 .map_err(|e| NerError::Inference(format!("tokenize: {e}")))?;
-            // Borrow the overflow windows before moving the main encoding below.
-            for overflow in encoding.get_overflowing() {
+            for overflow in encoding.take_overflowing() {
                 if !overflow.get_ids().is_empty() {
-                    windows.push(Window {
-                        src: i,
-                        enc: overflow.clone(),
-                    });
+                    windows.push(Window { src: i, enc: overflow });
                 }
             }
             if !encoding.get_ids().is_empty() {
@@ -461,7 +454,7 @@ impl NerEngine {
             self.run_chunk(chunk, &mut results)?;
         }
 
-        // Merge overflow-window dupes per text, exactly as the single path did.
+        // Merge overflow-window dupes per text.
         for spans in &mut results {
             if !spans.is_empty() {
                 *spans = crate::overlap::resolve(std::mem::take(spans));
@@ -478,8 +471,7 @@ impl NerEngine {
     fn run_chunk(&self, chunk: &[Window], results: &mut [Vec<RecognizerResult>]) -> Result<(), NerError> {
         let batch = chunk.len();
         let num_labels = self.id2label.len();
-        // Dynamic padding to the longest window in the chunk (clamp is defensive:
-        // the tokenizer already truncates each window to MAX_SEQ_LEN).
+        // Clamp is defensive: the tokenizer already truncates each window to MAX_SEQ_LEN.
         let max_len = chunk
             .iter()
             .map(|w| w.enc.get_ids().len())
@@ -490,7 +482,6 @@ impl NerEngine {
             return Ok(());
         }
 
-        // Right-pad each window into flat row-major `[batch, max_len]` buffers.
         let mut input_ids = vec![self.pad_id; batch * max_len];
         let mut attention = vec![0_i64; batch * max_len];
         let mut type_ids = if self.needs_token_type_ids {
@@ -556,7 +547,6 @@ impl NerEngine {
         for (r, w) in chunk.iter().enumerate() {
             let real = w.enc.get_ids().len().min(max_len);
             let start = r * row_stride;
-            // Decode only the row's real (unpadded) tokens; pad positions are skipped.
             let Some(row_logits) = logits.get(start..start + real * num_labels) else {
                 continue;
             };

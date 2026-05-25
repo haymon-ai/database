@@ -80,8 +80,9 @@ enum Frame<'a> {
 
 /// One string leaf deferred to the batched NER pass.
 ///
-/// Holds a write-back handle to the leaf, an owned copy of its text (the batch
-/// input, kept independent of `slot`), and the already-computed regex spans.
+/// `slot` is the write-back handle to the (now-empty) leaf; `text` owns the
+/// leaf's original contents, moved out to serve as batch input; `regex` holds
+/// its already-computed regex spans. The merge pass restores `text` into `slot`.
 struct LeafSlot<'a> {
     slot: &'a mut String,
     text: String,
@@ -193,7 +194,7 @@ impl Redactor {
         let result = catch_unwind(AssertUnwindSafe(|| {
             // When NER is attached, defer inference: collect every leaf during the
             // walk and run one batched forward pass afterwards, instead of one pass
-            // per leaf. Without NER, anonymize inline (regex-only, no leaf clones).
+            // per leaf. Without NER, anonymize inline (regex-only).
             let ner_engine = self.analyzer.ner_engine();
             let mut slots: Vec<LeafSlot<'_>> = Vec::new();
 
@@ -224,9 +225,10 @@ impl Redactor {
                         stats.string_leaves_scanned += 1;
                         let regex = self.analyzer.analyze_with_context(s, &path, &self.opts);
                         if ner_engine.is_some() {
-                            // Clone the leaf as batch input; keep `s` as the
-                            // write-back handle for the merge pass below.
-                            let text = s.clone();
+                            // Move the leaf's text out as batch input (no clone),
+                            // leaving the leaf empty; the merge pass restores it
+                            // before rewriting. `s` stays as the write-back handle.
+                            let text = std::mem::take(s);
                             slots.push(LeafSlot { slot: s, text, regex });
                         } else if !regex.is_empty() {
                             apply_spans(s, regex, &self.operator, &mut stats);
@@ -248,10 +250,9 @@ impl Redactor {
                 }
             }
 
-            // Batched NER pass: one forward pass over every collected leaf, then
-            // merge each leaf's regex + NER spans and rewrite it in place. On
-            // failure, record the error and rewrite nothing — `apply` fails closed
-            // and the caller discards the rows, so partial state never leaks.
+            // On failure, record the error and leave the moved-out leaves empty:
+            // `apply` fails closed and the caller discards the rows, so the
+            // emptied (or partial) state never leaks.
             if let Some(engine) = ner_engine
                 && !slots.is_empty()
             {
@@ -259,11 +260,14 @@ impl Redactor {
                 match engine.analyze_batch(&texts) {
                     Ok(per_leaf) => {
                         for (leaf, ner) in slots.into_iter().zip(per_leaf) {
+                            // Restore the moved-out text into the emptied leaf, so a
+                            // no-PII leaf keeps its original value and apply_spans
+                            // rewrites in place.
+                            *leaf.slot = leaf.text;
                             let results = merge_spans(leaf.regex, ner, self.opts.min_score);
-                            if results.is_empty() {
-                                continue;
+                            if !results.is_empty() {
+                                apply_spans(leaf.slot, results, &self.operator, &mut stats);
                             }
-                            apply_spans(leaf.slot, results, &self.operator, &mut stats);
                         }
                     }
                     Err(e) => infer_err = Some(e.to_string()),
@@ -1009,6 +1013,38 @@ mod tests {
             allowed_ner_entities(&cfg).is_empty(),
             "a non-NER category must allow no NER entities (model not loaded)"
         );
+    }
+
+    #[test]
+    fn ner_redactor_preserves_non_pii_leaves() {
+        // Exercises the batched-NER deferral in `apply`: a leaf whose text is
+        // moved out for inference must be restored verbatim when it yields no
+        // spans. Dropping the restore would silently blank every non-PII string
+        // under NER, so this guards that invariant. Skips without a local model.
+        let Some(dir) = std::env::var_os("PII_NER_TEST_MODEL").map(std::path::PathBuf::from) else {
+            eprintln!("PII_NER_TEST_MODEL unset; skipping NER redactor test");
+            return;
+        };
+        let cfg = dbmcp_config::PiiConfig {
+            enabled: true,
+            ner_enabled: true,
+            ner_model: Some(dir),
+            ..dbmcp_config::PiiConfig::default()
+        };
+        let r = Redactor::from_config(&cfg)
+            .expect("config ok")
+            .expect("redactor present");
+        let mut rows = vec![json!({
+            "name": "Alice Johnson",
+            "clean": "status code 200 returned",
+            "n": 42,
+        })];
+        r.apply(&mut rows).expect("apply ok");
+        // Non-PII leaf survives verbatim (the moved-out text was restored).
+        assert_eq!(rows[0]["clean"], "status code 200 returned");
+        assert_eq!(rows[0]["n"], 42);
+        // The person name is redacted (changed from the original).
+        assert_ne!(rows[0]["name"], "Alice Johnson");
     }
 
     #[tokio::test]
