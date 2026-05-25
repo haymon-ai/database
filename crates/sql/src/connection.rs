@@ -19,7 +19,8 @@ use crate::timeout::execute_with_timeout;
 /// wrapper at every call site. Callers remain responsible for ensuring bindless
 /// strings carry no injection (via read-only validation and identifier quoting).
 ///
-/// The returned [`SqlStr`] owns its text, so no input borrow escapes; a `None`
+/// The returned [`SqlStr`] owns its text, so no input borrow escapes. The
+/// `(SqlStr, Option<_>)` pair is itself an [`sqlx::Execute`] value: a `None`
 /// argument set routes through the unprepared text protocol, `Some` through a
 /// prepared statement.
 pub trait IntoSafeQuery<DB: sqlx::Database> {
@@ -72,7 +73,6 @@ where
     usize: sqlx::ColumnIndex<<Self::DB as sqlx::Database>::Row>,
     <Self::DB as sqlx::Database>::Row: RowExt,
     <Self::DB as sqlx::Database>::QueryResult: sqlx_json::QueryResult,
-    <Self::DB as sqlx::Database>::Arguments: sqlx::IntoArguments<Self::DB>,
 {
     /// The sqlx database driver type (e.g. `sqlx::MySql`).
     type DB: sqlx::Database;
@@ -97,14 +97,9 @@ where
         Q: IntoSafeQuery<Self::DB>,
     {
         let (sql, arguments) = query.into_sql_and_args()?;
-        let sql_log = sql.as_str().to_owned();
         let pool = self.pool(database).await?;
-        execute_with_timeout(self.query_timeout(), &sql_log, async move {
-            let result = match arguments {
-                None => pool.execute(sql).await?,
-                Some(args) => pool.execute(sqlx::query_with(sql, args)).await?,
-            };
-            Ok(result.rows_affected())
+        execute_with_timeout(self.query_timeout(), sql, |sql| async move {
+            Ok(pool.execute((sql, arguments)).await?.rows_affected())
         })
         .await
     }
@@ -119,13 +114,9 @@ where
         Q: IntoSafeQuery<Self::DB>,
     {
         let (sql, arguments) = query.into_sql_and_args()?;
-        let sql_log = sql.as_str().to_owned();
         let pool = self.pool(database).await?;
-        execute_with_timeout(self.query_timeout(), &sql_log, async move {
-            let rows = match arguments {
-                None => pool.fetch_all(sql).await?,
-                Some(args) => pool.fetch_all(sqlx::query_with(sql, args)).await?,
-            };
+        execute_with_timeout(self.query_timeout(), sql, |sql| async move {
+            let rows = pool.fetch_all((sql, arguments)).await?;
             Ok(rows.iter().map(RowExt::to_json).collect())
         })
         .await
@@ -145,13 +136,9 @@ where
         T: for<'r> Decode<'r, Self::DB> + Type<Self::DB> + Send + Unpin,
     {
         let (sql, arguments) = query.into_sql_and_args()?;
-        let sql_log = sql.as_str().to_owned();
         let pool = self.pool(database).await?;
-        execute_with_timeout(self.query_timeout(), &sql_log, async move {
-            let row = match arguments {
-                None => pool.fetch_optional(sql).await?,
-                Some(args) => pool.fetch_optional(sqlx::query_with(sql, args)).await?,
-            };
+        execute_with_timeout(self.query_timeout(), sql, |sql| async move {
+            let row = pool.fetch_optional((sql, arguments)).await?;
             Ok(row.and_then(|r| r.try_get(0usize).ok()))
         })
         .await
@@ -168,13 +155,9 @@ where
         T: for<'r> Decode<'r, Self::DB> + Type<Self::DB> + Send + Unpin,
     {
         let (sql, arguments) = query.into_sql_and_args()?;
-        let sql_log = sql.as_str().to_owned();
         let pool = self.pool(database).await?;
-        execute_with_timeout(self.query_timeout(), &sql_log, async move {
-            let rows = match arguments {
-                None => pool.fetch_all(sql).await?,
-                Some(args) => pool.fetch_all(sqlx::query_with(sql, args)).await?,
-            };
+        execute_with_timeout(self.query_timeout(), sql, |sql| async move {
+            let rows = pool.fetch_all((sql, arguments)).await?;
             rows.iter().map(|r| r.try_get(0usize)).collect()
         })
         .await
@@ -193,13 +176,9 @@ where
         T: for<'r> FromRow<'r, <Self::DB as sqlx::Database>::Row> + Send + Unpin,
     {
         let (sql, arguments) = query.into_sql_and_args()?;
-        let sql_log = sql.as_str().to_owned();
         let pool = self.pool(database).await?;
-        execute_with_timeout(self.query_timeout(), &sql_log, async move {
-            let rows = match arguments {
-                None => pool.fetch_all(sql).await?,
-                Some(args) => pool.fetch_all(sqlx::query_with(sql, args)).await?,
-            };
+        execute_with_timeout(self.query_timeout(), sql, |sql| async move {
+            let rows = pool.fetch_all((sql, arguments)).await?;
             rows.iter().map(T::from_row).collect()
         })
         .await
