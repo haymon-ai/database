@@ -1,7 +1,7 @@
 //! MCP tool: `listTriggers`.
 
 use dbmcp_server::pagination::{Cursor, Pager};
-use dbmcp_server::types::{ListEntriesResponse, PinnedListTriggersRequest, UnpinnedListTriggersRequest};
+use dbmcp_server::types::{ListEntriesResponse, PinnedListEntriesRequest, UnpinnedListEntriesRequest};
 
 use super::prelude::*;
 
@@ -22,7 +22,7 @@ fn annotations() -> ToolAnnotations {
 pub(crate) struct PinnedListTriggersTool;
 
 impl ToolBase for PinnedListTriggersTool {
-    type Parameter = PinnedListTriggersRequest;
+    type Parameter = PinnedListEntriesRequest;
     type Output = ListEntriesResponse;
     type Error = ErrorData;
 
@@ -55,7 +55,7 @@ impl AsyncTool<MysqlHandler> for PinnedListTriggersTool {
 pub(crate) struct UnpinnedListTriggersTool;
 
 impl ToolBase for UnpinnedListTriggersTool {
-    type Parameter = UnpinnedListTriggersRequest;
+    type Parameter = UnpinnedListEntriesRequest;
     type Output = ListEntriesResponse;
     type Error = ErrorData;
 

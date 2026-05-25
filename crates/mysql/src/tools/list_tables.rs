@@ -3,7 +3,7 @@
 use dbmcp_server::pagination::{Cursor, Pager};
 
 use super::prelude::*;
-use crate::types::{ListEntriesResponse, PinnedListTablesRequest, UnpinnedListTablesRequest};
+use crate::types::{ListEntriesResponse, PinnedListEntriesRequest, UnpinnedListEntriesRequest};
 
 /// Brief-mode SQL: `information_schema.TABLES` filtered to `BASE TABLE` rows.
 ///
@@ -301,7 +301,7 @@ fn annotations() -> ToolAnnotations {
 pub(crate) struct PinnedListTablesTool;
 
 impl ToolBase for PinnedListTablesTool {
-    type Parameter = PinnedListTablesRequest;
+    type Parameter = PinnedListEntriesRequest;
     type Output = ListEntriesResponse;
     type Error = ErrorData;
 
@@ -334,7 +334,7 @@ impl AsyncTool<MysqlHandler> for PinnedListTablesTool {
 pub(crate) struct UnpinnedListTablesTool;
 
 impl ToolBase for UnpinnedListTablesTool {
-    type Parameter = UnpinnedListTablesRequest;
+    type Parameter = UnpinnedListEntriesRequest;
     type Output = ListEntriesResponse;
     type Error = ErrorData;
 

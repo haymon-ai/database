@@ -3,7 +3,7 @@
 use dbmcp_server::pagination::{Cursor, Pager};
 
 use super::prelude::*;
-use crate::types::{ListEntriesResponse, PinnedListMaterializedViewsRequest, UnpinnedListMaterializedViewsRequest};
+use crate::types::{ListEntriesResponse, PinnedListEntriesRequest, UnpinnedListEntriesRequest};
 
 const NAME: &str = "listMaterializedViews";
 const TITLE: &str = "List Materialized Views";
@@ -22,7 +22,7 @@ fn annotations() -> ToolAnnotations {
 pub(crate) struct PinnedListMaterializedViewsTool;
 
 impl ToolBase for PinnedListMaterializedViewsTool {
-    type Parameter = PinnedListMaterializedViewsRequest;
+    type Parameter = PinnedListEntriesRequest;
     type Output = ListEntriesResponse;
     type Error = ErrorData;
 
@@ -55,7 +55,7 @@ impl AsyncTool<PostgresHandler> for PinnedListMaterializedViewsTool {
 pub(crate) struct UnpinnedListMaterializedViewsTool;
 
 impl ToolBase for UnpinnedListMaterializedViewsTool {
-    type Parameter = UnpinnedListMaterializedViewsRequest;
+    type Parameter = UnpinnedListEntriesRequest;
     type Output = ListEntriesResponse;
     type Error = ErrorData;
 

@@ -1,19 +1,16 @@
 //! MySQL/MariaDB-specific MCP tool request types.
 //!
-//! The shared list request pairs (`listTables`, `listViews`, `listFunctions`,
-//! `listProcedures`), the brief/detailed payload (`ListEntries`), and the general
-//! `ListEntriesResponse` live in the shared `dbmcp-server` crate; they are re-exported
-//! here so call sites can keep importing them from `crate::types`. Only the
-//! MySQL-specific `dropTable` request remains defined here.
+//! The shared list request pair (`PinnedListEntriesRequest` / `UnpinnedListEntriesRequest`,
+//! used by `listTables`, `listViews`, `listTriggers`, `listFunctions`, `listProcedures`),
+//! the brief/detailed payload (`ListEntries`), and the general `ListEntriesResponse` live
+//! in the shared `dbmcp-server` crate; they are re-exported here so call sites can keep
+//! importing them from `crate::types`. Only the MySQL-specific `dropTable` request remains
+//! defined here.
 
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-pub use dbmcp_server::types::{
-    ListEntries, ListEntriesResponse, PinnedListFunctionsRequest, PinnedListProceduresRequest, PinnedListTablesRequest,
-    PinnedListViewsRequest, UnpinnedListFunctionsRequest, UnpinnedListProceduresRequest, UnpinnedListTablesRequest,
-    UnpinnedListViewsRequest,
-};
+pub use dbmcp_server::types::{ListEntries, ListEntriesResponse, PinnedListEntriesRequest, UnpinnedListEntriesRequest};
 
 /// Request for the `dropTable` tool.
 #[derive(Debug, Default, Deserialize, JsonSchema)]

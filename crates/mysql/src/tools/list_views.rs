@@ -3,7 +3,7 @@
 use dbmcp_server::pagination::{Cursor, Pager};
 
 use super::prelude::*;
-use crate::types::{ListEntriesResponse, PinnedListViewsRequest, UnpinnedListViewsRequest};
+use crate::types::{ListEntriesResponse, PinnedListEntriesRequest, UnpinnedListEntriesRequest};
 
 const NAME: &str = "listViews";
 const TITLE: &str = "List Views";
@@ -22,7 +22,7 @@ fn annotations() -> ToolAnnotations {
 pub(crate) struct PinnedListViewsTool;
 
 impl ToolBase for PinnedListViewsTool {
-    type Parameter = PinnedListViewsRequest;
+    type Parameter = PinnedListEntriesRequest;
     type Output = ListEntriesResponse;
     type Error = ErrorData;
 
@@ -55,7 +55,7 @@ impl AsyncTool<MysqlHandler> for PinnedListViewsTool {
 pub(crate) struct UnpinnedListViewsTool;
 
 impl ToolBase for UnpinnedListViewsTool {
-    type Parameter = UnpinnedListViewsRequest;
+    type Parameter = UnpinnedListEntriesRequest;
     type Output = ListEntriesResponse;
     type Error = ErrorData;
 

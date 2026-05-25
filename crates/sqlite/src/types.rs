@@ -1,20 +1,21 @@
 //! SQLite-specific MCP tool request types.
 //!
 //! Unlike `MySQL` and `PostgreSQL`, `SQLite` operates on a single file and has no
-//! database selection. The shared `Pinned*` request types carry no `database` field,
-//! so `SQLite` reuses them directly (re-exported under the unprefixed names) for
-//! `listTables`, `listTriggers`, `writeQuery`, and `readQuery`. The brief/detailed
-//! payload (`ListEntries`) and the general `ListEntriesResponse` are likewise shared.
-//! The `listViews` (cursor-only), `explainQuery` (no `analyze`), and `dropTable`
-//! (no `cascade`) requests have SQLite-specific shapes and remain defined here.
+//! database selection. The shared `PinnedListEntriesRequest` carries no `database` field,
+//! so `SQLite` reuses it directly (re-exported under the unprefixed names) for
+//! `listTables` and `listTriggers`; the pinned query types back `writeQuery` and
+//! `readQuery`. The brief/detailed payload (`ListEntries`) and the general
+//! `ListEntriesResponse` are likewise shared. The `listViews` (cursor-only),
+//! `explainQuery` (no `analyze`), and `dropTable` (no `cascade`) requests have
+//! SQLite-specific shapes and remain defined here.
 
 use dbmcp_server::pagination::Cursor;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
 pub use dbmcp_server::types::{
-    ListEntries, ListEntriesResponse, PinnedListTablesRequest as ListTablesRequest,
-    PinnedListTriggersRequest as ListTriggersRequest, PinnedQueryRequest as QueryRequest,
+    ListEntries, ListEntriesResponse, PinnedListEntriesRequest as ListTablesRequest,
+    PinnedListEntriesRequest as ListTriggersRequest, PinnedQueryRequest as QueryRequest,
     PinnedReadQueryRequest as ReadQueryRequest,
 };
 
