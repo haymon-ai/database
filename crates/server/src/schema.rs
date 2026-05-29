@@ -14,18 +14,16 @@
 
 use std::any::{Any, TypeId, type_name};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 
 use rmcp::model::JsonObject;
 use schemars::JsonSchema;
 use schemars::Schema;
 use schemars::generate::SchemaSettings;
-use schemars::transform::Transform;
 use serde_json::Value;
 
 thread_local! {
-    static INPUT_SCHEMA_CACHE: RwLock<HashMap<TypeId, Arc<JsonObject>>> = RwLock::new(HashMap::new());
-    static OUTPUT_SCHEMA_CACHE: RwLock<HashMap<TypeId, Arc<JsonObject>>> = RwLock::new(HashMap::new());
+    static SCHEMA_CACHE: Mutex<HashMap<TypeId, Arc<JsonObject>>> = Mutex::new(HashMap::new());
 }
 
 /// Returns the input JSON schema for the tool parameter type `T`.
@@ -41,28 +39,20 @@ thread_local! {
 /// would indicate a broken derive.
 #[must_use]
 pub fn input_schema<T: JsonSchema + Any>() -> Arc<JsonObject> {
-    INPUT_SCHEMA_CACHE.with(|cache| {
-        if let Some(cached) = cache
-            .read()
-            .expect("input schema cache poisoned")
-            .get(&TypeId::of::<T>())
-        {
-            return cached.clone();
-        }
-        let schema = Arc::new(build::<T>());
+    SCHEMA_CACHE.with(|cache| {
         cache
-            .write()
-            .expect("input schema cache poisoned")
-            .insert(TypeId::of::<T>(), schema.clone());
-        schema
+            .lock()
+            .expect("schema cache poisoned")
+            .entry(TypeId::of::<T>())
+            .or_insert_with(|| Arc::new(build::<T>()))
+            .clone()
     })
 }
 
 /// Returns the output JSON schema for the tool result type `T`.
 ///
-/// Same generation pipeline as [`input_schema`], plus an MCP-spec invariant:
-/// the schema's root `type` must be `"object"`. Results are cached per
-/// [`TypeId`].
+/// Delegates to [`input_schema`] (same cache, same generation pipeline) and
+/// enforces the MCP-spec invariant that the schema's root `type` is `"object"`.
 ///
 /// # Panics
 ///
@@ -70,60 +60,52 @@ pub fn input_schema<T: JsonSchema + Any>() -> Arc<JsonObject> {
 /// when `T`'s `JsonSchema` impl produces a non-object JSON value.
 #[must_use]
 pub fn output_schema<T: JsonSchema + Any>() -> Arc<JsonObject> {
-    OUTPUT_SCHEMA_CACHE.with(|cache| {
-        if let Some(cached) = cache
-            .read()
-            .expect("output schema cache poisoned")
-            .get(&TypeId::of::<T>())
-        {
-            return cached.clone();
-        }
-        let object = build::<T>();
-        match object.get("type") {
-            Some(Value::String(t)) if t == "object" => {}
-            other => panic!(
-                "Invalid output schema for type `{}`: root `type` must be \"object\", got {:?}",
-                type_name::<T>(),
-                other
-            ),
-        }
-        let schema = Arc::new(object);
-        cache
-            .write()
-            .expect("output schema cache poisoned")
-            .insert(TypeId::of::<T>(), schema.clone());
-        schema
-    })
+    let schema = input_schema::<T>();
+    match schema.get("type") {
+        Some(Value::String(t)) if t == "object" => schema,
+        other => panic!(
+            "Invalid output schema for type `{}`: root `type` must be \"object\", got {:?}",
+            type_name::<T>(),
+            other,
+        ),
+    }
 }
 
-/// Builds the JSON schema object for `T` via schemars draft-2020-12 with
-/// `inline_subschemas = true` and the [`StripRootMetadata`] transform that
-/// drops the root `$schema`, `title`, and `description` keys.
+/// Builds the JSON schema object for `T` via schemars draft-2020-12.
+///
+/// Configures `inline_subschemas = true` to fold every `$defs` / `$ref` into
+/// the parent, `meta_schema = None` to suppress the root `$schema` key
+/// natively (schemars only inserts it when this is `Some`), and a root-only
+/// transform that strips the `title` and `description` schemars derives from
+/// the type's name and doc-comment.
 fn build<T: JsonSchema>() -> JsonObject {
-    let schema = SchemaSettings::draft2020_12()
-        .with(|s| s.inline_subschemas = true)
-        .with_transform(StripRootMetadata)
+    let value = SchemaSettings::draft2020_12()
+        .with(|s| {
+            s.inline_subschemas = true;
+            s.meta_schema = None;
+        })
+        .with_transform(strip_root_metadata)
         .into_generator()
-        .into_root_schema_for::<T>();
+        .into_root_schema_for::<T>()
+        .to_value();
 
-    let value = serde_json::to_value(schema).expect("schema serialises to JSON");
     let Value::Object(object) = value else {
         panic!("schema for `{}` did not produce a JSON object", type_name::<T>());
     };
     object
 }
 
-/// Schemars [`Transform`] that drops root-only metadata keys MCP clients ignore.
-#[derive(Clone)]
-struct StripRootMetadata;
-
-impl Transform for StripRootMetadata {
-    fn transform(&mut self, schema: &mut Schema) {
-        if let Some(object) = schema.as_object_mut() {
-            object.remove("$schema");
-            object.remove("title");
-            object.remove("description");
-        }
+/// Removes the root `title` and `description` keys MCP clients ignore.
+///
+/// Works as a schemars [`Transform`] via the
+/// `impl<F: FnMut(&mut Schema)> Transform for F` blanket. Root-only: the
+/// schemars generator calls each transform once on the root schema and never
+/// recurses into subschemas unless the transform itself calls
+/// [`transform_subschemas`][schemars::transform::transform_subschemas].
+fn strip_root_metadata(schema: &mut Schema) {
+    if let Some(object) = schema.as_object_mut() {
+        object.remove("title");
+        object.remove("description");
     }
 }
 
