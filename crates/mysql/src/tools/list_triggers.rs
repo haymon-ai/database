@@ -54,7 +54,7 @@ impl ToolBase for PinnedListTriggersTool {
 impl AsyncTool<MysqlHandler> for PinnedListTriggersTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
         handler
-            .list_triggers(params.database, params.cursor, params.search, params.detailed)
+            .list_triggers(None, params.cursor, params.search, params.detailed)
             .await
     }
 }

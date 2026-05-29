@@ -54,7 +54,7 @@ impl ToolBase for PinnedListFunctionsTool {
 impl AsyncTool<PostgresHandler> for PinnedListFunctionsTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
         handler
-            .list_functions(params.database, params.cursor, params.search, params.detailed)
+            .list_functions(None, params.cursor, params.search, params.detailed)
             .await
     }
 }

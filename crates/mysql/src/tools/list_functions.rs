@@ -55,7 +55,7 @@ impl ToolBase for PinnedListFunctionsTool {
 impl AsyncTool<MysqlHandler> for PinnedListFunctionsTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
         handler
-            .list_functions(params.database, params.cursor, params.search, params.detailed)
+            .list_functions(None, params.cursor, params.search, params.detailed)
             .await
     }
 }

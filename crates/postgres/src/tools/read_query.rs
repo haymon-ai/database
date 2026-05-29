@@ -57,7 +57,7 @@ impl ToolBase for PinnedReadQueryTool {
 
 impl AsyncTool<PostgresHandler> for PinnedReadQueryTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        handler.read_query(params.query, params.database, params.cursor).await
+        handler.read_query(params.query, None, params.cursor).await
     }
 }
 

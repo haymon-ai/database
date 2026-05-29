@@ -54,7 +54,7 @@ impl ToolBase for PinnedListTriggersTool {
 impl AsyncTool<PostgresHandler> for PinnedListTriggersTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
         handler
-            .list_triggers(params.database, params.cursor, params.search, params.detailed)
+            .list_triggers(None, params.cursor, params.search, params.detailed)
             .await
     }
 }

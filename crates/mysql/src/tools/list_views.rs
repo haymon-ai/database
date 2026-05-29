@@ -54,7 +54,7 @@ impl ToolBase for PinnedListViewsTool {
 impl AsyncTool<MysqlHandler> for PinnedListViewsTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
         handler
-            .list_views(params.database, params.cursor, params.search, params.detailed)
+            .list_views(None, params.cursor, params.search, params.detailed)
             .await
     }
 }

@@ -54,9 +54,7 @@ impl ToolBase for PinnedExplainQueryTool {
 
 impl AsyncTool<MysqlHandler> for PinnedExplainQueryTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        handler
-            .explain_query(params.database, params.query, params.analyze)
-            .await
+        handler.explain_query(None, params.query, params.analyze).await
     }
 }
 

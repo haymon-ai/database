@@ -54,7 +54,7 @@ impl ToolBase for PinnedListViewsTool {
 impl AsyncTool<PostgresHandler> for PinnedListViewsTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
         handler
-            .list_views(params.database, params.cursor, params.search, params.detailed)
+            .list_views(None, params.cursor, params.search, params.detailed)
             .await
     }
 }

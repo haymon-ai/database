@@ -54,7 +54,7 @@ impl ToolBase for PinnedListProceduresTool {
 impl AsyncTool<PostgresHandler> for PinnedListProceduresTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
         handler
-            .list_procedures(params.database, params.cursor, params.search, params.detailed)
+            .list_procedures(None, params.cursor, params.search, params.detailed)
             .await
     }
 }

@@ -53,7 +53,7 @@ impl ToolBase for PinnedWriteQueryTool {
 
 impl AsyncTool<MysqlHandler> for PinnedWriteQueryTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        handler.write_query(params.query, params.database).await
+        handler.write_query(params.query, None).await
     }
 }
 

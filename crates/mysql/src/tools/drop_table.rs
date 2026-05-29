@@ -55,7 +55,7 @@ impl ToolBase for PinnedDropTableTool {
 
 impl AsyncTool<MysqlHandler> for PinnedDropTableTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        handler.drop_table(params.database, params.table).await
+        handler.drop_table(None, params.table).await
     }
 }
 

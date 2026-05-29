@@ -57,7 +57,7 @@ impl ToolBase for PinnedReadQueryTool {
 
 impl AsyncTool<MysqlHandler> for PinnedReadQueryTool {
     async fn invoke(handler: &MysqlHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
-        handler.read_query(params.query, params.database, params.cursor).await
+        handler.read_query(params.query, None, params.cursor).await
     }
 }
 

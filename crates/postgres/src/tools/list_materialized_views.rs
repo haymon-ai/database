@@ -54,7 +54,7 @@ impl ToolBase for PinnedListMaterializedViewsTool {
 impl AsyncTool<PostgresHandler> for PinnedListMaterializedViewsTool {
     async fn invoke(handler: &PostgresHandler, params: Self::Parameter) -> Result<Self::Output, Self::Error> {
         handler
-            .list_materialized_views(params.database, params.cursor, params.search, params.detailed)
+            .list_materialized_views(None, params.cursor, params.search, params.detailed)
             .await
     }
 }
