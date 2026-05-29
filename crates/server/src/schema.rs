@@ -1,13 +1,13 @@
-//! Slim JSON-schema generators for MCP tool input and output schemas.
+//! JSON-schema generators for MCP tool input and output schemas.
 //!
 //! These helpers replace the default [`rmcp::handler::server::router::tool::ToolBase`]
 //! schema generators with versions that strip the four metadata fields no MCP
 //! client consumes — root `$schema`, root `title`, root `description`, and the
 //! `$defs` / `$ref` indirection — while preserving every keyword the model and
 //! clients actually use. Each backend's `ToolBase` impls override
-//! [`input_schema`] / [`output_schema`] to call into this module so the slim
-//! shape is established at schema-generation time, not by post-processing the
-//! `tools/list` response.
+//! [`input_schema`] / [`output_schema`] to call into this module so the input
+//! and output shapes are established at schema-generation time, not by
+//! post-processing the `tools/list` response.
 //!
 //! [`input_schema`]: rmcp::handler::server::router::tool::ToolBase::input_schema
 //! [`output_schema`]: rmcp::handler::server::router::tool::ToolBase::output_schema
@@ -18,7 +18,9 @@ use std::sync::{Arc, RwLock};
 
 use rmcp::model::JsonObject;
 use schemars::JsonSchema;
+use schemars::Schema;
 use schemars::generate::SchemaSettings;
+use schemars::transform::Transform;
 use serde_json::Value;
 
 thread_local! {
@@ -26,7 +28,7 @@ thread_local! {
     static OUTPUT_SCHEMA_CACHE: RwLock<HashMap<TypeId, Arc<JsonObject>>> = RwLock::new(HashMap::new());
 }
 
-/// Returns a slim JSON schema for the tool input parameter type `T`.
+/// Returns the input JSON schema for the tool parameter type `T`.
 ///
 /// Strips root `$schema`, `title`, and `description`, and inlines every
 /// `$defs` / `$ref` indirection. Results are cached per [`TypeId`] in a
@@ -40,22 +42,27 @@ thread_local! {
 #[must_use]
 pub fn input_schema<T: JsonSchema + Any>() -> Arc<JsonObject> {
     INPUT_SCHEMA_CACHE.with(|cache| {
-        if let Some(cached) = cache.read().expect("slim input cache poisoned").get(&TypeId::of::<T>()) {
+        if let Some(cached) = cache
+            .read()
+            .expect("input schema cache poisoned")
+            .get(&TypeId::of::<T>())
+        {
             return cached.clone();
         }
         let schema = Arc::new(build::<T>());
         cache
             .write()
-            .expect("slim input cache poisoned")
+            .expect("input schema cache poisoned")
             .insert(TypeId::of::<T>(), schema.clone());
         schema
     })
 }
 
-/// Returns a slim JSON schema for the tool output type `T`.
+/// Returns the output JSON schema for the tool result type `T`.
 ///
-/// Same trimming as [`input_schema`], plus an MCP-spec invariant: the
-/// schema's root `type` must be `"object"`. Results are cached per [`TypeId`].
+/// Same generation pipeline as [`input_schema`], plus an MCP-spec invariant:
+/// the schema's root `type` must be `"object"`. Results are cached per
+/// [`TypeId`].
 ///
 /// # Panics
 ///
@@ -66,7 +73,7 @@ pub fn output_schema<T: JsonSchema + Any>() -> Arc<JsonObject> {
     OUTPUT_SCHEMA_CACHE.with(|cache| {
         if let Some(cached) = cache
             .read()
-            .expect("slim output cache poisoned")
+            .expect("output schema cache poisoned")
             .get(&TypeId::of::<T>())
         {
             return cached.clone();
@@ -83,27 +90,41 @@ pub fn output_schema<T: JsonSchema + Any>() -> Arc<JsonObject> {
         let schema = Arc::new(object);
         cache
             .write()
-            .expect("slim output cache poisoned")
+            .expect("output schema cache poisoned")
             .insert(TypeId::of::<T>(), schema.clone());
         schema
     })
 }
 
-/// Builds the slim JSON object for `T` via schemars draft-2020-12 with
-/// `inline_subschemas = true`, then removes the four root metadata keys.
+/// Builds the JSON schema object for `T` via schemars draft-2020-12 with
+/// `inline_subschemas = true` and the [`StripRootMetadata`] transform that
+/// drops the root `$schema`, `title`, and `description` keys.
 fn build<T: JsonSchema>() -> JsonObject {
-    let mut settings = SchemaSettings::draft2020_12();
-    settings.inline_subschemas = true;
-    let generator = settings.into_generator();
-    let schema = generator.into_root_schema_for::<T>();
+    let schema = SchemaSettings::draft2020_12()
+        .with(|s| s.inline_subschemas = true)
+        .with_transform(StripRootMetadata)
+        .into_generator()
+        .into_root_schema_for::<T>();
+
     let value = serde_json::to_value(schema).expect("schema serialises to JSON");
-    let Value::Object(mut object) = value else {
+    let Value::Object(object) = value else {
         panic!("schema for `{}` did not produce a JSON object", type_name::<T>());
     };
-    object.remove("$schema");
-    object.remove("title");
-    object.remove("description");
     object
+}
+
+/// Schemars [`Transform`] that drops root-only metadata keys MCP clients ignore.
+#[derive(Clone)]
+struct StripRootMetadata;
+
+impl Transform for StripRootMetadata {
+    fn transform(&mut self, schema: &mut Schema) {
+        if let Some(object) = schema.as_object_mut() {
+            object.remove("$schema");
+            object.remove("title");
+            object.remove("description");
+        }
+    }
 }
 
 #[cfg(test)]
@@ -117,7 +138,7 @@ mod tests {
     #[derive(Deserialize, Serialize, JsonSchema)]
     #[schemars(title = "FixtureTitle", description = "Fixture root description.")]
     struct Fixture {
-        /// Doc-comment kept on the property — must survive slimming.
+        /// Doc-comment kept on the property — must survive schema generation.
         name: String,
         nested: Nested,
     }
@@ -142,7 +163,7 @@ mod tests {
     }
 
     #[test]
-    fn slim_input_strips_dollar_schema_title_and_description() {
+    fn input_schema_strips_dollar_schema_title_and_description() {
         let schema = input_schema::<Fixture>();
         assert!(!schema.contains_key("$schema"), "root $schema not stripped: {schema:?}");
         assert!(!schema.contains_key("title"), "root title not stripped: {schema:?}");
@@ -154,7 +175,7 @@ mod tests {
     }
 
     #[test]
-    fn slim_inlines_nested_subschemas() {
+    fn input_schema_inlines_nested_subschemas() {
         let schema = input_schema::<Fixture>();
         let value = Value::Object((*schema).clone());
         assert!(!contains_key(&value, "$defs"), "$defs not inlined: {value}");
@@ -162,7 +183,7 @@ mod tests {
     }
 
     #[test]
-    fn slim_input_caches_by_type() {
+    fn input_schema_caches_by_type() {
         let first = input_schema::<Fixture>();
         let second = input_schema::<Fixture>();
         assert!(
@@ -177,7 +198,7 @@ mod tests {
     }
 
     #[test]
-    fn slim_output_accepts_object_root() {
+    fn output_schema_accepts_object_root() {
         let schema = output_schema::<Fixture>();
         assert_eq!(schema.get("type"), Some(&Value::String("object".into())));
         let again = output_schema::<Fixture>();
@@ -186,24 +207,24 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "root `type` must be \"object\"")]
-    fn slim_output_panics_on_non_object_root() {
+    fn output_schema_panics_on_non_object_root() {
         let _ = output_schema::<u32>();
     }
 
     #[test]
-    fn slim_preserves_properties() {
+    fn build_preserves_properties() {
         let schema = build::<Fixture>();
         let properties = schema
             .get("properties")
             .and_then(Value::as_object)
-            .expect("properties survive slimming");
+            .expect("properties survive generation");
         assert!(properties.contains_key("name"));
         assert!(properties.contains_key("nested"));
         let name = properties.get("name").and_then(Value::as_object).unwrap();
         assert_eq!(
             name.get("description").and_then(Value::as_str),
-            Some("Doc-comment kept on the property — must survive slimming."),
-            "per-property descriptions must survive slimming"
+            Some("Doc-comment kept on the property — must survive schema generation."),
+            "per-property descriptions must survive schema generation"
         );
     }
 }

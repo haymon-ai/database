@@ -1,9 +1,9 @@
 //! Shared MCP server utilities and request types.
 //!
 //! Provides [`types`] for tool request/response schemas,
-//! [`pagination`] cursor helpers, the [`tool`] registry, [`schema`] slim
-//! schema generators, and the [`Server`] wrapper plus [`server_info`] used
-//! by per-backend servers.
+//! [`pagination`] cursor helpers, the [`tool`] registry, [`schema`] input
+//! and output schema generators, and the [`Server`] wrapper plus
+//! [`server_info`] used by per-backend servers.
 
 pub mod pagination;
 pub mod schema;
