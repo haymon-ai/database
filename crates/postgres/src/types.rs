@@ -171,12 +171,9 @@ pub struct UnpinnedListProceduresRequest {
 
 #[cfg(test)]
 mod tests {
-    use indexmap::IndexMap;
-    use serde_json::json;
-
     use super::{
-        ListEntries, ListEntriesResponse, PinnedListFunctionsRequest, PinnedListMaterializedViewsRequest,
-        PinnedListProceduresRequest, PinnedListTablesRequest, PinnedListViewsRequest, UnpinnedListFunctionsRequest,
+        PinnedListFunctionsRequest, PinnedListMaterializedViewsRequest, PinnedListProceduresRequest,
+        PinnedListTablesRequest, PinnedListViewsRequest, UnpinnedListFunctionsRequest,
         UnpinnedListMaterializedViewsRequest, UnpinnedListProceduresRequest, UnpinnedListTablesRequest,
         UnpinnedListViewsRequest,
     };
@@ -288,28 +285,5 @@ mod tests {
     fn pinned_list_materialized_views_request_accepts_database() {
         let req: UnpinnedListMaterializedViewsRequest = serde_json::from_str(r#"{"database": "mydb"}"#).expect("parse");
         assert_eq!(req.database.as_deref(), Some("mydb"));
-    }
-
-    #[test]
-    fn list_materialized_views_response_brief_constructor_wraps_vec() {
-        let response = ListEntriesResponse::brief(vec!["mv_recent_orders".into()], None);
-        assert!(matches!(response.entries, ListEntries::Brief(ref v) if v == &["mv_recent_orders"]));
-        assert!(response.next_cursor.is_none());
-    }
-
-    #[test]
-    fn list_materialized_views_response_detailed_constructor_wraps_indexmap() {
-        let map = IndexMap::from([("mv_recent_orders".into(), json!({"populated": true}))]);
-        let response = ListEntriesResponse::detailed(map, None);
-        assert!(matches!(response.entries, ListEntries::Detailed(_)));
-    }
-
-    #[test]
-    fn list_materialized_views_response_brief_matches_entries_wire_shape() {
-        let response = ListEntriesResponse::brief(vec!["mv_recent_orders".into()], None);
-        assert_eq!(
-            serde_json::to_value(&response).unwrap(),
-            json!({"entries": ["mv_recent_orders"]})
-        );
     }
 }

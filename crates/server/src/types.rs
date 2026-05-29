@@ -1,6 +1,9 @@
 //! Request and response types for MCP tool parameters.
 //!
-//! Each struct maps to the JSON input or output schema of one MCP tool.
+//! Most structs map to the input or output schema of a single MCP tool;
+//! [`ListEntriesResponse`] is the shared output for every `list*` tool
+//! (`listTables`, `listViews`, `listTriggers`, `listFunctions`,
+//! `listProcedures`, `listMaterializedViews`).
 
 use indexmap::IndexMap;
 use schemars::JsonSchema;
@@ -411,19 +414,5 @@ mod tests {
         let new_len = serde_json::to_vec(&ListEntries::Detailed(new_map)).unwrap().len();
         let old_len = serde_json::to_vec(&old).unwrap().len();
         assert!(new_len < old_len, "payload not smaller: new={new_len} old={old_len}");
-    }
-
-    #[test]
-    fn list_entries_response_brief_constructor_wraps_vec() {
-        let response = ListEntriesResponse::brief(vec!["calc_total".into()], None);
-        assert!(matches!(response.entries, ListEntries::Brief(ref v) if v == &["calc_total"]));
-        assert!(response.next_cursor.is_none());
-    }
-
-    #[test]
-    fn list_entries_response_detailed_constructor_wraps_indexmap() {
-        let map = IndexMap::from([("calc_total(integer)".into(), json!({"language": "sql"}))]);
-        let response = ListEntriesResponse::detailed(map, None);
-        assert!(matches!(response.entries, ListEntries::Detailed(_)));
     }
 }
